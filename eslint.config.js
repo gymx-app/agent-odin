@@ -1,6 +1,14 @@
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**'],
+    ignores: [
+      'node_modules/**',
+      'dist/**',
+      'coverage/**',
+      'generated/**',
+      '**/generated/**',
+      '**/*.generated.*',
+      '**/*.ts',
+    ],
   },
   {
     files: ['**/*.js', '**/*.ts'],
