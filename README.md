@@ -104,7 +104,9 @@ Disallowed origins are rejected with a controlled error response. Wildcard origi
 
 ## Vercel deployment
 
-The repository includes `vercel.json` with the build command. Vercel discovers TypeScript functions under `api/`, including `api/health.ts`.
+This is an API-only Vercel project. It does not configure an output directory and does not require a `public` folder or static frontend build output. The TypeScript build emits library artifacts to `dist`, but `dist` is not a Vercel static output directory.
+
+Vercel discovers TypeScript functions under the root `api/` directory by convention. The file `api/health.ts` is deployed as `/api/health`.
 
 Set production environment variables in the Vercel project settings:
 
