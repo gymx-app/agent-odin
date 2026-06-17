@@ -2,9 +2,9 @@
 
 `agent-odin` is the future programme-planning intelligence service for the GymX React + Vite PWA. It will generate structured, personalised, periodised exercise programmes from athlete profiles, goals, equipment availability, movement restrictions, an approved exercise library, deterministic programming rules, and an optional LLM refinement layer.
 
-## Phase 3 scope
+## Phase 4 scope
 
-Phase 3 adds a deterministic exercise knowledge model on top of the Phase 0 domain contracts, Phase 1 deployable service foundation, and Phase 2 athlete normalization.
+Phase 4 adds a deterministic baseline programme planner on top of the Phase 0 domain contracts, Phase 1 deployable service foundation, Phase 2 athlete normalization, and Phase 3 exercise knowledge model.
 
 Included:
 
@@ -18,8 +18,9 @@ Included:
 - A pure `normalizeAthlete(input)` pipeline that converts `AthleteInput` into the existing `NormalizedAthleteProfile` schema.
 - Deterministic calculations for weekly training minutes, weight-change direction, programme horizon, recovery capacity, injury movement tags, health flags, assumptions, and programme confidence.
 - Structured exercise schemas, taxonomies, eligibility checks, equipment compatibility, filtering, substitution ranking, and a curated seed exercise library.
+- A pure `buildBaselineProgramme(profile, exercises, options?)` planner that emits a valid baseline `OdinProgramme`.
 
-The Phase 0 domain schemas remain framework independent under `src/domain`. Phase 3 extends the normalized athlete profile with structured movement restrictions while preserving the existing flat `restricted_movement_tags` compatibility field.
+The Phase 0 domain schemas remain framework independent under `src/domain`. Phase 4 extends the programme exercise prescription contract to support exact set-level prescriptions while keeping machine-readable progression boundaries.
 
 ## Architecture
 
@@ -32,6 +33,7 @@ The Phase 0 domain schemas remain framework independent under `src/domain`. Phas
 - `src/domain/exercise` owns exercise schemas and controlled exercise taxonomies.
 - `src/exercises` owns pure exercise eligibility, equipment, filtering, substitution, and library validation utilities.
 - `fixtures/exercises` owns the curated seed exercise library.
+- `src/planning` owns deterministic strategy selection, split selection, movement slots, exercise slot filling, exact prescriptions, duration estimation, progression policy, and programme compilation.
 - `src/domain` remains independent of Vercel, HTTP, logging, storage, model providers, and UI concerns.
 
 API handlers should call shared helpers rather than manually constructing response envelopes or error bodies.
@@ -133,6 +135,39 @@ Mismatch results include structured missing-equipment reasons.
 ### Seed library scope
 
 The seed library contains a curated set of 50-70 structured exercises across squat, hinge, push, pull, isolation, shoulder, calves, carries, core, LISS, and mobility categories. It includes bodyweight, dumbbell, machine, cable, band, barbell, and cardio-machine options, with beginner-friendly alternatives and higher-skill compounds.
+
+## Baseline Programme Planner
+
+`buildBaselineProgramme(profile, exercises, options?)` validates the normalized athlete profile, validates the approved exercise library, selects a strategy and split, builds a single Foundation phase, creates a seven-day template, fills movement slots with eligible exercises, assigns exact set-level prescriptions, estimates session duration, applies deterministic reductions when needed, and validates the final `OdinProgramme`.
+
+OpenAI is intentionally absent from Phase 4. The baseline plan must be reproducible, inspectable, and testable before any future model layer can refine language or propose alternatives.
+
+### Supported splits
+
+- 2 days: Full Body.
+- 3 days: Full Body.
+- 4 days: Upper / Lower.
+- 5 days: body-composition goals use 4 resistance days plus 1 LISS day; muscle gain uses a 5-day hybrid; endurance prioritizes LISS while preserving resistance work.
+- 6 days: Push / Pull / Legs only for intermediate or advanced profiles without low recovery; otherwise a conservative hybrid fallback.
+- 7 days: never 7 resistance days; active days are capped and at least one Rest day remains.
+
+### Exact set-level prescriptions
+
+Workout exercises contain exact `target_reps`, `target_rpe`, `rpe_ceiling`, `rest_seconds`, and `set_type` values for every set. Rep ranges remain only as `progression_bounds`; the user does not choose a value inside a range. Odin decides the starting target.
+
+The first set is marked `calibration` so the athlete can choose a load expected to match the prescribed reps and RPE. The programme does not prescribe specific weight values.
+
+### Progression boundaries
+
+Phase 4 uses double progression as structured guidance: complete all prescribed sets at or below the RPE ceiling to increase target reps next time; complete the top progression bound to increase load next time and reset reps; miss the minimum target without exceeding the ceiling to maintain or reduce load. Live progression execution is left for future Ragnar logic.
+
+### Naming and duration
+
+Programme names are concise, such as `Fat Loss Base`, `Hypertrophy Base`, and `Strength Base`. The phase is always `Foundation`. Workout titles use canonical session names such as `Full Body`, `Upper Body — Strength`, `Lower Body — Quad Focus`, `Push`, `Pull`, `Legs`, `LISS Cardio`, and `Rest`.
+
+Exercise names use common gym terminology. Grip, stance, and setup guidance belong in `tags` or `coaching_cues`, not long display names.
+
+Duration estimation includes warm-up, cooldown, set execution, exact rest seconds, and transitions. Session duration is a hard constraint. If a workout is too long, the planner removes optional accessory slots first, then reduces lower-priority set counts, then reduces required work to a two-set minimum. If required movement patterns still cannot fit, the planner fails with a structured `PlannerError` and does not return a partial programme.
 
 ### Example normalization
 
@@ -268,4 +303,4 @@ Deploy with the Vercel CLI or Git integration after running the local verificati
 
 ## Intentionally not implemented
 
-Phase 3 does not include Supabase, authentication, OpenAI integration, programme generation, phase planning, weekly volume allocation, exercise-selection programmes, vector search, embeddings, fuzzy matching, HTTP endpoints for exercise lookup, persistence, caching, rate limiting, calorie prescription, nutrition plans, or agent frameworks.
+Phase 4 does not include Supabase, authentication, OpenAI integration, persistence, caching, Ragnar autoregulation, adaptive volume landmarks, nutrition or calorie prescription, vector search, embeddings, fuzzy matching, public programme-generation endpoints, or agent frameworks.

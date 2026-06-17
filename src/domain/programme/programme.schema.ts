@@ -25,46 +25,72 @@ const OrderedItemSchema = z.object({
   display_order: z.number().int().nonnegative(),
 });
 
+const ExerciseSetPrescriptionSchema = z
+  .object({
+    set_number: z.number().int().positive(),
+    target_reps: z.number().int().positive(),
+    target_rpe: z.number().min(1).max(10),
+    rpe_ceiling: z.number().min(1).max(10),
+    rest_seconds: z.number().int().nonnegative(),
+    set_type: z.enum(['working', 'backoff', 'calibration']),
+  })
+  .superRefine((set, ctx) => {
+    if (set.rpe_ceiling < set.target_rpe) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'rpe_ceiling must be greater than or equal to target_rpe',
+        path: ['rpe_ceiling'],
+      });
+    }
+  });
+
 const ExercisePrescriptionSchema = z
   .object({
     display_order: z.number().int().nonnegative(),
     exercise_id: z.string().min(1),
     exercise_name: z.string().min(1),
-    sets: z.number().int().positive(),
-    rep_min: z.number().int().positive(),
-    rep_max: z.number().int().positive(),
-    rpe_target: z.number().min(1).max(10),
-    rpe_ceiling: z.number().min(1).max(10),
-    rest_seconds_min: z.number().int().nonnegative(),
-    rest_seconds_max: z.number().int().nonnegative(),
-    notes: z.string(),
-    warn: z.string().nullable(),
+    tags: z.array(z.string()),
+    coaching_cues: z.array(z.string()),
+    warnings: z.array(z.string()),
+    sets: z.array(ExerciseSetPrescriptionSchema).min(1),
+    progression_bounds: z.object({
+      rep_min: z.number().int().positive(),
+      rep_max: z.number().int().positive(),
+    }),
+    progression_rule: z.string().min(1),
     equipment: z.array(z.string()),
     movement_patterns: z.array(z.string()),
     primary_muscles: z.array(z.string()),
     secondary_muscles: z.array(z.string()),
   })
   .superRefine((exercise, ctx) => {
-    if (exercise.rep_max < exercise.rep_min) {
+    if (
+      exercise.progression_bounds.rep_max < exercise.progression_bounds.rep_min
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'rep_max must be greater than or equal to rep_min',
-        path: ['rep_max'],
+        message: 'progression rep_max must be greater than or equal to rep_min',
+        path: ['progression_bounds', 'rep_max'],
       });
     }
-    if (exercise.rpe_ceiling < exercise.rpe_target) {
+    if (!uniqueBy(exercise.sets, (set) => set.set_number)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'rpe_ceiling must be greater than or equal to rpe_target',
-        path: ['rpe_ceiling'],
+        message: 'set_number values must be unique',
+        path: ['sets'],
       });
     }
-    if (exercise.rest_seconds_max < exercise.rest_seconds_min) {
+    if (
+      exercise.sets.some(
+        (set) =>
+          set.target_reps < exercise.progression_bounds.rep_min ||
+          set.target_reps > exercise.progression_bounds.rep_max,
+      )
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message:
-          'rest_seconds_max must be greater than or equal to rest_seconds_min',
-        path: ['rest_seconds_max'],
+        message: 'set target reps must fit progression bounds',
+        path: ['sets'],
       });
     }
   });

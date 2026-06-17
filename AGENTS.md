@@ -25,3 +25,18 @@
 - Exercises may not be added without complete metadata.
 - No model-generated exercise names may enter a programme unless matched to an approved exercise ID.
 - Avoid movement restrictions must override modify restrictions for the same tag.
+- User-facing programme prescriptions must contain exact target reps.
+- Rep ranges are internal progression boundaries.
+- Odin decides initial target reps, RPE ceilings, and rest times.
+- Future Ragnar logic may adjust target reps after actual performance.
+- Programme labels must remain concise and professional.
+- Workout titles must use canonical session names.
+- Exercise names must use common gym terminology.
+- Grip and setup guidance belongs in tags or coaching cues.
+- Baseline programme planning must remain deterministic.
+- Approved exercise IDs only.
+- Required movement slots may not be silently removed.
+- Session duration is a hard constraint.
+- Do not prescribe specific weights.
+- Do not use random selection.
+- Future model integration may not bypass the deterministic baseline planner.

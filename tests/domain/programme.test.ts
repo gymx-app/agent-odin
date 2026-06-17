@@ -25,20 +25,20 @@ describe('OdinProgrammeSchema', () => {
     [
       'rep_max lower than rep_min',
       (p: OdinProgramme) => {
-        p.phase_week_templates[0]!.days[0]!.exercises[0]!.rep_max = 7;
+        p.phase_week_templates[0]!.days[0]!.exercises[0]!.progression_bounds.rep_max = 7;
       },
     ],
     [
       'RPE target above RPE ceiling',
       (p: OdinProgramme) => {
-        p.phase_week_templates[0]!.days[0]!.exercises[0]!.rpe_target = 9;
-        p.phase_week_templates[0]!.days[0]!.exercises[0]!.rpe_ceiling = 8;
+        p.phase_week_templates[0]!.days[0]!.exercises[0]!.sets[0]!.target_rpe = 9;
+        p.phase_week_templates[0]!.days[0]!.exercises[0]!.sets[0]!.rpe_ceiling = 8;
       },
     ],
     [
-      'rest max lower than min',
+      'set target reps outside progression bounds',
       (p: OdinProgramme) => {
-        p.phase_week_templates[0]!.days[0]!.exercises[0]!.rest_seconds_max = 30;
+        p.phase_week_templates[0]!.days[0]!.exercises[0]!.sets[0]!.target_reps = 20;
       },
     ],
     [
