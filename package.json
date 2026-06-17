@@ -1,7 +1,7 @@
 {
   "name": "agent-odin",
-  "version": "0.0.0",
-  "description": "Phase 0 domain contracts for the GymX programme-planning intelligence service.",
+  "version": "0.1.0",
+  "description": "Deployable service foundation for the GymX programme-planning intelligence service.",
   "type": "module",
   "private": true,
   "scripts": {
@@ -11,7 +11,8 @@
     "format:check": "prettier . --check",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json",
+    "dev:api": "npx vercel dev"
   },
   "dependencies": {
     "zod": "^3.25.76"
