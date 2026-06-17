@@ -12,3 +12,9 @@
 - Request logging must never include tokens, secrets, authorization headers, or full request bodies.
 - Endpoint handlers should remain thin.
 - Domain code must not import infrastructure code.
+- Normalization functions must remain deterministic and independently testable.
+- Do not make LLM calls inside normalization.
+- Injury mapping must use generic movement tags, not exercise prescriptions.
+- Health flags are planning signals, not medical diagnoses.
+- Normalization assumptions must remain visible in the normalized profile.
+- Changes to normalization thresholds require tests and documentation.
