@@ -27,7 +27,13 @@ describe('mapInjuriesToRestrictions', () => {
       },
     ]);
 
-    expect(result.restrictedMovementTags).toContain('avoid_high_impact');
+    expect(result.restrictedMovementTags).toContain('high_impact');
+    expect(result.movementRestrictions).toContainEqual(
+      expect.objectContaining({
+        tag: 'high_impact',
+        severity: 'avoid',
+      }),
+    );
     expect(result.healthFlags).toEqual([
       {
         code: 'AVOID_SEVERITY_INJURY',

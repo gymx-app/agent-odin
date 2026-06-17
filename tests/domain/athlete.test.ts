@@ -47,6 +47,7 @@ describe('NormalizedAthleteProfileSchema', () => {
       weekly_training_minutes: 135,
       programme_horizon_weeks: 8,
       recovery_capacity: 'unknown',
+      movement_restrictions: [],
       restricted_movement_tags: [],
       excluded_exercise_ids: [],
       health_flags: [

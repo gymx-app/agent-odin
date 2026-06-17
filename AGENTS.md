@@ -18,3 +18,10 @@
 - Health flags are planning signals, not medical diagnoses.
 - Normalization assumptions must remain visible in the normalized profile.
 - Changes to normalization thresholds require tests and documentation.
+- Exercise IDs are stable contracts.
+- Exercise taxonomy changes require migration notes, tests, and fixture updates.
+- Movement demand scores are planning metadata, not medical diagnoses.
+- Exercise eligibility must remain deterministic.
+- Exercises may not be added without complete metadata.
+- No model-generated exercise names may enter a programme unless matched to an approved exercise ID.
+- Avoid movement restrictions must override modify restrictions for the same tag.

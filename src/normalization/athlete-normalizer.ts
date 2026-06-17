@@ -37,6 +37,7 @@ export const normalizeAthlete = (
       weeklyTrainingMinutes,
       healthFlags,
     ),
+    movement_restrictions: injuryRestrictions.movementRestrictions,
     restricted_movement_tags: injuryRestrictions.restrictedMovementTags,
     excluded_exercise_ids: [],
     health_flags: healthFlags,

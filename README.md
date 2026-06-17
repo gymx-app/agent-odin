@@ -2,9 +2,9 @@
 
 `agent-odin` is the future programme-planning intelligence service for the GymX React + Vite PWA. It will generate structured, personalised, periodised exercise programmes from athlete profiles, goals, equipment availability, movement restrictions, an approved exercise library, deterministic programming rules, and an optional LLM refinement layer.
 
-## Phase 2 scope
+## Phase 3 scope
 
-Phase 2 adds deterministic athlete profile normalization on top of the Phase 0 domain contracts and Phase 1 deployable service foundation.
+Phase 3 adds a deterministic exercise knowledge model on top of the Phase 0 domain contracts, Phase 1 deployable service foundation, and Phase 2 athlete normalization.
 
 Included:
 
@@ -17,8 +17,9 @@ Included:
 - Focused Vitest coverage for the service foundation.
 - A pure `normalizeAthlete(input)` pipeline that converts `AthleteInput` into the existing `NormalizedAthleteProfile` schema.
 - Deterministic calculations for weekly training minutes, weight-change direction, programme horizon, recovery capacity, injury movement tags, health flags, assumptions, and programme confidence.
+- Structured exercise schemas, taxonomies, eligibility checks, equipment compatibility, filtering, substitution ranking, and a curated seed exercise library.
 
-The Phase 0 domain schemas remain framework independent under `src/domain`, and Phase 2 does not redesign them.
+The Phase 0 domain schemas remain framework independent under `src/domain`. Phase 3 extends the normalized athlete profile with structured movement restrictions while preserving the existing flat `restricted_movement_tags` compatibility field.
 
 ## Architecture
 
@@ -28,6 +29,9 @@ The Phase 0 domain schemas remain framework independent under `src/domain`, and 
 - `src/infrastructure/logging` owns structured console logging.
 - `src/shared/errors` owns application error types.
 - `src/normalization` owns pure athlete-profile normalization calculations.
+- `src/domain/exercise` owns exercise schemas and controlled exercise taxonomies.
+- `src/exercises` owns pure exercise eligibility, equipment, filtering, substitution, and library validation utilities.
+- `fixtures/exercises` owns the curated seed exercise library.
 - `src/domain` remains independent of Vercel, HTTP, logging, storage, model providers, and UI concerns.
 
 API handlers should call shared helpers rather than manually constructing response envelopes or error bodies.
@@ -69,6 +73,67 @@ Health flags are not medical diagnoses. Injury restrictions are generic movement
 
 Phase 2 does not prescribe calories, nutrition plans, clinical interventions, exercises, programme templates, or final programme content.
 
+## Exercise Knowledge Model
+
+Phase 3 represents exercises as structured data rather than free-text names. Each exercise has a stable lowercase snake-case `id`, display name, status, exercise type, movement patterns, muscles, equipment, difficulty, laterality, skill and stability demands, fatigue costs, movement-demand scores, default rep/rest ranges, substitution group, contraindication tags, coaching notes, and aliases.
+
+### Exercise taxonomy
+
+Controlled taxonomies cover:
+
+- Movement patterns: squat, hinge, horizontal and vertical push/pull, isolation patterns, carries, core patterns, LISS, and mobility.
+- Muscle groups: major upper-body, lower-body, trunk, and arm groups used by the current planner.
+- Equipment: bodyweight, common free weights, cables, machines, racks, bands, and LISS cardio machines.
+- Movement demands: canonical injury-aware demand tags such as `loaded_deep_knee_flexion`, `high_spinal_compression`, `overhead_loading`, `high_wrist_extension`, and `deep_ankle_dorsiflexion`.
+
+Taxonomy changes are contract changes and require tests plus fixture updates.
+
+### Fatigue and movement-demand scores
+
+Fatigue costs use bounded 0-5 scores for systemic, local, axial, and grip fatigue. Movement demands use bounded 0-5 scores for every supported demand tag. These scores are planning metadata only; they are not medical diagnoses or clinical risk estimates.
+
+### Structured movement restrictions
+
+`NormalizedAthleteProfile` now includes `movement_restrictions`, where each restriction contains:
+
+- `tag`
+- `severity`: `modify` or `avoid`
+- `source_area`
+- `notes`
+
+The existing `restricted_movement_tags` array remains as a derived compatibility field. Duplicate restrictions are merged conservatively, and `avoid` wins over `modify` for the same tag.
+
+### Eligibility behavior
+
+`evaluateExerciseEligibility(exercise, normalizedProfile)` returns:
+
+- `eligible`: no relevant movement restriction, active exercise, not explicitly excluded.
+- `modifiable`: a `modify` restriction conflicts with a non-zero movement-demand score, or the exercise is experimental.
+- `excluded`: an `avoid` restriction conflicts with a non-zero movement-demand score, the exercise ID is explicitly excluded, or the exercise is deprecated.
+
+The eligibility layer does not prescribe replacements automatically.
+
+### Equipment assumptions
+
+Equipment compatibility is conservative:
+
+- `full_gym` allows all supported equipment.
+- `dumbbells_only` allows bodyweight, dumbbell, and bench exercises.
+- `bodyweight` allows bodyweight only; pull-up bars are not assumed in Phase 3.
+- `home_gym` allows bodyweight, dumbbell, resistance band, and bench exercises.
+
+Mismatch results include structured missing-equipment reasons.
+
+### Filtering and substitutions
+
+`filterEligibleExercises` supports movement pattern, primary muscle, maximum difficulty, equipment compatibility, modifiable inclusion, and substitution-group filters. Results are sorted deterministically by eligibility, difficulty, systemic fatigue, axial fatigue, then exercise name.
+
+`findExerciseSubstitutions` is deterministic and LLM-free. It removes the source exercise, filters out ineligible options, requires shared movement patterns, prefers the same substitution group and shared primary muscles, and returns ranking reasons.
+
+### Seed library scope
+
+The seed library contains a curated set of 50-70 structured exercises across squat, hinge, push, pull, isolation, shoulder, calves, carries, core, LISS, and mobility categories. It includes bodyweight, dumbbell, machine, cable, band, barbell, and cardio-machine options, with beginner-friendly alternatives and higher-skill compounds.
+
 ### Example normalization
 
 Input excerpt:
@@ -94,6 +159,7 @@ Output excerpt:
   "weekly_training_minutes": 135,
   "programme_horizon_weeks": 17,
   "recovery_capacity": "moderate",
+  "movement_restrictions": [],
   "restricted_movement_tags": [],
   "excluded_exercise_ids": [],
   "health_flags": [],
@@ -202,4 +268,4 @@ Deploy with the Vercel CLI or Git integration after running the local verificati
 
 ## Intentionally not implemented
 
-Phase 2 does not include Supabase, authentication, OpenAI integration, programme generation, programme templates, exercise selection, programme validators, persistence, caching, rate limiting, calorie prescription, nutrition plans, API endpoints for normalization, or agent frameworks.
+Phase 3 does not include Supabase, authentication, OpenAI integration, programme generation, phase planning, weekly volume allocation, exercise-selection programmes, vector search, embeddings, fuzzy matching, HTTP endpoints for exercise lookup, persistence, caching, rate limiting, calorie prescription, nutrition plans, or agent frameworks.

@@ -1,4 +1,5 @@
 import type { AthleteInput } from '../domain/athlete/athlete.types.js';
+import type { MovementDemandTag } from '../domain/exercise/exercise-taxonomy.js';
 
 export type WeightChangeDirection = 'loss' | 'gain' | 'maintain';
 
@@ -26,8 +27,16 @@ export type GoalFeasibilityResult = {
 
 export type InjuryRestrictionResult = {
   restrictedMovementTags: string[];
+  movementRestrictions: MovementRestriction[];
   assumptions: string[];
   healthFlags: HealthFlag[];
+};
+
+export type MovementRestriction = {
+  tag: MovementDemandTag;
+  severity: 'modify' | 'avoid';
+  source_area: string;
+  notes: string;
 };
 
 export type NormalizationContext = {
