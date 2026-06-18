@@ -2,24 +2,34 @@ import { describe, expect, it } from 'vitest';
 import { IdempotencyRepository } from '../../src/repositories/idempotency.repository.js';
 import { createQueryClient } from './test-supabase-client.js';
 
-describe('IdempotencyRepository', () => {
-  it('returns a completed response reference for an identical replay', async () => {
-    const { client } = createQueryClient({
-      single: {
-        data: {
-          user_id: 'user-1',
-          endpoint: '/api/odin/generate',
-          idempotency_key: 'key-1',
-          request_hash: 'hash-1',
-          response_reference: { programme_id: 'programme-1' },
-          status: 'succeeded',
-        },
+const repositoryFor = (
+  outcome: 'started' | 'replay' | 'conflict' | 'in_progress',
+  responseReference: Record<string, unknown> | null = null,
+) =>
+  new IdempotencyRepository(
+    createQueryClient({
+      rpc: {
+        data: { outcome, response_reference: responseReference },
         error: null,
       },
-    });
+    }).client,
+  );
 
+describe('IdempotencyRepository', () => {
+  it('claims a new, expired, or retryable request through the atomic RPC', async () => {
     await expect(
-      new IdempotencyRepository(client).claim(
+      repositoryFor('started').claim(
+        'user-1',
+        '/api/odin/generate',
+        'key-1',
+        'hash-1',
+      ),
+    ).resolves.toEqual({ type: 'started' });
+  });
+
+  it('returns a completed response reference for an identical replay', async () => {
+    await expect(
+      repositoryFor('replay', { programme_id: 'programme-1' }).claim(
         'user-1',
         '/api/odin/generate',
         'key-1',
@@ -32,22 +42,8 @@ describe('IdempotencyRepository', () => {
   });
 
   it('rejects the same key with a different request body', async () => {
-    const { client } = createQueryClient({
-      single: {
-        data: {
-          user_id: 'user-1',
-          endpoint: '/api/odin/generate',
-          idempotency_key: 'key-1',
-          request_hash: 'other-hash',
-          response_reference: null,
-          status: 'started',
-        },
-        error: null,
-      },
-    });
-
     await expect(
-      new IdempotencyRepository(client).claim(
+      repositoryFor('conflict').claim(
         'user-1',
         '/api/odin/generate',
         'key-1',
@@ -59,23 +55,9 @@ describe('IdempotencyRepository', () => {
     });
   });
 
-  it('rejects an in-progress identical request', async () => {
-    const { client } = createQueryClient({
-      single: {
-        data: {
-          user_id: 'user-1',
-          endpoint: '/api/odin/generate',
-          idempotency_key: 'key-1',
-          request_hash: 'hash-1',
-          response_reference: null,
-          status: 'started',
-        },
-        error: null,
-      },
-    });
-
+  it('rejects a non-expired in-progress request', async () => {
     await expect(
-      new IdempotencyRepository(client).claim(
+      repositoryFor('in_progress').claim(
         'user-1',
         '/api/odin/generate',
         'key-1',
@@ -84,6 +66,32 @@ describe('IdempotencyRepository', () => {
     ).rejects.toMatchObject({
       code: 'IDEMPOTENCY_REQUEST_IN_PROGRESS',
       httpStatus: 409,
+    });
+  });
+
+  it('marks a failed request through the guarded RPC', async () => {
+    const { client, calls } = createQueryClient({
+      rpc: { data: true, error: null },
+    });
+
+    await new IdempotencyRepository(client).markFailed(
+      'user-1',
+      '/api/odin/generate',
+      'key-1',
+      'hash-1',
+    );
+
+    expect(calls).toContainEqual({
+      method: 'rpc',
+      args: [
+        'mark_idempotency_failed',
+        {
+          p_user_id: 'user-1',
+          p_endpoint: '/api/odin/generate',
+          p_idempotency_key: 'key-1',
+          p_request_hash: 'hash-1',
+        },
+      ],
     });
   });
 });

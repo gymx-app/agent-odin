@@ -18,6 +18,7 @@ const config: AppConfig = {
   openaiTimeoutMs: 20000,
   openaiMaxRetries: 1,
   llmRefinementEnabled: false,
+  generationTimeoutMs: 60000,
 };
 
 const logger = {

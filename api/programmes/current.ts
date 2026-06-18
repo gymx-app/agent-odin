@@ -8,17 +8,17 @@ import type {
 import { successResponse } from '../../src/infrastructure/http/api-response.js';
 import { createLogger } from '../../src/infrastructure/logging/logger.js';
 import { requireAuthenticatedUser } from '../../src/infrastructure/supabase/auth.js';
-import { odinError } from '../../src/shared/errors/odin-errors.js';
 import {
-  createApiDependencies,
+  getRuntimeDependencies,
+  createRepositories,
   type ApiDependencies,
 } from '../../src/api/dependencies.js';
-import { ProgrammeRepository } from '../../src/repositories/programme.repository.js';
 import { programmeResponseData } from '../../src/application/programme-response.js';
+import { getCurrentDraft } from '../../src/application/programmes/get-current-draft.js';
 
 export const createGetCurrentProgrammeHandler = (
   appConfig: AppConfig = config,
-  dependencies: ApiDependencies = createApiDependencies(appConfig),
+  dependencies: ApiDependencies = getRuntimeDependencies(appConfig),
 ) =>
   createEndpointHandler({
     allowedMethods: ['GET'],
@@ -29,16 +29,10 @@ export const createGetCurrentProgrammeHandler = (
         request,
         dependencies.authClient,
       );
-      const repository = new ProgrammeRepository(dependencies.adminClient);
-      const saved = await repository.getCurrentDraft(user.id);
-
-      if (!saved) {
-        throw odinError(
-          'CURRENT_PROGRAMME_NOT_FOUND',
-          'Current draft programme was not found.',
-          404,
-        );
-      }
+      const repository = createRepositories(
+        dependencies.adminClient,
+      ).programmes;
+      const saved = await getCurrentDraft(user.id, repository);
 
       return successResponse(programmeResponseData(saved));
     },

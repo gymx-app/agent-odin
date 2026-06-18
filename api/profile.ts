@@ -11,14 +11,16 @@ import { createLogger } from '../src/infrastructure/logging/logger.js';
 import { requireAuthenticatedUser } from '../src/infrastructure/supabase/auth.js';
 import { AthleteInputSchema } from '../src/domain/athlete/athlete-input.schema.js';
 import {
-  createApiDependencies,
+  getRuntimeDependencies,
   type ApiDependencies,
 } from '../src/api/dependencies.js';
 import { AthleteProfileRepository } from '../src/repositories/athlete-profile.repository.js';
+import { REQUEST_BODY_LIMITS } from '../src/infrastructure/http/request-limits.js';
+import { upsertAthleteProfile } from '../src/application/profiles/upsert-athlete-profile.js';
 
 export const createProfileHandler = (
   appConfig: AppConfig = config,
-  dependencies: ApiDependencies = createApiDependencies(appConfig),
+  dependencies: ApiDependencies = getRuntimeDependencies(appConfig),
 ) =>
   createEndpointHandler({
     allowedMethods: ['PUT'],
@@ -29,9 +31,13 @@ export const createProfileHandler = (
         request,
         dependencies.authClient,
       );
-      const body = await readJsonBody(request, AthleteInputSchema);
+      const body = await readJsonBody(
+        request,
+        AthleteInputSchema,
+        REQUEST_BODY_LIMITS.profile,
+      );
       const repository = new AthleteProfileRepository(dependencies.adminClient);
-      const athlete = await repository.upsertForUser(user.id, body);
+      const athlete = await upsertAthleteProfile(user.id, body, repository);
 
       return successResponse({ profile: athlete });
     },

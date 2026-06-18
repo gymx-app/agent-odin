@@ -16,6 +16,7 @@ describe('environment configuration', () => {
       openaiTimeoutMs: 20000,
       openaiMaxRetries: 1,
       llmRefinementEnabled: false,
+      generationTimeoutMs: 60000,
     });
   });
 
@@ -90,6 +91,7 @@ describe('environment configuration', () => {
     ).toEqual(
       expect.objectContaining({
         llmRefinementEnabled: true,
+        generationTimeoutMs: 60000,
         openaiModel: 'configured-model',
         openaiTimeoutMs: 20000,
         openaiMaxRetries: 1,
@@ -109,6 +111,7 @@ describe('environment configuration', () => {
         openaiApiKey: null,
         openaiModel: null,
         llmRefinementEnabled: false,
+        generationTimeoutMs: 60000,
       }),
     );
   });

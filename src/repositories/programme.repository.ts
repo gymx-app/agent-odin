@@ -22,21 +22,10 @@ type ProgrammeRow = {
   programme_data: unknown;
   validation_data: unknown;
   refinement_data: unknown;
-};
-
-type ProgrammeVersionRow = {
   version_number: number;
 };
 
-type CreateProgrammeRpcResult = {
-  programme_id: string;
-  version_number: number;
-};
-
-const toSavedProgramme = (
-  row: ProgrammeRow,
-  version: number,
-): SavedProgramme => {
+const toSavedProgramme = (row: ProgrammeRow): SavedProgramme => {
   const parsed = OdinProgrammeSchema.safeParse(row.programme_data);
   const validation = ProgrammeValidationReportSchema.safeParse(
     row.validation_data,
@@ -54,7 +43,7 @@ const toSavedProgramme = (
   return {
     id: row.id,
     userId: row.user_id,
-    version,
+    version: row.version_number,
     name: row.name,
     goalType: row.goal_type,
     status: row.status,
@@ -68,18 +57,6 @@ const toSavedProgramme = (
 export class ProgrammeRepository {
   constructor(private readonly client: SupabaseClientLike) {}
 
-  async assertNoDraft(userId: string): Promise<void> {
-    const existing = await this.getCurrentDraft(userId);
-
-    if (existing) {
-      throw odinError(
-        'DRAFT_PROGRAMME_ALREADY_EXISTS',
-        'A draft programme already exists.',
-        409,
-      );
-    }
-  }
-
   async createWithVersion(
     input: ProgrammeCreateInput,
   ): Promise<SavedProgramme> {
@@ -91,7 +68,7 @@ export class ProgrammeRepository {
       );
     }
 
-    const rpcResult = await this.client.rpc?.<CreateProgrammeRpcResult>(
+    const rpcResult = await this.client.rpc?.<ProgrammeRow | ProgrammeRow[]>(
       'create_programme_with_version',
       {
         p_user_id: input.userId,
@@ -104,8 +81,14 @@ export class ProgrammeRepository {
         p_refinement_data: input.refinement,
         p_schema_version: 1,
         p_replace_existing_draft: input.replaceExistingDraft,
+        p_idempotency_endpoint: input.idempotency?.endpoint ?? null,
+        p_idempotency_key: input.idempotency?.key ?? null,
+        p_request_hash: input.idempotency?.requestHash ?? null,
       },
     );
+    const row = Array.isArray(rpcResult?.data)
+      ? rpcResult.data[0]
+      : rpcResult?.data;
 
     if (rpcResult?.error?.message.includes('DRAFT_PROGRAMME_ALREADY_EXISTS')) {
       throw odinError(
@@ -115,7 +98,7 @@ export class ProgrammeRepository {
       );
     }
 
-    if (!rpcResult?.data || rpcResult.error) {
+    if (!row || rpcResult?.error) {
       throw odinError(
         'PROGRAMME_PERSISTENCE_FAILED',
         'Programme could not be saved with version 1.',
@@ -123,58 +106,38 @@ export class ProgrammeRepository {
       );
     }
 
-    const saved = await this.getById(input.userId, rpcResult.data.programme_id);
-
-    if (!saved) {
-      throw odinError(
-        'PROGRAMME_VERSION_PERSISTENCE_FAILED',
-        'Programme version 1 could not be verified.',
-        500,
-      );
-    }
-
-    return saved;
+    return toSavedProgramme(row);
   }
 
   async getById(
     userId: string,
     programmeId: string,
   ): Promise<SavedProgramme | null> {
-    const result = await this.client
-      .from<ProgrammeRow>('programmes')
-      .select(
-        'id,user_id,name,goal_type,status,source,programme_data,validation_data,refinement_data',
-      )
-      .eq('id', programmeId)
-      .eq('user_id', userId)
-      .maybeSingle();
+    const result = await this.client.rpc?.<ProgrammeRow | ProgrammeRow[]>(
+      'get_programme_with_latest_version',
+      { p_user_id: userId, p_programme_id: programmeId },
+    );
+    const row = Array.isArray(result?.data) ? result.data[0] : result?.data;
 
-    if (result.error) {
+    if (result?.error) {
       throw odinError('PROGRAMME_NOT_FOUND', 'Programme was not found.', 404);
     }
 
-    if (!result.data) {
+    if (!row) {
       return null;
     }
 
-    const version = await this.getLatestVersionNumber(result.data.id, userId);
-
-    return toSavedProgramme(result.data, version);
+    return toSavedProgramme(row);
   }
 
   async getCurrentDraft(userId: string): Promise<SavedProgramme | null> {
-    const result = await this.client
-      .from<ProgrammeRow>('programmes')
-      .select(
-        'id,user_id,name,goal_type,status,source,programme_data,validation_data,refinement_data',
-      )
-      .eq('user_id', userId)
-      .eq('status', 'draft')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const result = await this.client.rpc?.<ProgrammeRow | ProgrammeRow[]>(
+      'get_current_draft_with_latest_version',
+      { p_user_id: userId },
+    );
+    const row = Array.isArray(result?.data) ? result.data[0] : result?.data;
 
-    if (result.error) {
+    if (result?.error) {
       throw odinError(
         'CURRENT_PROGRAMME_NOT_FOUND',
         'Current draft programme was not found.',
@@ -182,36 +145,10 @@ export class ProgrammeRepository {
       );
     }
 
-    if (!result.data) {
+    if (!row) {
       return null;
     }
 
-    const version = await this.getLatestVersionNumber(result.data.id, userId);
-
-    return toSavedProgramme(result.data, version);
-  }
-
-  private async getLatestVersionNumber(
-    programmeId: string,
-    userId: string,
-  ): Promise<number> {
-    const result = await this.client
-      .from<ProgrammeVersionRow>('programme_versions')
-      .select('version_number')
-      .eq('programme_id', programmeId)
-      .eq('user_id', userId)
-      .order('version_number', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (result.error || !result.data) {
-      throw odinError(
-        'PROGRAMME_VERSION_PERSISTENCE_FAILED',
-        'Programme version could not be loaded.',
-        500,
-      );
-    }
-
-    return result.data.version_number;
+    return toSavedProgramme(row);
   }
 }

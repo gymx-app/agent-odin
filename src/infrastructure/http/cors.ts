@@ -1,18 +1,14 @@
 import type { AppConfig } from '../config/env.schema.js';
 import type { HttpMethod, HttpRequest, HttpResponse } from './types.js';
+import { firstHeaderValue } from './headers.js';
 
 const corsMethods: HttpMethod[] = ['GET', 'POST', 'PUT', 'OPTIONS'];
-const corsHeaders = ['Content-Type', 'Authorization', 'Idempotency-Key'];
-
-const firstHeaderValue = (
-  value: HttpRequest['headers'][string],
-): string | undefined => {
-  if (Array.isArray(value)) {
-    return value[0];
-  }
-
-  return value;
-};
+const corsHeaders = [
+  'Content-Type',
+  'Authorization',
+  'Idempotency-Key',
+  'X-Request-Id',
+];
 
 const isLocalhostOrigin = (origin: string): boolean => {
   try {

@@ -44,6 +44,12 @@ export const envSchema = z
       .default(20000),
     OPENAI_MAX_RETRIES: z.coerce.number().int().min(0).max(1).default(1),
     ODIN_LLM_REFINEMENT_ENABLED: booleanStringSchema,
+    ODIN_GENERATION_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(5000)
+      .max(120000)
+      .default(60000),
   })
   .superRefine((env, context) => {
     if (!env.ODIN_LLM_REFINEMENT_ENABLED) {
@@ -80,6 +86,7 @@ export type AppConfig = {
   openaiTimeoutMs: number;
   openaiMaxRetries: number;
   llmRefinementEnabled: boolean;
+  generationTimeoutMs: number;
 };
 
 export type RawEnv = Partial<Record<keyof z.input<typeof envSchema>, string>>;
@@ -99,10 +106,12 @@ export const parseEnv = (rawEnv: RawEnv): AppConfig => {
     nodeEnv: parsed.data.NODE_ENV,
     appVersion: parsed.data.APP_VERSION,
     allowedOrigins: [
-      ...parsed.data.ALLOWED_ORIGINS,
-      ...(parsed.data.GYMX_ALLOWED_ORIGIN
-        ? [parsed.data.GYMX_ALLOWED_ORIGIN]
-        : []),
+      ...new Set([
+        ...parsed.data.ALLOWED_ORIGINS,
+        ...(parsed.data.GYMX_ALLOWED_ORIGIN
+          ? [parsed.data.GYMX_ALLOWED_ORIGIN]
+          : []),
+      ]),
     ],
     logLevel: parsed.data.LOG_LEVEL,
     supabaseUrl: parsed.data.SUPABASE_URL ?? null,
@@ -113,5 +122,6 @@ export const parseEnv = (rawEnv: RawEnv): AppConfig => {
     openaiTimeoutMs: parsed.data.OPENAI_TIMEOUT_MS,
     openaiMaxRetries: parsed.data.OPENAI_MAX_RETRIES,
     llmRefinementEnabled: parsed.data.ODIN_LLM_REFINEMENT_ENABLED,
+    generationTimeoutMs: parsed.data.ODIN_GENERATION_TIMEOUT_MS,
   };
 };

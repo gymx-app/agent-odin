@@ -16,7 +16,6 @@ const createContext = () => {
     loadActiveApproved: vi.fn(async () => seedExercises),
   };
   const programmes = {
-    assertNoDraft: vi.fn(async () => undefined),
     getById: vi.fn(async () => saved.value),
     createWithVersion: vi.fn(async (input) => {
       saved.value = {
@@ -68,7 +67,6 @@ describe('generateProgrammeForUser', () => {
     expect(result.saved.status).toBe('draft');
     expect(result.saved.source).toBe('deterministic');
     expect(result.saved.validation.passed).toBe(true);
-    expect(context.programmes.assertNoDraft).toHaveBeenCalledWith('user-1');
     expect(context.programmes.createWithVersion).toHaveBeenCalledWith(
       expect.objectContaining({
         replaceExistingDraft: false,
@@ -113,6 +111,36 @@ describe('generateProgrammeForUser', () => {
     );
   });
 
+  it('marks a claimed idempotency request failed when generation fails', async () => {
+    const context = createContext();
+    const idempotency = {
+      claim: vi.fn(async () => ({ type: 'started' as const })),
+      markFailed: vi.fn(async () => undefined),
+    };
+    context.exercises.loadActiveApproved.mockRejectedValue(
+      new Error('storage unavailable'),
+    );
+
+    await expect(
+      generateProgrammeForUser(
+        'user-1',
+        {
+          replace_existing_draft: false,
+          refinement_mode: 'deterministic',
+          idempotencyKey: 'idem-1',
+        },
+        { ...context, idempotency },
+      ),
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+
+    expect(idempotency.markFailed).toHaveBeenCalledWith(
+      'user-1',
+      '/api/odin/generate',
+      'idem-1',
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+    );
+  });
+
   it('replays an idempotent result without creating a duplicate programme', async () => {
     const context = createContext();
     const saved = await generateProgrammeForUser(
@@ -125,7 +153,7 @@ describe('generateProgrammeForUser', () => {
         type: 'replay' as const,
         responseReference: { programme_id: saved.saved.id },
       })),
-      markSucceeded: vi.fn(),
+      markFailed: vi.fn(async () => undefined),
     };
 
     context.programmes.getById.mockResolvedValue(saved.saved);
@@ -145,6 +173,51 @@ describe('generateProgrammeForUser', () => {
 
     expect(replay.replayed).toBe(true);
     expect(context.programmes.createWithVersion).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call the refinement provider during replay', async () => {
+    const context = createContext();
+    const provider = {
+      proposeRefinement: vi.fn(),
+    } satisfies ProgrammeRefinementProvider;
+    const saved = {
+      id: 'programme-1',
+      userId: 'user-1',
+      version: 1,
+      name: 'Fat Loss Base',
+      goalType: 'fat_loss' as const,
+      status: 'draft' as const,
+      source: 'deterministic' as const,
+      programme: null,
+      validation: null,
+      refinement: null,
+    };
+    context.programmes.getById.mockResolvedValue(
+      saved as unknown as SavedProgramme,
+    );
+
+    await generateProgrammeForUser(
+      'user-1',
+      {
+        replace_existing_draft: false,
+        refinement_mode: 'llm_optional',
+        idempotencyKey: 'idem-1',
+      },
+      {
+        ...context,
+        refinementProvider: provider,
+        idempotency: {
+          claim: vi.fn(async () => ({
+            type: 'replay' as const,
+            responseReference: { programme_id: 'programme-1' },
+          })),
+          markFailed: vi.fn(async () => undefined),
+        },
+      },
+    );
+
+    expect(provider.proposeRefinement).not.toHaveBeenCalled();
+    expect(context.programmes.createWithVersion).not.toHaveBeenCalled();
   });
 
   it('persists accepted optional refinement metadata and source', async () => {

@@ -16,6 +16,7 @@ const createConfig = (overrides: Partial<AppConfig> = {}): AppConfig => ({
   openaiTimeoutMs: 20000,
   openaiMaxRetries: 1,
   llmRefinementEnabled: false,
+  generationTimeoutMs: 60000,
   ...overrides,
 });
 
@@ -84,7 +85,7 @@ describe('CORS helper', () => {
       'GET, POST, PUT, OPTIONS',
     );
     expect(header(response.headers['access-control-allow-headers'])).toBe(
-      'Content-Type, Authorization, Idempotency-Key',
+      'Content-Type, Authorization, Idempotency-Key, X-Request-Id',
     );
   });
 });

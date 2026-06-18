@@ -20,6 +20,8 @@ export type ApiDependencies = {
   refinementProvider?: ProgrammeRefinementProvider;
 };
 
+const runtimeCache = new WeakMap<AppConfig, ApiDependencies>();
+
 export const createApiDependencies = (config: AppConfig): ApiDependencies => {
   const dependencies: ApiDependencies = {
     authClient: createSupabaseAuthClient(config),
@@ -34,6 +36,18 @@ export const createApiDependencies = (config: AppConfig): ApiDependencies => {
   }
 
   return dependencies;
+};
+
+export const getRuntimeDependencies = (config: AppConfig): ApiDependencies => {
+  const existing = runtimeCache.get(config);
+
+  if (existing) {
+    return existing;
+  }
+
+  const created = createApiDependencies(config);
+  runtimeCache.set(config, created);
+  return created;
 };
 
 export const createRepositories = (adminClient: SupabaseClientLike) => ({

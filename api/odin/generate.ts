@@ -11,12 +11,14 @@ import { successResult } from '../../src/infrastructure/http/api-response.js';
 import { createLogger } from '../../src/infrastructure/logging/logger.js';
 import { requireAuthenticatedUser } from '../../src/infrastructure/supabase/auth.js';
 import {
-  createApiDependencies,
   createRepositories,
+  getRuntimeDependencies,
   type ApiDependencies,
 } from '../../src/api/dependencies.js';
 import { generateProgrammeForUser } from '../../src/application/programme-generation.service.js';
 import { programmeResponseData } from '../../src/application/programme-response.js';
+import { firstHeaderValue } from '../../src/infrastructure/http/headers.js';
+import { REQUEST_BODY_LIMITS } from '../../src/infrastructure/http/request-limits.js';
 
 const generateRequestSchema = z
   .object({
@@ -28,19 +30,9 @@ const generateRequestSchema = z
   .strict()
   .default({ replace_existing_draft: false });
 
-const firstHeaderValue = (
-  value: HttpRequest['headers'][string],
-): string | undefined => {
-  if (Array.isArray(value)) {
-    return value[0];
-  }
-
-  return value;
-};
-
 export const createGenerateHandler = (
   appConfig: AppConfig = config,
-  dependencies: ApiDependencies = createApiDependencies(appConfig),
+  dependencies: ApiDependencies = getRuntimeDependencies(appConfig),
 ) =>
   createEndpointHandler({
     allowedMethods: ['POST'],
@@ -51,7 +43,11 @@ export const createGenerateHandler = (
         request,
         dependencies.authClient,
       );
-      const body = await readJsonBody(request, generateRequestSchema);
+      const body = await readJsonBody(
+        request,
+        generateRequestSchema,
+        REQUEST_BODY_LIMITS.generate,
+      );
       const idempotencyKey = firstHeaderValue(
         request.headers['idempotency-key'],
       );
@@ -65,6 +61,8 @@ export const createGenerateHandler = (
         },
         {
           requestId: context.requestId,
+          logger: createLogger(appConfig),
+          generationTimeoutMs: appConfig.generationTimeoutMs,
           configuredModel: appConfig.openaiModel,
           refinementUnavailableReason: appConfig.llmRefinementEnabled
             ? 'OPENAI_CONFIGURATION_MISSING'

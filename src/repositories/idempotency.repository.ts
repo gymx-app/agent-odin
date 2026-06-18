@@ -1,13 +1,9 @@
 import { odinError } from '../shared/errors/odin-errors.js';
 import type { SupabaseClientLike } from '../infrastructure/supabase/supabase.types.js';
 
-type IdempotencyRow = {
-  user_id: string;
-  endpoint: string;
-  idempotency_key: string;
-  request_hash: string;
+type IdempotencyClaimRow = {
+  outcome: 'started' | 'replay' | 'conflict' | 'in_progress';
   response_reference: Record<string, unknown> | null;
-  status: 'started' | 'succeeded' | 'failed';
 };
 
 export type IdempotencyClaim =
@@ -23,43 +19,34 @@ export class IdempotencyRepository {
     idempotencyKey: string,
     requestHash: string,
   ): Promise<IdempotencyClaim> {
-    const existing = await this.client
-      .from<IdempotencyRow>('idempotency_keys')
-      .select(
-        'user_id,endpoint,idempotency_key,request_hash,response_reference,status',
-      )
-      .eq('user_id', userId)
-      .eq('endpoint', endpoint)
-      .eq('idempotency_key', idempotencyKey)
-      .maybeSingle();
+    const result = await this.client.rpc?.<
+      IdempotencyClaimRow | IdempotencyClaimRow[]
+    >('claim_idempotency_key', {
+      p_user_id: userId,
+      p_endpoint: endpoint,
+      p_idempotency_key: idempotencyKey,
+      p_request_hash: requestHash,
+      p_ttl_seconds: 24 * 60 * 60,
+    });
+    const claim = Array.isArray(result?.data) ? result.data[0] : result?.data;
 
-    if (existing.error) {
+    if (result?.error || !claim) {
       throw odinError(
         'IDEMPOTENCY_REQUEST_IN_PROGRESS',
-        'Idempotency key could not be checked.',
+        'Idempotency key could not be claimed.',
         409,
       );
     }
 
-    if (existing.data) {
-      if (existing.data.request_hash !== requestHash) {
-        throw odinError(
-          'IDEMPOTENCY_KEY_CONFLICT',
-          'Idempotency key was reused with a different request body.',
-          409,
-        );
-      }
+    if (claim.outcome === 'conflict') {
+      throw odinError(
+        'IDEMPOTENCY_KEY_CONFLICT',
+        'Idempotency key was reused with a different request body.',
+        409,
+      );
+    }
 
-      if (
-        existing.data.status === 'succeeded' &&
-        existing.data.response_reference
-      ) {
-        return {
-          type: 'replay',
-          responseReference: existing.data.response_reference,
-        };
-      }
-
+    if (claim.outcome === 'in_progress') {
       throw odinError(
         'IDEMPOTENCY_REQUEST_IN_PROGRESS',
         'Request with this idempotency key is still in progress.',
@@ -67,22 +54,11 @@ export class IdempotencyRepository {
       );
     }
 
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    const inserted = await this.client.from('idempotency_keys').insert({
-      user_id: userId,
-      endpoint,
-      idempotency_key: idempotencyKey,
-      request_hash: requestHash,
-      status: 'started',
-      expires_at: expiresAt,
-    });
-
-    if (inserted.error) {
-      throw odinError(
-        'IDEMPOTENCY_REQUEST_IN_PROGRESS',
-        'Idempotency key could not be claimed.',
-        409,
-      );
+    if (claim.outcome === 'replay' && claim.response_reference) {
+      return {
+        type: 'replay',
+        responseReference: claim.response_reference,
+      };
     }
 
     return { type: 'started' };
@@ -109,6 +85,28 @@ export class IdempotencyRepository {
         'IDEMPOTENCY_REQUEST_IN_PROGRESS',
         'Idempotency key could not be completed.',
         409,
+      );
+    }
+  }
+
+  async markFailed(
+    userId: string,
+    endpoint: string,
+    idempotencyKey: string,
+    requestHash: string,
+  ): Promise<void> {
+    const result = await this.client.rpc?.('mark_idempotency_failed', {
+      p_user_id: userId,
+      p_endpoint: endpoint,
+      p_idempotency_key: idempotencyKey,
+      p_request_hash: requestHash,
+    });
+
+    if (result?.error || result?.data !== true) {
+      throw odinError(
+        'IDEMPOTENCY_FINALIZATION_FAILED',
+        'Idempotency request could not be marked failed.',
+        500,
       );
     }
   }

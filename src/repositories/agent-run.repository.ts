@@ -26,20 +26,31 @@ export class AgentRunRepository {
     requestId: string,
     inputSummary: AgentRunInputSummary,
   ): Promise<AgentRun> {
-    const result = await this.client
-      .from<AgentRunRow>('agent_runs')
-      .insert({
-        user_id: userId,
-        agent_name: 'agent-odin',
-        operation: 'generate_programme',
-        status: 'started',
-        input_summary: inputSummary,
-        request_id: requestId,
-      })
-      .select('id,user_id,request_id')
-      .single();
+    const rpcResult = await this.client.rpc?.<AgentRunRow | AgentRunRow[]>(
+      'start_generation_run',
+      {
+        p_user_id: userId,
+        p_request_id: requestId,
+        p_input_summary: inputSummary,
+        p_stale_after_seconds: 120,
+      },
+    );
+    const data = Array.isArray(rpcResult?.data)
+      ? rpcResult.data[0]
+      : rpcResult?.data;
 
-    if (result.error || !result.data) {
+    if (rpcResult?.error || !data) {
+      if (
+        rpcResult?.error?.code === '23505' ||
+        rpcResult?.error?.message.includes('GENERATION_ALREADY_IN_PROGRESS')
+      ) {
+        throw odinError(
+          'GENERATION_ALREADY_IN_PROGRESS',
+          'Programme generation is already in progress.',
+          409,
+        );
+      }
+
       throw odinError(
         'AGENT_RUN_PERSISTENCE_FAILED',
         'Agent run could not be started.',
@@ -48,9 +59,9 @@ export class AgentRunRepository {
     }
 
     return {
-      id: result.data.id,
-      userId: result.data.user_id,
-      requestId: result.data.request_id,
+      id: data.id,
+      userId: data.user_id,
+      requestId: data.request_id,
     };
   }
 
@@ -69,7 +80,8 @@ export class AgentRunRepository {
         duration_ms: durationMs,
         completed_at: new Date().toISOString(),
       })
-      .eq('id', runId);
+      .eq('id', runId)
+      .eq('status', 'started');
 
     if (result.error) {
       throw odinError(
@@ -95,7 +107,8 @@ export class AgentRunRepository {
         duration_ms: durationMs,
         completed_at: new Date().toISOString(),
       })
-      .eq('id', runId);
+      .eq('id', runId)
+      .eq('status', 'started');
 
     if (result.error) {
       throw odinError(

@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "agent-odin Phase 7",
+    "name": "agent-odin",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -19,6 +19,38 @@
     {
       "key": "idempotencyKey",
       "value": "local-generate-001"
+    },
+    {
+      "key": "requestId",
+      "value": ""
+    }
+  ],
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('Request ID header exists', function () { pm.expect(pm.response.headers.get('x-request-id')).to.be.a('string').and.not.empty; });",
+          "const json = (() => { try { return pm.response.json(); } catch (_) { return null; } })();",
+          "if (pm.request.url.getPath() === '/api/health' && pm.response.code === 200) {",
+          "  pm.test('Health contract', function () { pm.expect(json.success).to.eql(true); pm.expect(json.data.service).to.eql('agent-odin'); });",
+          "}",
+          "if (pm.request.url.getPath() === '/api/odin/generate' && [200, 201].includes(pm.response.code)) {",
+          "  pm.test('Programme generation contract', function () {",
+          "    pm.expect(json.success).to.eql(true); pm.expect(json.data.version).to.be.a('number');",
+          "    pm.expect(['deterministic', 'llm_refined']).to.include(json.data.source);",
+          "    pm.expect(['pass', 'pass_with_warnings']).to.include(json.data.validation.status);",
+          "    pm.expect(JSON.stringify(json)).not.to.include('provider_response');",
+          "    pm.expect(JSON.stringify(json)).not.to.include('exact_weight');",
+          "  });",
+          "  pm.collectionVariables.set('programmeId', json.data.programme_id);",
+          "}",
+          "if (pm.request.url.getPath().includes('/api/programmes/') && pm.response.code === 200) {",
+          "  pm.test('Programme retrieval contract', function () { pm.expect(json.success).to.eql(true); pm.expect(json.data.version).to.be.a('number'); pm.expect(json.data.programme).to.be.an('object'); pm.expect(json.data.validation).to.be.an('object'); });",
+          "}"
+        ]
+      }
     }
   ],
   "item": [
@@ -138,7 +170,58 @@
               "raw": "{\n  \"replace_existing_draft\": false,\n  \"refinement_mode\": \"deterministic\"\n}"
             },
             "url": "{{baseUrl}}/api/odin/generate"
-          }
+          },
+          "response": [
+            {
+              "name": "Accepted LLM refinement",
+              "status": "Created",
+              "code": 201,
+              "header": [],
+              "body": "{\"success\":true,\"data\":{\"source\":\"llm_refined\",\"refinement\":{\"status\":\"accepted\",\"applied\":true}}}"
+            },
+            {
+              "name": "No-change refinement",
+              "status": "Created",
+              "code": 201,
+              "header": [],
+              "body": "{\"success\":true,\"data\":{\"source\":\"deterministic\",\"refinement\":{\"status\":\"accepted\",\"applied\":false}}}"
+            },
+            {
+              "name": "Deterministic fallback",
+              "status": "Created",
+              "code": 201,
+              "header": [],
+              "body": "{\"success\":true,\"data\":{\"source\":\"deterministic\",\"refinement\":{\"status\":\"fallback\"}}}"
+            },
+            {
+              "name": "Provider timeout fallback",
+              "status": "Created",
+              "code": 201,
+              "header": [],
+              "body": "{\"success\":true,\"data\":{\"source\":\"deterministic\",\"refinement\":{\"status\":\"fallback\",\"reason_code\":\"PROVIDER_TIMEOUT\"}}}"
+            },
+            {
+              "name": "Provider refusal fallback",
+              "status": "Created",
+              "code": 201,
+              "header": [],
+              "body": "{\"success\":true,\"data\":{\"source\":\"deterministic\",\"refinement\":{\"status\":\"fallback\",\"reason_code\":\"PROVIDER_REFUSAL\"}}}"
+            },
+            {
+              "name": "Required refinement failure",
+              "status": "Bad Gateway",
+              "code": 502,
+              "header": [],
+              "body": "{\"success\":false,\"error\":{\"code\":\"LLM_REFINEMENT_REQUIRED_FAILED\",\"message\":\"Required refinement failed.\",\"details\":null}}"
+            },
+            {
+              "name": "Validation rejection",
+              "status": "Created",
+              "code": 201,
+              "header": [],
+              "body": "{\"success\":true,\"data\":{\"source\":\"deterministic\",\"refinement\":{\"status\":\"rejected\",\"reason_code\":\"VALIDATION_REJECTED\"}}}"
+            }
+          ]
         },
         {
           "name": "Generate - LLM Optional",
@@ -191,7 +274,7 @@
           }
         },
         {
-          "name": "POST Generate Programme - Missing Auth",
+          "name": "Generate - Missing Auth",
           "request": {
             "method": "POST",
             "header": [
@@ -208,7 +291,7 @@
           }
         },
         {
-          "name": "POST Generate Programme - Idempotency Conflict",
+          "name": "Generate - Idempotency Conflict",
           "request": {
             "method": "POST",
             "header": [
@@ -233,7 +316,7 @@
           }
         },
         {
-          "name": "POST Generate Programme - Idempotent Replay",
+          "name": "Generate - Idempotent Replay",
           "request": {
             "method": "POST",
             "header": [
@@ -258,141 +341,6 @@
           }
         },
         {
-          "name": "POST Generate Programme - Athlete Profile Missing",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"replace_existing_draft\": false\n}"
-            },
-            "url": "{{baseUrl}}/api/odin/generate"
-          }
-        },
-        {
-          "name": "POST Generate Programme - Draft Conflict",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"replace_existing_draft\": false\n}"
-            },
-            "url": "{{baseUrl}}/api/odin/generate"
-          }
-        },
-        {
-          "name": "POST Generate Programme - Validation Failure",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"replace_existing_draft\": false\n}"
-            },
-            "url": "{{baseUrl}}/api/odin/generate"
-          }
-        },
-        {
-          "name": "Generate - Accepted Refinement Example",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"replace_existing_draft\": true,\n  \"refinement_mode\": \"llm_optional\"\n}"
-            },
-            "url": "{{baseUrl}}/api/odin/generate"
-          }
-        },
-        {
-          "name": "Generate - No Change Refinement Example",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"replace_existing_draft\": true,\n  \"refinement_mode\": \"llm_optional\"\n}"
-            },
-            "url": "{{baseUrl}}/api/odin/generate"
-          }
-        },
-        {
-          "name": "Generate - Deterministic Fallback Example",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"replace_existing_draft\": true,\n  \"refinement_mode\": \"llm_optional\"\n}"
-            },
-            "url": "{{baseUrl}}/api/odin/generate"
-          }
-        },
-        {
-          "name": "Generate - Required Refinement Failure Example",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"replace_existing_draft\": true,\n  \"refinement_mode\": \"llm_required\"\n}"
-            },
-            "url": "{{baseUrl}}/api/odin/generate"
-          }
-        },
-        {
           "name": "Generate - Invalid Refinement Mode",
           "request": {
             "method": "POST",
@@ -409,23 +357,6 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"replace_existing_draft\": false,\n  \"refinement_mode\": \"unrestricted\"\n}"
-            },
-            "url": "{{baseUrl}}/api/odin/generate"
-          }
-        },
-        {
-          "name": "Generate - Missing OpenAI Configuration",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"replace_existing_draft\": true,\n  \"refinement_mode\": \"llm_required\"\n}"
             },
             "url": "{{baseUrl}}/api/odin/generate"
           }
@@ -462,14 +393,14 @@
           }
         },
         {
-          "name": "GET Programme by ID - Unauthorized",
+          "name": "GET Programme - Unauthorized",
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/programmes/{{programmeId}}"
           }
         },
         {
-          "name": "GET Programme by ID - Not Found",
+          "name": "GET Programme - Not Found",
           "request": {
             "method": "GET",
             "header": [
@@ -479,6 +410,19 @@
               }
             ],
             "url": "{{baseUrl}}/api/programmes/00000000-0000-0000-0000-000000000000"
+          }
+        },
+        {
+          "name": "GET Programme - Invalid ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/programmes/not-a-uuid"
           }
         }
       ]
