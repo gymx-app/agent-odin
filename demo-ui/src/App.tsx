@@ -26,6 +26,7 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
+  Database,
   UserRound,
 } from 'lucide-react';
 import { ApiError, odinApi } from './api/client';
@@ -40,6 +41,7 @@ import {
   isSupabaseAuthConfigured,
   supabaseAuth,
 } from './auth/supabase';
+import { athleteInputSchema } from './profile/profile-schema';
 
 type Notice = {
   tone: 'success' | 'error' | 'info';
@@ -51,11 +53,19 @@ type Notice = {
 type BusyAction =
   | 'health'
   | 'auth'
+  | 'profile-load'
   | 'profile'
   | 'generate'
   | 'current'
   | 'lookup'
   | null;
+
+type ProfileLoadState =
+  | { status: 'default' }
+  | { status: 'loading' }
+  | { status: 'loaded'; updatedAt: string | null }
+  | { status: 'not_found' }
+  | { status: 'error'; message: string };
 
 const labelize = (value: string) =>
   value
@@ -192,6 +202,8 @@ function App() {
   const [showPassword, setShowPassword] = useState(false);
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [profile, setProfile] = useState<AthleteInput>(defaultProfile);
+  const [profileLoad, setProfileLoad] =
+    useState<ProfileLoadState>({ status: 'default' });
   const [refinementMode, setRefinementMode] =
     useState<RefinementMode>('deterministic');
   const [replaceDraft, setReplaceDraft] = useState(false);
@@ -270,6 +282,83 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const loadAuthenticatedProfile = async (showNotice = true) => {
+    const authClient = supabaseAuth;
+
+    if (!authClient) return;
+
+    setBusy('profile-load');
+    setProfileLoad({ status: 'loading' });
+
+    try {
+      const { data, error } = await authClient
+        .from('athlete_profiles')
+        .select('athlete_data,updated_at')
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!data) {
+        setProfile(defaultProfile);
+        setProfileLoad({ status: 'not_found' });
+        if (showNotice) {
+          setNotice({
+            tone: 'info',
+            title: 'Signed in — no saved profile',
+            message:
+              'Authentication succeeded. Complete the default form and save it to create this user’s athlete profile.',
+          });
+        }
+        return;
+      }
+
+      const parsed = athleteInputSchema.safeParse(data.athlete_data);
+
+      if (!parsed.success) {
+        throw new Error(
+          'The saved athlete profile does not match the current profile schema.',
+        );
+      }
+
+      setProfile(parsed.data);
+      setProfileLoad({
+        status: 'loaded',
+        updatedAt:
+          typeof data.updated_at === 'string' ? data.updated_at : null,
+      });
+      if (showNotice) {
+        setNotice({
+          tone: 'success',
+          title: 'Profile loaded',
+          message:
+            'Supabase authentication is valid and this user’s saved athlete profile populated the form.',
+        });
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Profile loading failed.';
+      setProfileLoad({ status: 'error', message });
+      if (showNotice) {
+        setNotice({
+          tone: 'error',
+          title: 'PROFILE_LOAD_FAILED',
+          message,
+        });
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!token) {
+      setProfileLoad({ status: 'default' });
+      return;
+    }
+
+    void loadAuthenticatedProfile(true);
+  }, [token]);
+
   const requireToken = (): boolean => {
     if (token.trim()) return true;
     setNotice({
@@ -339,6 +428,8 @@ function App() {
       () => {
         setToken('');
         setSessionEmail(null);
+        setProfile(defaultProfile);
+        setProfileLoad({ status: 'default' });
         setProgramme(null);
         setNotice({
           tone: 'success',
@@ -360,11 +451,14 @@ function App() {
       'profile',
       () => odinApi.saveProfile(token.trim(), profile),
       () =>
-        setNotice({
-          tone: 'success',
-          title: 'Profile saved',
-          message: 'The authenticated athlete profile is ready for generation.',
-        }),
+        void loadAuthenticatedProfile(false).then(() =>
+          setNotice({
+            tone: 'success',
+            title: 'Profile saved and verified',
+            message:
+              'The profile was saved through Odin and read back from Supabase for the authenticated user.',
+          }),
+        ),
     );
   };
 
@@ -595,7 +689,32 @@ function App() {
                     <p>Inputs match the current public profile contract.</p>
                   </div>
                 </div>
-                <StatusPill><UserRound size={13} /> Required</StatusPill>
+                <StatusPill
+                  tone={
+                    profileLoad.status === 'loaded'
+                      ? 'positive'
+                      : profileLoad.status === 'error'
+                        ? 'negative'
+                        : 'neutral'
+                  }
+                >
+                  {profileLoad.status === 'loading' ? (
+                    <Loader2 size={13} className="spin" />
+                  ) : profileLoad.status === 'loaded' ? (
+                    <Database size={13} />
+                  ) : (
+                    <UserRound size={13} />
+                  )}
+                  {profileLoad.status === 'loaded'
+                    ? 'Loaded from DB'
+                    : profileLoad.status === 'not_found'
+                      ? 'New profile'
+                      : profileLoad.status === 'error'
+                        ? 'Load failed'
+                        : profileLoad.status === 'loading'
+                          ? 'Loading'
+                          : 'Required'}
+                </StatusPill>
               </div>
 
               <div className="form-grid">
@@ -808,10 +927,29 @@ function App() {
               </div>
 
               <div className="panel-actions">
-                <span><ShieldCheck size={16} /> User ID comes from the verified token</span>
-                <Button onClick={saveProfile} busy={busy === 'profile'}>
-                  <Save size={16} /> Save profile
-                </Button>
+                <span>
+                  <ShieldCheck size={16} />
+                  {profileLoad.status === 'loaded'
+                    ? `Loaded through user-scoped RLS${
+                        profileLoad.updatedAt
+                          ? ` · ${new Date(profileLoad.updatedAt).toLocaleString()}`
+                          : ''
+                      }`
+                    : 'User ID comes from the verified token'}
+                </span>
+                <div className="profile-actions">
+                  <Button
+                    variant="secondary"
+                    onClick={() => void loadAuthenticatedProfile(true)}
+                    busy={busy === 'profile-load'}
+                    disabled={!token}
+                  >
+                    <RefreshCw size={16} /> Reload profile
+                  </Button>
+                  <Button onClick={saveProfile} busy={busy === 'profile'}>
+                    <Save size={16} /> Save profile
+                  </Button>
+                </div>
               </div>
             </section>
 
