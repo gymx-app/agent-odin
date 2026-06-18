@@ -8,6 +8,14 @@ const createConfig = (overrides: Partial<AppConfig> = {}): AppConfig => ({
   appVersion: '0.1.0',
   allowedOrigins: ['https://app.example.com'],
   logLevel: 'error',
+  supabaseUrl: null,
+  supabaseAnonKey: null,
+  supabaseServiceRoleKey: null,
+  openaiApiKey: null,
+  openaiModel: null,
+  openaiTimeoutMs: 20000,
+  openaiMaxRetries: 1,
+  llmRefinementEnabled: false,
   ...overrides,
 });
 
@@ -73,10 +81,10 @@ describe('CORS helper', () => {
     applyCorsHeaders(response, createTestRequest(), createConfig());
 
     expect(header(response.headers['access-control-allow-methods'])).toBe(
-      'GET, POST, OPTIONS',
+      'GET, POST, PUT, OPTIONS',
     );
     expect(header(response.headers['access-control-allow-headers'])).toBe(
-      'Content-Type, Authorization',
+      'Content-Type, Authorization, Idempotency-Key',
     );
   });
 });

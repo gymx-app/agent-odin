@@ -10,6 +10,14 @@ const config: AppConfig = {
   appVersion: '0.1.0',
   allowedOrigins: ['https://app.example.com'],
   logLevel: 'error',
+  supabaseUrl: null,
+  supabaseAnonKey: null,
+  supabaseServiceRoleKey: null,
+  openaiApiKey: null,
+  openaiModel: null,
+  openaiTimeoutMs: 20000,
+  openaiMaxRetries: 1,
+  llmRefinementEnabled: false,
 };
 
 const logger = {

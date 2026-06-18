@@ -4,6 +4,8 @@ export type HttpRequest = {
   method?: string;
   url?: string;
   headers: Record<string, HeaderValue>;
+  body?: unknown;
+  on?: (event: string, listener: (chunk?: unknown) => void) => void;
 };
 
 export type HttpResponse = {
@@ -12,4 +14,4 @@ export type HttpResponse = {
   end: (body?: string) => void;
 };
 
-export type HttpMethod = 'GET' | 'POST' | 'OPTIONS';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'OPTIONS';

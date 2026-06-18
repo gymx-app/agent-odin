@@ -40,3 +40,32 @@
 - Do not prescribe specific weights.
 - Do not use random selection.
 - Future model integration may not bypass the deterministic baseline planner.
+- Planner output must never be trusted without independent validation.
+- Validators must remain deterministic and must not mutate programmes.
+- Validation findings require stable machine-readable codes.
+- Validation scores are diagnostic and are not proof of scientific optimality.
+- Exercise display names must match the approved exercise library.
+- Avoid movement restriction violations are hard failures.
+- No LLM may override validation errors.
+- Future automatic repair must run validation again.
+- Authenticated user IDs must come from verified Supabase tokens.
+- Supabase service-role keys are server-only and must never be logged.
+- Repositories must validate JSONB through Zod schemas before returning domain data.
+- No programme may be saved without validation and version 1.
+- Request bodies may not select another user.
+- Postman examples must not contain real tokens or secrets.
+- Every API change must update the Postman collection.
+- Future OpenAI refinement may not bypass deterministic validation.
+- The deterministic planner remains the authoritative baseline.
+- The programme validator remains the final authority.
+- Model output is untrusted until schema validation, bounded application, and full programme validation succeed.
+- Models may use only approved exercise IDs supplied in refinement context.
+- Exact reps, RPE, RPE ceilings, and rest seconds must remain exact.
+- Programme, phase, workout, and exercise names are model-invariant.
+- Model output may not prescribe specific weights.
+- Never store or expose hidden chain-of-thought or raw provider internals.
+- Prompt and proposal schema changes require version increments.
+- Provider errors must be sanitized.
+- `llm_optional` must fall back to the deterministic baseline.
+- Model integration must preserve persistent idempotency.
+- Tests must mock the refinement provider; normal CI must not call OpenAI.

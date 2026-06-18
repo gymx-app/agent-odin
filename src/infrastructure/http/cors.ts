@@ -1,8 +1,8 @@
 import type { AppConfig } from '../config/env.schema.js';
 import type { HttpMethod, HttpRequest, HttpResponse } from './types.js';
 
-const corsMethods: HttpMethod[] = ['GET', 'POST', 'OPTIONS'];
-const corsHeaders = ['Content-Type', 'Authorization'];
+const corsMethods: HttpMethod[] = ['GET', 'POST', 'PUT', 'OPTIONS'];
+const corsHeaders = ['Content-Type', 'Authorization', 'Idempotency-Key'];
 
 const firstHeaderValue = (
   value: HttpRequest['headers'][string],

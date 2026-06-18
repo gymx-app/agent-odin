@@ -9,7 +9,8 @@
     "skipLibCheck": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "types": ["node"]
   },
   "include": ["api", "src", "fixtures", "tests", "vitest.config.ts"],
   "exclude": ["dist", "node_modules"]

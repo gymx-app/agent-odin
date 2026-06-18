@@ -2,13 +2,48 @@ import { describe, expect, it } from 'vitest';
 import { parseEnv } from '../../src/infrastructure/config/env.schema.js';
 
 describe('environment configuration', () => {
-  it('uses valid defaults', () => {
-    expect(parseEnv({})).toEqual({
-      nodeEnv: 'development',
+  it('allows Supabase credentials to be omitted in test mode', () => {
+    expect(parseEnv({ NODE_ENV: 'test' })).toEqual({
+      nodeEnv: 'test',
       appVersion: '0.1.0',
       allowedOrigins: [],
       logLevel: 'info',
+      supabaseUrl: null,
+      supabaseAnonKey: null,
+      supabaseServiceRoleKey: null,
+      openaiApiKey: null,
+      openaiModel: null,
+      openaiTimeoutMs: 20000,
+      openaiMaxRetries: 1,
+      llmRefinementEnabled: false,
     });
+  });
+
+  it('allows unauthenticated endpoints to load without Supabase credentials', () => {
+    expect(parseEnv({ NODE_ENV: 'production' })).toEqual(
+      expect.objectContaining({
+        supabaseUrl: null,
+        supabaseAnonKey: null,
+        supabaseServiceRoleKey: null,
+      }),
+    );
+  });
+
+  it('loads Supabase credentials without exposing them through unrelated fields', () => {
+    expect(
+      parseEnv({
+        NODE_ENV: 'production',
+        SUPABASE_URL: 'https://example.supabase.co',
+        SUPABASE_ANON_KEY: 'anon',
+        SUPABASE_SERVICE_ROLE_KEY: 'service',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        supabaseUrl: 'https://example.supabase.co',
+        supabaseAnonKey: 'anon',
+        supabaseServiceRoleKey: 'service',
+      }),
+    );
   });
 
   it('rejects invalid NODE_ENV values', () => {
@@ -26,6 +61,7 @@ describe('environment configuration', () => {
   it('normalizes comma-separated origins', () => {
     expect(
       parseEnv({
+        NODE_ENV: 'test',
         ALLOWED_ORIGINS:
           'https://app.example.com, http://localhost:5173, ,https://admin.example.com',
       }).allowedOrigins,
@@ -34,5 +70,55 @@ describe('environment configuration', () => {
       'http://localhost:5173',
       'https://admin.example.com',
     ]);
+  });
+
+  it('requires OpenAI credentials only when refinement is enabled', () => {
+    expect(() =>
+      parseEnv({
+        NODE_ENV: 'test',
+        ODIN_LLM_REFINEMENT_ENABLED: 'true',
+      }),
+    ).toThrow('Invalid environment configuration');
+
+    expect(
+      parseEnv({
+        NODE_ENV: 'test',
+        ODIN_LLM_REFINEMENT_ENABLED: 'true',
+        OPENAI_API_KEY: 'test-key',
+        OPENAI_MODEL: 'configured-model',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        llmRefinementEnabled: true,
+        openaiModel: 'configured-model',
+        openaiTimeoutMs: 20000,
+        openaiMaxRetries: 1,
+      }),
+    );
+  });
+
+  it('treats blank optional OpenAI values as absent when disabled', () => {
+    expect(
+      parseEnv({
+        NODE_ENV: 'test',
+        OPENAI_API_KEY: '',
+        OPENAI_MODEL: '',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        openaiApiKey: null,
+        openaiModel: null,
+        llmRefinementEnabled: false,
+      }),
+    );
+  });
+
+  it('validates timeout and retry bounds', () => {
+    expect(() =>
+      parseEnv({ NODE_ENV: 'test', OPENAI_TIMEOUT_MS: '500' }),
+    ).toThrow('Invalid environment configuration');
+    expect(() =>
+      parseEnv({ NODE_ENV: 'test', OPENAI_MAX_RETRIES: '2' }),
+    ).toThrow('Invalid environment configuration');
   });
 });

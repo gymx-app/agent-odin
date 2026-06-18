@@ -6,7 +6,7 @@ import {
   InternalServerError,
   MethodNotAllowedError,
 } from '../../shared/errors/http-errors.js';
-import { errorResponse } from './api-response.js';
+import { errorResponse, isSuccessResult } from './api-response.js';
 import { applyCorsHeaders } from './cors.js';
 import { getRequestId } from './request-id.js';
 import type { HttpMethod, HttpRequest, HttpResponse } from './types.js';
@@ -115,13 +115,20 @@ export const createEndpointHandler = <Data>({
         requestId,
         config,
       });
+      const bodyAsUnknown = body as unknown;
+      const statusCode = isSuccessResult(bodyAsUnknown)
+        ? (bodyAsUnknown.statusCode ?? 200)
+        : 200;
+      const responseBody = isSuccessResult(bodyAsUnknown)
+        ? bodyAsUnknown.body
+        : body;
 
-      sendJson(response, 200, body);
+      sendJson(response, statusCode, responseBody);
       logger.info('request completed', {
         requestId,
         method,
         path,
-        responseStatus: 200,
+        responseStatus: statusCode,
         durationMs: Date.now() - startedAt,
       });
     } catch (error) {

@@ -12,6 +12,14 @@ const config: AppConfig = {
   appVersion: '9.8.7',
   allowedOrigins: ['https://app.example.com'],
   logLevel: 'error',
+  supabaseUrl: null,
+  supabaseAnonKey: null,
+  supabaseServiceRoleKey: null,
+  openaiApiKey: null,
+  openaiModel: null,
+  openaiTimeoutMs: 20000,
+  openaiMaxRetries: 1,
+  llmRefinementEnabled: false,
 };
 
 describe('GET /api/health', () => {
@@ -100,10 +108,10 @@ describe('GET /api/health', () => {
       'https://app.example.com',
     );
     expect(header(response.headers['access-control-allow-methods'])).toBe(
-      'GET, POST, OPTIONS',
+      'GET, POST, PUT, OPTIONS',
     );
     expect(header(response.headers['access-control-allow-headers'])).toBe(
-      'Content-Type, Authorization',
+      'Content-Type, Authorization, Idempotency-Key',
     );
   });
 });

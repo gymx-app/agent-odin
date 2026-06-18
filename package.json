@@ -12,15 +12,20 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "tsc -p tsconfig.build.json",
-    "dev:api": "npx vercel dev"
+    "dev:api": "npx vercel dev",
+    "supabase:seed:exercises": "tsx scripts/generate-exercise-seed.ts > supabase/seed.sql"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
+    "openai": "^6.44.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "typescript": "^5.8.3",
+    "@types/node": "^25.9.3",
     "eslint": "^8.57.1",
     "prettier": "^3.5.3",
+    "tsx": "^4.22.4",
+    "typescript": "^5.8.3",
     "vitest": "^3.2.4"
   }
 }

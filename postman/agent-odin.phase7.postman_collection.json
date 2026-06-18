@@ -1,0 +1,487 @@
+{
+  "info": {
+    "name": "agent-odin Phase 7",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "programmeId",
+      "value": ""
+    },
+    {
+      "key": "idempotencyKey",
+      "value": "local-generate-001"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET Health",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "PUT Athlete Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sex\": \"male\",\n  \"age\": 32,\n  \"height_cm\": 178,\n  \"current_weight_kg\": 82,\n  \"target_weight_kg\": 74,\n  \"goal\": \"fat_loss\",\n  \"available_days_per_week\": 3,\n  \"session_duration_min\": 45,\n  \"fitness_level\": \"beginner\",\n  \"equipment\": \"full_gym\",\n  \"injuries\": [],\n  \"inbody\": null\n}"
+            },
+            "url": "{{baseUrl}}/api/profile"
+          }
+        },
+        {
+          "name": "PUT Athlete Profile - Unauthorized",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/profile"
+          }
+        },
+        {
+          "name": "PUT Athlete Profile - Invalid Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"goal\": \"unknown\"\n}"
+            },
+            "url": "{{baseUrl}}/api/profile"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Odin",
+      "item": [
+        {
+          "name": "Generate - Deterministic",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.expect([200, 201]).to.include(pm.response.code);",
+                  "const json = pm.response.json();",
+                  "pm.expect(json.success).to.eql(true);",
+                  "pm.collectionVariables.set('programmeId', json.data.programme_id);",
+                  "pm.expect(json.data.version).to.eql(1);",
+                  "pm.expect(json.data.source).to.eql('deterministic');",
+                  "pm.expect(['pass', 'pass_with_warnings']).to.include(json.data.validation.status);",
+                  "pm.expect(json.data.refinement.status).to.eql('not_requested');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"replace_existing_draft\": false,\n  \"refinement_mode\": \"deterministic\"\n}"
+            },
+            "url": "{{baseUrl}}/api/odin/generate"
+          }
+        },
+        {
+          "name": "Generate - LLM Optional",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-optional"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"replace_existing_draft\": true,\n  \"refinement_mode\": \"llm_optional\"\n}"
+            },
+            "url": "{{baseUrl}}/api/odin/generate"
+          }
+        },
+        {
+          "name": "Generate - LLM Required (Development Only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-required"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"replace_existing_draft\": true,\n  \"refinement_mode\": \"llm_required\"\n}"
+            },
+            "url": "{{baseUrl}}/api/odin/generate"
+          }
+        },
+        {
+          "name": "POST Generate Programme - Missing Auth",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"replace_existing_draft\": false\n}"
+            },
+            "url": "{{baseUrl}}/api/odin/generate"
+          }
+        },
+        {
+          "name": "POST Generate Programme - Idempotency Conflict",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"replace_existing_draft\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/odin/generate"
+          }
+        },
+        {
+          "name": "POST Generate Programme - Idempotent Replay",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"replace_existing_draft\": false\n}"
+            },
+            "url": "{{baseUrl}}/api/odin/generate"
+          }
+        },
+        {
+          "name": "POST Generate Programme - Athlete Profile Missing",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"replace_existing_draft\": false\n}"
+            },
+            "url": "{{baseUrl}}/api/odin/generate"
+          }
+        },
+        {
+          "name": "POST Generate Programme - Draft Conflict",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"replace_existing_draft\": false\n}"
+            },
+            "url": "{{baseUrl}}/api/odin/generate"
+          }
+        },
+        {
+          "name": "POST Generate Programme - Validation Failure",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"replace_existing_draft\": false\n}"
+            },
+            "url": "{{baseUrl}}/api/odin/generate"
+          }
+        },
+        {
+          "name": "Generate - Accepted Refinement Example",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"replace_existing_draft\": true,\n  \"refinement_mode\": \"llm_optional\"\n}"
+            },
+            "url": "{{baseUrl}}/api/odin/generate"
+          }
+        },
+        {
+          "name": "Generate - No Change Refinement Example",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"replace_existing_draft\": true,\n  \"refinement_mode\": \"llm_optional\"\n}"
+            },
+            "url": "{{baseUrl}}/api/odin/generate"
+          }
+        },
+        {
+          "name": "Generate - Deterministic Fallback Example",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"replace_existing_draft\": true,\n  \"refinement_mode\": \"llm_optional\"\n}"
+            },
+            "url": "{{baseUrl}}/api/odin/generate"
+          }
+        },
+        {
+          "name": "Generate - Required Refinement Failure Example",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"replace_existing_draft\": true,\n  \"refinement_mode\": \"llm_required\"\n}"
+            },
+            "url": "{{baseUrl}}/api/odin/generate"
+          }
+        },
+        {
+          "name": "Generate - Invalid Refinement Mode",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"replace_existing_draft\": false,\n  \"refinement_mode\": \"unrestricted\"\n}"
+            },
+            "url": "{{baseUrl}}/api/odin/generate"
+          }
+        },
+        {
+          "name": "Generate - Missing OpenAI Configuration",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"replace_existing_draft\": true,\n  \"refinement_mode\": \"llm_required\"\n}"
+            },
+            "url": "{{baseUrl}}/api/odin/generate"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Programmes",
+      "item": [
+        {
+          "name": "GET Programme by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/programmes/{{programmeId}}"
+          }
+        },
+        {
+          "name": "GET Current Draft",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/programmes/current"
+          }
+        },
+        {
+          "name": "GET Programme by ID - Unauthorized",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/programmes/{{programmeId}}"
+          }
+        },
+        {
+          "name": "GET Programme by ID - Not Found",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/programmes/00000000-0000-0000-0000-000000000000"
+          }
+        }
+      ]
+    }
+  ]
+}

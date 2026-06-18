@@ -1,6 +1,7 @@
 import { AppError } from './app-error.js';
 
 type HttpErrorOptions = {
+  code?: string;
   message?: string;
   details?: unknown;
   cause?: unknown;
@@ -12,7 +13,7 @@ const createOptions = (
   httpStatus: number,
   options: HttpErrorOptions = {},
 ) => ({
-  code,
+  code: options.code ?? code,
   message: options.message ?? defaultMessage,
   httpStatus,
   details: options.details,

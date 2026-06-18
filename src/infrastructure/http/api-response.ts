@@ -22,6 +22,11 @@ export type ApiSuccessResponse<Data> = {
   data: Data;
 };
 
+export type ApiSuccessResult<Data> = {
+  statusCode?: number;
+  body: ApiSuccessResponse<Data>;
+};
+
 export type ApiErrorResponse = z.infer<typeof errorResponseSchema>;
 
 export type ApiResponse<Data> = ApiSuccessResponse<Data> | ApiErrorResponse;
@@ -32,6 +37,24 @@ export const successResponse = <Data>(
   success: true,
   data,
 });
+
+export const successResult = <Data>(
+  data: Data,
+  statusCode = 200,
+): ApiSuccessResult<Data> => ({
+  statusCode,
+  body: successResponse(data),
+});
+
+export const isSuccessResult = (
+  value: unknown,
+): value is ApiSuccessResult<unknown> =>
+  typeof value === 'object' &&
+  value !== null &&
+  'body' in value &&
+  typeof value.body === 'object' &&
+  value.body !== null &&
+  'success' in value.body;
 
 export const errorResponse = (
   code: string,
