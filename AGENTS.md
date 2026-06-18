@@ -69,3 +69,12 @@
 - `llm_optional` must fall back to the deterministic baseline.
 - Model integration must preserve persistent idempotency.
 - Tests must mock the refinement provider; normal CI must not call OpenAI.
+- Do not duplicate authoritative database constraints with application pre-checks.
+- Idempotency must handle failure, expiry, concurrency, and replay recovery.
+- Public APIs must remain minimal; internal planner and validator functions are not public endpoints.
+- Route parameters must be schema validated before repository access.
+- Request bodies require explicit byte limits.
+- Persistence must remain outside model control.
+- API contract changes require Postman updates.
+- Migrations, repository calls, tests, and documentation must remain synchronized.
+- Do not add a tool-calling agent until authorization, contracts, observability, and evaluation prerequisites are complete.

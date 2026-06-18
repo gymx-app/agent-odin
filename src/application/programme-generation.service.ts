@@ -1,138 +1,27 @@
-import { createHash } from 'node:crypto';
-import { AppError } from '../shared/errors/app-error.js';
 import { odinError } from '../shared/errors/odin-errors.js';
 import { normalizeAthlete } from '../normalization/athlete-normalizer.js';
 import { buildBaselineProgramme } from '../planning/baseline-programme-planner.js';
-import { PlannerError } from '../planning/planner-errors.js';
 import {
   applyValidationSummary,
   validateProgramme,
 } from '../validation/programme-validator.js';
-import type { AthleteInput } from '../domain/athlete/athlete.types.js';
-import type { Exercise } from '../domain/exercise/exercise.types.js';
-import type { ProgrammeCreateInput } from '../repositories/repository.types.js';
-import type { SavedProgramme } from '../repositories/repository.types.js';
-import type { ProgrammeRefinementProvider } from '../llm/programme-refinement-provider.js';
-import type { RefinementMode } from '../llm/refinement.types.js';
 import { refineProgramme } from './programme-refinement.service.js';
+import { hashIdempotentRequest } from '../shared/request-hash.js';
+import type {
+  GenerateProgrammeContext,
+  GenerateProgrammeOptions,
+  GenerateProgrammeResult,
+} from './programme-generation/generation.types.js';
+import {
+  safeGenerationErrorMessage,
+  toSafeGenerationError,
+} from './programme-generation/generation-errors.js';
 
-export type GenerateProgrammeOptions = {
-  replace_existing_draft: boolean;
-  refinement_mode: RefinementMode;
-  idempotencyKey?: string;
-  endpoint?: string;
-};
-
-export type GenerateProgrammeContext = {
-  requestId: string;
-  refinementProvider?: ProgrammeRefinementProvider;
-  configuredModel?: string | null;
-  refinementUnavailableReason?:
-    | 'LLM_REFINEMENT_DISABLED'
-    | 'OPENAI_CONFIGURATION_MISSING';
-  athleteProfiles: {
-    getByUserId: (userId: string) => Promise<AthleteInput>;
-  };
-  exercises: {
-    loadActiveApproved: () => Promise<Exercise[]>;
-  };
-  programmes: {
-    assertNoDraft: (userId: string) => Promise<void>;
-    createWithVersion: (input: ProgrammeCreateInput) => Promise<SavedProgramme>;
-    getById: (
-      userId: string,
-      programmeId: string,
-    ) => Promise<SavedProgramme | null>;
-  };
-  agentRuns: {
-    start: (
-      userId: string,
-      requestId: string,
-      inputSummary: {
-        goal: string;
-        fitness_level: string;
-        available_days: number;
-        session_duration: number;
-        equipment: string;
-        has_inbody: boolean;
-        injury_count: number;
-      },
-    ) => Promise<{ id: string }>;
-    markSucceeded: (
-      runId: string,
-      outputReference: Record<string, unknown>,
-      validationSummary: Record<string, unknown>,
-      durationMs: number,
-    ) => Promise<void>;
-    markFailed: (
-      runId: string,
-      errorCode: string,
-      errorMessage: string,
-      durationMs: number,
-    ) => Promise<void>;
-  };
-  idempotency?: {
-    claim: (
-      userId: string,
-      endpoint: string,
-      idempotencyKey: string,
-      requestHash: string,
-    ) => Promise<
-      | { type: 'started' }
-      | { type: 'replay'; responseReference: Record<string, unknown> }
-    >;
-    markSucceeded: (
-      userId: string,
-      endpoint: string,
-      idempotencyKey: string,
-      responseReference: Record<string, unknown>,
-    ) => Promise<void>;
-  };
-};
-
-export type GenerateProgrammeResult = {
-  saved: SavedProgramme;
-  replayed: boolean;
-};
-
-const hashRequest = (body: unknown): string =>
-  createHash('sha256')
-    .update(
-      JSON.stringify(body, Object.keys(body as Record<string, unknown>).sort()),
-    )
-    .digest('hex');
-
-const safeMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Programme generation failed.';
-
-const toSafeAppError = (error: unknown): AppError => {
-  if (error instanceof AppError) {
-    return error;
-  }
-
-  if (error instanceof PlannerError) {
-    if (error.code === 'INVALID_EXERCISE_LIBRARY') {
-      return odinError(
-        'EXERCISE_LIBRARY_INVALID',
-        'Exercise library failed validation.',
-        500,
-      );
-    }
-
-    return odinError(
-      'GENERATED_PROGRAMME_INVALID',
-      'Generated programme failed deterministic planning.',
-      422,
-      { planner_code: error.code },
-    );
-  }
-
-  return odinError(
-    'INTERNAL_SERVER_ERROR',
-    'Programme generation failed.',
-    500,
-  );
-};
+export type {
+  GenerateProgrammeContext,
+  GenerateProgrammeOptions,
+  GenerateProgrammeResult,
+} from './programme-generation/generation.types.js';
 
 export const generateProgrammeForUser = async (
   userId: string,
@@ -145,13 +34,39 @@ export const generateProgrammeForUser = async (
     replace_existing_draft: options.replace_existing_draft,
     refinement_mode: options.refinement_mode,
   };
+  const requestHash = hashIdempotentRequest(requestBody);
+  const deadline = startedAt + (context.generationTimeoutMs ?? 60_000);
+  const assertWithinDeadline = (): void => {
+    if (Date.now() > deadline) {
+      throw odinError(
+        'GENERATION_TIMEOUT',
+        'Programme generation exceeded its deadline.',
+        504,
+      );
+    }
+  };
+  const timed = async <T>(
+    stage: string,
+    operation: () => Promise<T>,
+  ): Promise<T> => {
+    const stageStartedAt = Date.now();
+    try {
+      return await operation();
+    } finally {
+      context.logger?.info('generation stage completed', {
+        requestId: context.requestId,
+        stage,
+        durationMs: Date.now() - stageStartedAt,
+      });
+    }
+  };
 
   if (options.idempotencyKey && context.idempotency) {
     const claim = await context.idempotency.claim(
       userId,
       endpoint,
       options.idempotencyKey,
-      hashRequest(requestBody),
+      requestHash,
     );
 
     if (claim.type === 'replay') {
@@ -175,26 +90,34 @@ export const generateProgrammeForUser = async (
     }
   }
 
-  const athlete = await context.athleteProfiles.getByUserId(userId);
-  const run = await context.agentRuns.start(userId, context.requestId, {
-    goal: athlete.goal,
-    fitness_level: athlete.fitness_level,
-    available_days: athlete.available_days_per_week,
-    session_duration: athlete.session_duration_min,
-    equipment: athlete.equipment,
-    has_inbody: athlete.inbody !== null,
-    injury_count: athlete.injuries.length,
-  });
+  let run: { id: string } | null = null;
+  let persisted = false;
 
   try {
-    if (!options.replace_existing_draft) {
-      await context.programmes.assertNoDraft(userId);
-    }
-
+    const athlete = await timed('athlete_profile_load', () =>
+      context.athleteProfiles.getByUserId(userId),
+    );
+    assertWithinDeadline();
+    run = await context.agentRuns.start(userId, context.requestId, {
+      goal: athlete.goal,
+      fitness_level: athlete.fitness_level,
+      available_days: athlete.available_days_per_week,
+      session_duration: athlete.session_duration_min,
+      equipment: athlete.equipment,
+      has_inbody: athlete.inbody !== null,
+      injury_count: athlete.injuries.length,
+    });
     const normalized = normalizeAthlete(athlete);
-    const exercises = await context.exercises.loadActiveApproved();
-    const programme = buildBaselineProgramme(normalized, exercises);
-    const validation = validateProgramme(programme, normalized, exercises);
+    const exercises = await timed('exercise_library_load', () =>
+      context.exercises.loadActiveApproved(),
+    );
+    assertWithinDeadline();
+    const programme = await timed('planner', async () =>
+      buildBaselineProgramme(normalized, exercises),
+    );
+    const validation = await timed('validator', async () =>
+      validateProgramme(programme, normalized, exercises),
+    );
 
     if (!validation.passed) {
       throw odinError(
@@ -208,33 +131,50 @@ export const generateProgrammeForUser = async (
       );
     }
 
-    const refinementResult = await refineProgramme({
-      mode: options.refinement_mode,
-      baseline: programme,
-      baselineValidation: validation,
-      profile: normalized,
-      exercises,
-      configuredModel: context.configuredModel ?? null,
-      unavailableReason:
-        context.refinementUnavailableReason ?? 'OPENAI_CONFIGURATION_MISSING',
-      requestId: context.requestId,
-      ...(context.refinementProvider
-        ? { provider: context.refinementProvider }
-        : {}),
-    });
+    assertWithinDeadline();
+    const refinementResult = await timed('llm_refinement', () =>
+      refineProgramme({
+        mode: options.refinement_mode,
+        baseline: programme,
+        baselineValidation: validation,
+        profile: normalized,
+        exercises,
+        configuredModel: context.configuredModel ?? null,
+        unavailableReason:
+          context.refinementUnavailableReason ?? 'OPENAI_CONFIGURATION_MISSING',
+        requestId: context.requestId,
+        ...(context.refinementProvider
+          ? { provider: context.refinementProvider }
+          : {}),
+      }),
+    );
     const validatedProgramme = applyValidationSummary(
       refinementResult.programme,
       refinementResult.validation,
     );
-    const saved = await context.programmes.createWithVersion({
-      userId,
-      replaceExistingDraft: options.replace_existing_draft,
-      status: 'draft',
-      source: refinementResult.source,
-      programme: validatedProgramme,
-      validation: refinementResult.validation,
-      refinement: refinementResult.refinement,
-    });
+    assertWithinDeadline();
+    const saved = await timed('programme_persistence', () =>
+      context.programmes.createWithVersion({
+        userId,
+        replaceExistingDraft: options.replace_existing_draft,
+        status: 'draft',
+        source: refinementResult.source,
+        programme: validatedProgramme,
+        validation: refinementResult.validation,
+        refinement: refinementResult.refinement,
+        ...(options.idempotencyKey && context.idempotency
+          ? {
+              idempotency: {
+                endpoint,
+                key: options.idempotencyKey,
+                requestHash,
+              },
+            }
+          : {}),
+      }),
+    );
+    persisted = true;
+    assertWithinDeadline();
 
     await context.agentRuns.markSucceeded(
       run.id,
@@ -248,28 +188,34 @@ export const generateProgrammeForUser = async (
       Date.now() - startedAt,
     );
 
-    if (options.idempotencyKey && context.idempotency) {
-      await context.idempotency.markSucceeded(
-        userId,
-        endpoint,
-        options.idempotencyKey,
-        { programme_id: saved.id },
-      );
-    }
-
     return { saved, replayed: false };
   } catch (error) {
-    const appError = toSafeAppError(error);
+    const appError = toSafeGenerationError(error);
 
-    try {
-      await context.agentRuns.markFailed(
-        run.id,
-        appError.code,
-        safeMessage(appError),
-        Date.now() - startedAt,
-      );
-    } catch {
-      // Preserve the original generation error for callers.
+    if (run) {
+      try {
+        await context.agentRuns.markFailed(
+          run.id,
+          appError.code,
+          safeGenerationErrorMessage(appError),
+          Date.now() - startedAt,
+        );
+      } catch {
+        // Preserve the original generation error for callers.
+      }
+    }
+
+    if (!persisted && options.idempotencyKey && context.idempotency) {
+      try {
+        await context.idempotency.markFailed(
+          userId,
+          endpoint,
+          options.idempotencyKey,
+          requestHash,
+        );
+      } catch {
+        // A retry can reclaim an expired started key if failure marking fails.
+      }
     }
 
     throw appError;

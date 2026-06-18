@@ -6,6 +6,7 @@ export type HttpRequest = {
   headers: Record<string, HeaderValue>;
   body?: unknown;
   on?: (event: string, listener: (chunk?: unknown) => void) => void;
+  destroy?: () => void;
 };
 
 export type HttpResponse = {

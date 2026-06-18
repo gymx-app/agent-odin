@@ -20,6 +20,7 @@ const config: AppConfig = {
   openaiTimeoutMs: 20000,
   openaiMaxRetries: 1,
   llmRefinementEnabled: false,
+  generationTimeoutMs: 60000,
 };
 
 describe('GET /api/health', () => {
@@ -111,7 +112,7 @@ describe('GET /api/health', () => {
       'GET, POST, PUT, OPTIONS',
     );
     expect(header(response.headers['access-control-allow-headers'])).toBe(
-      'Content-Type, Authorization, Idempotency-Key',
+      'Content-Type, Authorization, Idempotency-Key, X-Request-Id',
     );
   });
 });

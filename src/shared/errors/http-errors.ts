@@ -26,6 +26,19 @@ export class BadRequestError extends AppError {
   }
 }
 
+export class PayloadTooLargeError extends AppError {
+  constructor(options: HttpErrorOptions = {}) {
+    super(
+      createOptions(
+        'PAYLOAD_TOO_LARGE',
+        'Request body is too large.',
+        413,
+        options,
+      ),
+    );
+  }
+}
+
 export class UnauthorizedError extends AppError {
   constructor(options: HttpErrorOptions = {}) {
     super(createOptions('UNAUTHORIZED', 'Unauthorized.', 401, options));

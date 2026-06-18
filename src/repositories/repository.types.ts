@@ -29,6 +29,11 @@ export type ProgrammeCreateInput = {
   programme: OdinProgramme;
   validation: ProgrammeValidationReport;
   refinement: RefinementMetadata;
+  idempotency?: {
+    endpoint: string;
+    key: string;
+    requestHash: string;
+  };
 };
 
 export type AgentRunStatus = 'started' | 'succeeded' | 'failed';

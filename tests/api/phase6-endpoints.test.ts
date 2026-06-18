@@ -26,6 +26,7 @@ const config: AppConfig = {
   openaiTimeoutMs: 20000,
   openaiMaxRetries: 1,
   llmRefinementEnabled: false,
+  generationTimeoutMs: 60000,
 };
 
 const authClient = (userId: string | null): SupabaseAuthClientLike =>
@@ -141,7 +142,7 @@ describe('Phase 6 API endpoints', () => {
     })(
       createTestRequest({
         method: 'GET',
-        url: '/api/programmes/another-users-programme',
+        url: '/api/programmes/11111111-1111-4111-8111-111111111111',
         headers: {
           authorization: 'Bearer valid',
         },
@@ -157,6 +158,30 @@ describe('Phase 6 API endpoints', () => {
         message: 'Programme was not found.',
         details: null,
       },
+    });
+  });
+
+  it('rejects a malformed programme ID before querying storage', async () => {
+    const response = createTestResponse();
+
+    await createGetProgrammeHandler(config, {
+      authClient: authClient('verified-user'),
+      adminClient: unusedAdminClient,
+    })(
+      createTestRequest({
+        method: 'GET',
+        url: '/api/programmes/not-a-uuid',
+        headers: {
+          authorization: 'Bearer valid',
+        },
+      }),
+      response,
+    );
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      success: false,
+      error: { code: 'INVALID_PROGRAMME_ID' },
     });
   });
 });

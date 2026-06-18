@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { AppConfig } from '../config/env.schema.js';
 import { odinError } from '../../shared/errors/odin-errors.js';
 import type { SupabaseClientLike } from './supabase.types.js';
+import { supabaseClientOptions } from './client-options.js';
 
 export const createSupabaseAdminClient = (
   config: AppConfig,
@@ -14,10 +15,9 @@ export const createSupabaseAdminClient = (
     );
   }
 
-  return createClient(config.supabaseUrl, config.supabaseServiceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  }) as unknown as SupabaseClientLike;
+  return createClient(
+    config.supabaseUrl,
+    config.supabaseServiceRoleKey,
+    supabaseClientOptions,
+  ) as unknown as SupabaseClientLike;
 };
