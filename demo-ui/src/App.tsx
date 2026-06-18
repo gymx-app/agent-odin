@@ -63,14 +63,103 @@ type BusyAction =
 type ProfileLoadState =
   | { status: 'default' }
   | { status: 'loading' }
-  | { status: 'loaded'; updatedAt: string | null }
+  | {
+      status: 'loaded';
+      updatedAt: string | null;
+      assumptions: string[];
+    }
   | { status: 'not_found' }
   | { status: 'error'; message: string };
+
+type GymXUserProfile = {
+  full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  age: number | null;
+  date_of_birth: string | null;
+  gender: 'male' | 'female' | 'other' | 'prefer_not_to_say' | null;
+  height_cm: number | null;
+  current_weight_kg: number | null;
+  target_weight_kg: number | null;
+  fitness_level: string | null;
+  updated_at: string | null;
+};
 
 const labelize = (value: string) =>
   value
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const ageFromDateOfBirth = (dateOfBirth: string): number => {
+  const birthDate = new Date(`${dateOfBirth}T00:00:00Z`);
+  const today = new Date();
+  let age = today.getUTCFullYear() - birthDate.getUTCFullYear();
+  const beforeBirthday =
+    today.getUTCMonth() < birthDate.getUTCMonth() ||
+    (today.getUTCMonth() === birthDate.getUTCMonth() &&
+      today.getUTCDate() < birthDate.getUTCDate());
+
+  if (beforeBirthday) age -= 1;
+  return age;
+};
+
+const mapGymXProfile = (
+  source: GymXUserProfile,
+): { profile: AthleteInput; assumptions: string[] } => {
+  const assumptions: string[] = [];
+  const name =
+    source.full_name?.trim() ||
+    [source.first_name, source.last_name].filter(Boolean).join(' ').trim() ||
+    defaultProfile.name;
+  const age =
+    source.age ??
+    (source.date_of_birth
+      ? ageFromDateOfBirth(source.date_of_birth)
+      : defaultProfile.age);
+  const sex =
+    source.gender === 'male' || source.gender === 'female'
+      ? source.gender
+      : defaultProfile.sex;
+  const fitnessLevel =
+    source.fitness_level === 'beginner' ||
+    source.fitness_level === 'intermediate' ||
+    source.fitness_level === 'advanced'
+      ? source.fitness_level
+      : defaultProfile.fitness_level;
+
+  if (!source.full_name && !source.first_name && !source.last_name)
+    assumptions.push('Name uses the demo default.');
+  if (source.age === null && !source.date_of_birth)
+    assumptions.push('Age uses the demo default.');
+  if (source.gender !== 'male' && source.gender !== 'female')
+    assumptions.push('Sex uses the demo default because GymX has no binary value.');
+  if (!source.current_weight_kg)
+    assumptions.push('Current weight uses the demo default.');
+  if (!source.target_weight_kg)
+    assumptions.push('Target weight uses the demo default.');
+  if (!source.height_cm) assumptions.push('Height uses the demo default.');
+  if (fitnessLevel === defaultProfile.fitness_level && source.fitness_level !== fitnessLevel)
+    assumptions.push('Fitness level uses the demo default.');
+  assumptions.push(
+    'Goal, availability, session duration, equipment, injuries, and InBody remain demo defaults because GymX user_profiles does not store those Odin fields.',
+  );
+
+  return {
+    profile: {
+      ...defaultProfile,
+      name,
+      age,
+      sex,
+      current_weight_kg:
+        source.current_weight_kg ?? defaultProfile.current_weight_kg,
+      target_weight_kg:
+        source.target_weight_kg ?? defaultProfile.target_weight_kg,
+      height_cm: source.height_cm ?? defaultProfile.height_cm,
+      fitness_level: fitnessLevel,
+    },
+    assumptions,
+  };
+};
 
 const errorNotice = (error: unknown): Notice => {
   if (error instanceof ApiError) {
@@ -292,8 +381,10 @@ function App() {
 
     try {
       const { data, error } = await authClient
-        .from('athlete_profiles')
-        .select('athlete_data,updated_at')
+        .from('user_profiles')
+        .select(
+          'full_name,first_name,last_name,age,date_of_birth,gender,height_cm,current_weight_kg,target_weight_kg,fitness_level,updated_at',
+        )
         .maybeSingle();
 
       if (error) throw error;
@@ -306,32 +397,36 @@ function App() {
             tone: 'info',
             title: 'Signed in — no saved profile',
             message:
-              'Authentication succeeded. Complete the default form and save it to create this user’s athlete profile.',
+              'Authentication succeeded, but this user has no GymX user_profiles row. The form remains on demo defaults.',
           });
         }
         return;
       }
 
-      const parsed = athleteInputSchema.safeParse(data.athlete_data);
+      const mapped = mapGymXProfile(data as GymXUserProfile);
+      const parsed = athleteInputSchema.safeParse(mapped.profile);
 
       if (!parsed.success) {
         throw new Error(
-          'The saved athlete profile does not match the current profile schema.',
+          'The mapped GymX profile does not match the current Odin profile schema.',
         );
       }
 
       setProfile(parsed.data);
       setProfileLoad({
         status: 'loaded',
-        updatedAt:
-          typeof data.updated_at === 'string' ? data.updated_at : null,
+        updatedAt: typeof data.updated_at === 'string' ? data.updated_at : null,
+        assumptions: mapped.assumptions,
       });
       if (showNotice) {
         setNotice({
           tone: 'success',
-          title: 'Profile loaded',
+          title: 'GymX profile loaded',
           message:
-            'Supabase authentication is valid and this user’s saved athlete profile populated the form.',
+            'Supabase authentication is valid. Compatible fields from this user’s GymX profile populated the Odin form.',
+          details: {
+            mapping_assumptions: mapped.assumptions,
+          },
         });
       }
     } catch (error) {
@@ -451,14 +546,12 @@ function App() {
       'profile',
       () => odinApi.saveProfile(token.trim(), profile),
       () =>
-        void loadAuthenticatedProfile(false).then(() =>
-          setNotice({
-            tone: 'success',
-            title: 'Profile saved and verified',
-            message:
-              'The profile was saved through Odin and read back from Supabase for the authenticated user.',
-          }),
-        ),
+        setNotice({
+          tone: 'success',
+          title: 'Odin profile saved',
+          message:
+            'The profile was saved through Odin for the authenticated user.',
+        }),
     );
   };
 
@@ -706,7 +799,7 @@ function App() {
                     <UserRound size={13} />
                   )}
                   {profileLoad.status === 'loaded'
-                    ? 'Loaded from DB'
+                    ? 'Loaded from GymX'
                     : profileLoad.status === 'not_found'
                       ? 'New profile'
                       : profileLoad.status === 'error'
@@ -930,7 +1023,7 @@ function App() {
                 <span>
                   <ShieldCheck size={16} />
                   {profileLoad.status === 'loaded'
-                    ? `Loaded through user-scoped RLS${
+                    ? `Mapped from GymX through user-scoped RLS${
                         profileLoad.updatedAt
                           ? ` · ${new Date(profileLoad.updatedAt).toLocaleString()}`
                           : ''
