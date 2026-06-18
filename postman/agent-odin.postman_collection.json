@@ -1,6 +1,7 @@
 {
   "info": {
     "name": "agent-odin",
+    "description": "Authenticated, stateless programme preview API. Odin does not update athlete profiles or persist generated programmes.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -10,18 +11,6 @@
     },
     {
       "key": "accessToken",
-      "value": ""
-    },
-    {
-      "key": "programmeId",
-      "value": ""
-    },
-    {
-      "key": "idempotencyKey",
-      "value": "local-generate-001"
-    },
-    {
-      "key": "requestId",
       "value": ""
     }
   ],
@@ -36,18 +25,16 @@
           "if (pm.request.url.getPath() === '/api/health' && pm.response.code === 200) {",
           "  pm.test('Health contract', function () { pm.expect(json.success).to.eql(true); pm.expect(json.data.service).to.eql('agent-odin'); });",
           "}",
-          "if (pm.request.url.getPath() === '/api/odin/generate' && [200, 201].includes(pm.response.code)) {",
-          "  pm.test('Programme generation contract', function () {",
-          "    pm.expect(json.success).to.eql(true); pm.expect(json.data.version).to.be.a('number');",
+          "if (pm.request.url.getPath() === '/api/odin/preview' && pm.response.code === 200) {",
+          "  pm.test('Stateless preview contract', function () {",
+          "    pm.expect(json.success).to.eql(true);",
           "    pm.expect(['deterministic', 'llm_refined']).to.include(json.data.source);",
           "    pm.expect(['pass', 'pass_with_warnings']).to.include(json.data.validation.status);",
-          "    pm.expect(JSON.stringify(json)).not.to.include('provider_response');",
-          "    pm.expect(JSON.stringify(json)).not.to.include('exact_weight');",
+          "    pm.expect(json.data.programme).to.be.an('object');",
+          "    pm.expect(json.data).not.to.have.property('programme_id');",
+          "    pm.expect(json.data).not.to.have.property('version');",
+          "    pm.expect(json.data).not.to.have.property('status');",
           "  });",
-          "  pm.collectionVariables.set('programmeId', json.data.programme_id);",
-          "}",
-          "if (pm.request.url.getPath().includes('/api/programmes/') && pm.response.code === 200) {",
-          "  pm.test('Programme retrieval contract', function () { pm.expect(json.success).to.eql(true); pm.expect(json.data.version).to.be.a('number'); pm.expect(json.data.programme).to.be.an('object'); pm.expect(json.data.validation).to.be.an('object'); });",
           "}"
         ]
       }
@@ -67,12 +54,12 @@
       ]
     },
     {
-      "name": "Profile",
+      "name": "Programme Preview",
       "item": [
         {
-          "name": "PUT Athlete Profile",
+          "name": "Preview - Deterministic",
           "request": {
-            "method": "PUT",
+            "method": "POST",
             "header": [
               {
                 "key": "Authorization",
@@ -85,28 +72,15 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sex\": \"male\",\n  \"age\": 32,\n  \"height_cm\": 178,\n  \"current_weight_kg\": 82,\n  \"target_weight_kg\": 74,\n  \"goal\": \"fat_loss\",\n  \"available_days_per_week\": 3,\n  \"session_duration_min\": 45,\n  \"fitness_level\": \"beginner\",\n  \"equipment\": \"full_gym\",\n  \"injuries\": [],\n  \"inbody\": null\n}"
+              "raw": "{\n  \"athlete\": {\n    \"name\": \"Demo Athlete\",\n    \"age\": 32,\n    \"sex\": \"male\",\n    \"current_weight_kg\": 82,\n    \"target_weight_kg\": 74,\n    \"height_cm\": 178,\n    \"goal\": \"fat_loss\",\n    \"available_days_per_week\": 3,\n    \"session_duration_min\": 45,\n    \"equipment\": \"full_gym\",\n    \"fitness_level\": \"beginner\",\n    \"injuries\": [],\n    \"inbody\": null\n  },\n  \"refinement_mode\": \"deterministic\"\n}"
             },
-            "url": "{{baseUrl}}/api/profile"
+            "url": "{{baseUrl}}/api/odin/preview"
           }
         },
         {
-          "name": "PUT Athlete Profile - Unauthorized",
+          "name": "Preview - LLM Optional",
           "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{baseUrl}}/api/profile"
-          }
-        },
-        {
-          "name": "PUT Athlete Profile - Invalid Profile",
-          "request": {
-            "method": "PUT",
+            "method": "POST",
             "header": [
               {
                 "key": "Authorization",
@@ -119,310 +93,80 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"goal\": \"unknown\"\n}"
+              "raw": "{\n  \"athlete\": {\n    \"name\": \"Demo Athlete\",\n    \"age\": 32,\n    \"sex\": \"male\",\n    \"current_weight_kg\": 82,\n    \"target_weight_kg\": 74,\n    \"height_cm\": 178,\n    \"goal\": \"fat_loss\",\n    \"available_days_per_week\": 3,\n    \"session_duration_min\": 45,\n    \"equipment\": \"full_gym\",\n    \"fitness_level\": \"beginner\",\n    \"injuries\": [],\n    \"inbody\": null\n  },\n  \"refinement_mode\": \"llm_optional\"\n}"
             },
-            "url": "{{baseUrl}}/api/profile"
+            "url": "{{baseUrl}}/api/odin/preview"
+          }
+        },
+        {
+          "name": "Preview - Missing Auth",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"athlete\":{}}"
+            },
+            "url": "{{baseUrl}}/api/odin/preview"
+          }
+        },
+        {
+          "name": "Preview - Invalid Athlete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"athlete\":{\"available_days_per_week\":1}}"
+            },
+            "url": "{{baseUrl}}/api/odin/preview"
           }
         }
       ]
     },
     {
-      "name": "Odin",
+      "name": "Retired Persistence Endpoints",
       "item": [
         {
-          "name": "Generate - Deterministic",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.expect([200, 201]).to.include(pm.response.code);",
-                  "const json = pm.response.json();",
-                  "pm.expect(json.success).to.eql(true);",
-                  "pm.collectionVariables.set('programmeId', json.data.programme_id);",
-                  "pm.expect(json.data.version).to.eql(1);",
-                  "pm.expect(json.data.source).to.eql('deterministic');",
-                  "pm.expect(['pass', 'pass_with_warnings']).to.include(json.data.validation.status);",
-                  "pm.expect(json.data.refinement.status).to.eql('not_requested');"
-                ]
-              }
-            }
-          ],
+          "name": "Retired - PUT Athlete Profile",
           "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Idempotency-Key",
-                "value": "{{idempotencyKey}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"replace_existing_draft\": false,\n  \"refinement_mode\": \"deterministic\"\n}"
-            },
-            "url": "{{baseUrl}}/api/odin/generate"
-          },
-          "response": [
-            {
-              "name": "Accepted LLM refinement",
-              "status": "Created",
-              "code": 201,
-              "header": [],
-              "body": "{\"success\":true,\"data\":{\"source\":\"llm_refined\",\"refinement\":{\"status\":\"accepted\",\"applied\":true}}}"
-            },
-            {
-              "name": "No-change refinement",
-              "status": "Created",
-              "code": 201,
-              "header": [],
-              "body": "{\"success\":true,\"data\":{\"source\":\"deterministic\",\"refinement\":{\"status\":\"accepted\",\"applied\":false}}}"
-            },
-            {
-              "name": "Deterministic fallback",
-              "status": "Created",
-              "code": 201,
-              "header": [],
-              "body": "{\"success\":true,\"data\":{\"source\":\"deterministic\",\"refinement\":{\"status\":\"fallback\"}}}"
-            },
-            {
-              "name": "Provider timeout fallback",
-              "status": "Created",
-              "code": 201,
-              "header": [],
-              "body": "{\"success\":true,\"data\":{\"source\":\"deterministic\",\"refinement\":{\"status\":\"fallback\",\"reason_code\":\"PROVIDER_TIMEOUT\"}}}"
-            },
-            {
-              "name": "Provider refusal fallback",
-              "status": "Created",
-              "code": 201,
-              "header": [],
-              "body": "{\"success\":true,\"data\":{\"source\":\"deterministic\",\"refinement\":{\"status\":\"fallback\",\"reason_code\":\"PROVIDER_REFUSAL\"}}}"
-            },
-            {
-              "name": "Required refinement failure",
-              "status": "Bad Gateway",
-              "code": 502,
-              "header": [],
-              "body": "{\"success\":false,\"error\":{\"code\":\"LLM_REFINEMENT_REQUIRED_FAILED\",\"message\":\"Required refinement failed.\",\"details\":null}}"
-            },
-            {
-              "name": "Validation rejection",
-              "status": "Created",
-              "code": 201,
-              "header": [],
-              "body": "{\"success\":true,\"data\":{\"source\":\"deterministic\",\"refinement\":{\"status\":\"rejected\",\"reason_code\":\"VALIDATION_REJECTED\"}}}"
-            }
-          ]
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/profile"
+          }
         },
         {
-          "name": "Generate - LLM Optional",
+          "name": "Retired - POST Persistent Generate",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Idempotency-Key",
-                "value": "{{idempotencyKey}}-optional"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"replace_existing_draft\": true,\n  \"refinement_mode\": \"llm_optional\"\n}"
-            },
             "url": "{{baseUrl}}/api/odin/generate"
           }
         },
         {
-          "name": "Generate - LLM Required (Development Only)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Idempotency-Key",
-                "value": "{{idempotencyKey}}-required"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"replace_existing_draft\": true,\n  \"refinement_mode\": \"llm_required\"\n}"
-            },
-            "url": "{{baseUrl}}/api/odin/generate"
-          }
-        },
-        {
-          "name": "Generate - Missing Auth",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"replace_existing_draft\": false\n}"
-            },
-            "url": "{{baseUrl}}/api/odin/generate"
-          }
-        },
-        {
-          "name": "Generate - Idempotency Conflict",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Idempotency-Key",
-                "value": "{{idempotencyKey}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"replace_existing_draft\": true\n}"
-            },
-            "url": "{{baseUrl}}/api/odin/generate"
-          }
-        },
-        {
-          "name": "Generate - Idempotent Replay",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Idempotency-Key",
-                "value": "{{idempotencyKey}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"replace_existing_draft\": false\n}"
-            },
-            "url": "{{baseUrl}}/api/odin/generate"
-          }
-        },
-        {
-          "name": "Generate - Invalid Refinement Mode",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"replace_existing_draft\": false,\n  \"refinement_mode\": \"unrestricted\"\n}"
-            },
-            "url": "{{baseUrl}}/api/odin/generate"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Programmes",
-      "item": [
-        {
-          "name": "GET Programme by ID",
+          "name": "Retired - GET Current Programme",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": "{{baseUrl}}/api/programmes/{{programmeId}}"
-          }
-        },
-        {
-          "name": "GET Current Draft",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
             "url": "{{baseUrl}}/api/programmes/current"
           }
         },
         {
-          "name": "GET Programme - Unauthorized",
+          "name": "Retired - GET Programme by ID",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/api/programmes/{{programmeId}}"
-          }
-        },
-        {
-          "name": "GET Programme - Not Found",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
             "url": "{{baseUrl}}/api/programmes/00000000-0000-0000-0000-000000000000"
-          }
-        },
-        {
-          "name": "GET Programme - Invalid ID",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": "{{baseUrl}}/api/programmes/not-a-uuid"
           }
         }
       ]

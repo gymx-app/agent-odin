@@ -65,6 +65,14 @@ export class MethodNotAllowedError extends AppError {
   }
 }
 
+export class GoneError extends AppError {
+  constructor(options: HttpErrorOptions = {}) {
+    super(
+      createOptions('GONE', 'Resource is no longer available.', 410, options),
+    );
+  }
+}
+
 export class InternalServerError extends AppError {
   constructor(options: HttpErrorOptions = {}) {
     super(

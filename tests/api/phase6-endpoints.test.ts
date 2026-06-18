@@ -1,17 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { createGenerateHandler } from '../../api/odin/generate.js';
+import { createPreviewHandler } from '../../api/odin/preview.js';
 import { createProfileHandler } from '../../api/profile.js';
 import { createGetProgrammeHandler } from '../../api/programmes/[id].js';
 import type { AppConfig } from '../../src/infrastructure/config/env.schema.js';
-import type {
-  SupabaseAuthClientLike,
-  SupabaseClientLike,
-} from '../../src/infrastructure/supabase/supabase.types.js';
+import type { SupabaseAuthClientLike } from '../../src/infrastructure/supabase/supabase.types.js';
+import { beginnerFatLossAthlete } from '../../fixtures/athletes/valid-athletes.js';
 import {
   createTestRequest,
   createTestResponse,
 } from '../infrastructure/test-http.js';
-import { createQueryClient } from '../repositories/test-supabase-client.js';
 
 const config: AppConfig = {
   nodeEnv: 'test',
@@ -41,24 +39,19 @@ const authClient = (userId: string | null): SupabaseAuthClientLike =>
     },
   }) as SupabaseAuthClientLike;
 
-const unusedAdminClient = {
-  from: () => {
-    throw new Error('Admin client should not be used.');
-  },
-} as SupabaseClientLike;
-
-describe('Phase 6 API endpoints', () => {
-  it('returns the stable missing-authorization error from generate', async () => {
+describe('public API boundaries', () => {
+  it('requires authentication for programme preview', async () => {
     const response = createTestResponse();
 
-    await createGenerateHandler(config, {
+    await createPreviewHandler(config, {
       authClient: authClient('user-1'),
-      adminClient: unusedAdminClient,
     })(
       createTestRequest({
         method: 'POST',
-        url: '/api/odin/generate',
-        body: {},
+        url: '/api/odin/preview',
+        body: {
+          athlete: beginnerFatLossAthlete,
+        },
       }),
       response,
     );
@@ -74,21 +67,67 @@ describe('Phase 6 API endpoints', () => {
     });
   });
 
-  it('rejects an invalid refinement mode before generation', async () => {
+  it('returns a validated stateless deterministic preview', async () => {
     const response = createTestResponse();
 
-    await createGenerateHandler(config, {
-      authClient: authClient('user-1'),
-      adminClient: unusedAdminClient,
+    await createPreviewHandler(config, {
+      authClient: authClient('verified-user'),
     })(
       createTestRequest({
         method: 'POST',
-        url: '/api/odin/generate',
+        url: '/api/odin/preview',
         headers: {
           authorization: 'Bearer valid',
         },
         body: {
-          refinement_mode: 'unrestricted',
+          athlete: beginnerFatLossAthlete,
+          refinement_mode: 'deterministic',
+        },
+      }),
+      response,
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      success: true,
+      data: {
+        source: 'deterministic',
+        programme: {
+          programme: {
+            goal_type: beginnerFatLossAthlete.goal,
+          },
+        },
+        validation: {
+          passed: true,
+        },
+        refinement: {
+          requested: false,
+          status: 'not_requested',
+        },
+      },
+    });
+    expect(response.json()).not.toHaveProperty('data.programme_id');
+    expect(response.json()).not.toHaveProperty('data.version');
+    expect(response.json()).not.toHaveProperty('data.status');
+  });
+
+  it('rejects invalid preview input before planning', async () => {
+    const response = createTestResponse();
+
+    await createPreviewHandler(config, {
+      authClient: authClient('verified-user'),
+    })(
+      createTestRequest({
+        method: 'POST',
+        url: '/api/odin/preview',
+        headers: {
+          authorization: 'Bearer valid',
+        },
+        body: {
+          athlete: {
+            ...beginnerFatLossAthlete,
+            available_days_per_week: 1,
+          },
         },
       }),
       response,
@@ -101,87 +140,31 @@ describe('Phase 6 API endpoints', () => {
     });
   });
 
-  it('rejects body-supplied user IDs on the profile endpoint', async () => {
+  it.each([
+    ['PUT', '/api/profile', createProfileHandler(config)],
+    ['POST', '/api/odin/generate', createGenerateHandler(config)],
+    [
+      'GET',
+      '/api/programmes/11111111-1111-4111-8111-111111111111',
+      createGetProgrammeHandler(config),
+    ],
+  ])('retires the persistent %s %s endpoint', async (method, url, handler) => {
     const response = createTestResponse();
 
-    await createProfileHandler(config, {
-      authClient: authClient('verified-user'),
-      adminClient: unusedAdminClient,
-    })(
+    await handler(
       createTestRequest({
-        method: 'PUT',
-        url: '/api/profile',
-        headers: {
-          authorization: 'Bearer valid',
-        },
-        body: {
-          user_id: 'other-user',
-        },
+        method,
+        url,
       }),
       response,
     );
 
-    expect(response.statusCode).toBe(400);
+    expect(response.statusCode).toBe(410);
     expect(response.json()).toMatchObject({
       success: false,
       error: {
-        code: 'BAD_REQUEST',
+        code: 'ENDPOINT_RETIRED',
       },
-    });
-  });
-
-  it('returns not found without revealing ownership for programme retrieval', async () => {
-    const response = createTestResponse();
-    const { client } = createQueryClient({
-      single: { data: null, error: null },
-    });
-
-    await createGetProgrammeHandler(config, {
-      authClient: authClient('verified-user'),
-      adminClient: client,
-    })(
-      createTestRequest({
-        method: 'GET',
-        url: '/api/programmes/11111111-1111-4111-8111-111111111111',
-        headers: {
-          authorization: 'Bearer valid',
-        },
-      }),
-      response,
-    );
-
-    expect(response.statusCode).toBe(404);
-    expect(response.json()).toEqual({
-      success: false,
-      error: {
-        code: 'PROGRAMME_NOT_FOUND',
-        message: 'Programme was not found.',
-        details: null,
-      },
-    });
-  });
-
-  it('rejects a malformed programme ID before querying storage', async () => {
-    const response = createTestResponse();
-
-    await createGetProgrammeHandler(config, {
-      authClient: authClient('verified-user'),
-      adminClient: unusedAdminClient,
-    })(
-      createTestRequest({
-        method: 'GET',
-        url: '/api/programmes/not-a-uuid',
-        headers: {
-          authorization: 'Bearer valid',
-        },
-      }),
-      response,
-    );
-
-    expect(response.statusCode).toBe(400);
-    expect(response.json()).toMatchObject({
-      success: false,
-      error: { code: 'INVALID_PROGRAMME_ID' },
     });
   });
 });
