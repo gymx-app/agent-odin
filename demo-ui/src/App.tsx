@@ -6,8 +6,10 @@ import {
   Bot,
   Check,
   ChevronDown,
+  ChevronRight,
   CircleDashed,
   Clock3,
+  Copy,
   Dumbbell,
   FileCheck2,
   HeartPulse,
@@ -29,10 +31,18 @@ import {
 import { ApiError, odinApi } from './api/client';
 import type {
   AthleteInput,
+  LongitudinalOdinProgramme,
   ProgrammeDay,
   ProgrammePreviewResponse,
   PlannerVersion,
   RefinementMode,
+  V2Day,
+  V2Phase,
+  V2Week,
+} from './api/contracts';
+import {
+  isLegacyProgramme,
+  isLongitudinalProgramme,
 } from './api/contracts';
 import { defaultProfile } from './fixtures/default-profile';
 import {
@@ -56,13 +66,7 @@ type BusyAction =
   | null;
 
 type WorkflowStep = 'connect' | 'preview' | 'review';
-
-const isLegacyProgramme = (
-  programme: ProgrammePreviewResponse['programme'],
-): programme is Extract<
-  ProgrammePreviewResponse['programme'],
-  { phase_week_templates: unknown }
-> => 'phase_week_templates' in programme;
+type ResultTab = 'programme' | 'validation' | 'json';
 
 type ProfileLoadState =
   | { status: 'default' }
@@ -237,6 +241,8 @@ const ScoreRing = ({ score }: { score: number }) => (
   </div>
 );
 
+// --- V1 Legacy Programme View ---
+
 const WorkoutDay = ({ day }: { day: ProgrammeDay }) => (
   <details className={`workout-day workout-${day.workout_type}`}>
     <summary>
@@ -290,6 +296,479 @@ const WorkoutDay = ({ day }: { day: ProgrammeDay }) => (
   </details>
 );
 
+const LegacyProgrammeView = ({
+  programme,
+  selectedPhase,
+}: {
+  programme: import('./api/contracts').OdinProgramme;
+  selectedPhase: number;
+}) => {
+  const activeDays =
+    programme.phase_week_templates.find(
+      (template) => template.phase_number === selectedPhase,
+    )?.days ?? [];
+
+  return (
+    <div className="workout-list">
+      {activeDays.map((day) => (
+        <WorkoutDay key={day.day_of_week} day={day} />
+      ))}
+    </div>
+  );
+};
+
+// --- V2 Longitudinal Programme View ---
+
+const dayTypeLabel = (type: string) => {
+  const map: Record<string, string> = {
+    resistance: 'Resistance',
+    conditioning: 'Conditioning',
+    combined: 'Combined',
+    sport: 'Sport',
+    recovery: 'Recovery',
+    rest: 'Rest',
+  };
+  return map[type] ?? labelize(type);
+};
+
+const dayTypeTone = (type: string): 'positive' | 'purple' | 'warning' | 'neutral' => {
+  if (type === 'resistance' || type === 'combined') return 'positive';
+  if (type === 'conditioning' || type === 'sport') return 'purple';
+  if (type === 'recovery') return 'warning';
+  return 'neutral';
+};
+
+const setsAreIdentical = (sets: { target_reps: number; target_rpe: number; rest_seconds: number }[]) => {
+  if (sets.length <= 1) return true;
+  const first = sets[0]!;
+  return sets.every(
+    (s) =>
+      s.target_reps === first.target_reps &&
+      s.target_rpe === first.target_rpe &&
+      s.rest_seconds === first.rest_seconds,
+  );
+};
+
+const V2DayCard = ({ day, calendarType }: { day: V2Day; calendarType: 'weekly' | 'rolling' }) => {
+  const dayLabel = calendarType === 'weekly' && day.day_of_week
+    ? day.day_of_week.slice(0, 3)
+    : `D${day.cycle_day}`;
+
+  if (day.day_type === 'rest') {
+    return (
+      <div className="v2-day-card v2-rest-day">
+        <div className="v2-day-header">
+          <div className="day-code">{dayLabel}</div>
+          <div className="day-heading">
+            <strong>{day.title}</strong>
+            <span>Rest day</span>
+          </div>
+          <StatusPill>Rest</StatusPill>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <details className="v2-day-card">
+      <summary className="v2-day-header">
+        <div className="day-code">{dayLabel}</div>
+        <div className="day-heading">
+          <strong>{day.title}</strong>
+          <span>
+            {day.subtitle || (day.session_metadata?.session_kind
+              ? labelize(day.session_metadata.session_kind)
+              : dayTypeLabel(day.day_type))}
+          </span>
+        </div>
+        <div className="day-meta">
+          {day.estimated_duration_min ? (
+            <span><Clock3 size={14} /> {day.estimated_duration_min} min</span>
+          ) : null}
+          {day.fatigue_classification !== 'none' ? (
+            <StatusPill tone={day.fatigue_classification === 'high' ? 'warning' : 'neutral'}>
+              {labelize(day.fatigue_classification)} fatigue
+            </StatusPill>
+          ) : null}
+          <StatusPill tone={dayTypeTone(day.day_type)}>
+            {dayTypeLabel(day.day_type)}
+          </StatusPill>
+          <ChevronDown size={18} className="chevron" />
+        </div>
+      </summary>
+
+      <div className="day-content">
+        {day.movement_emphasis.length > 0 ? (
+          <div className="v2-emphasis">
+            {day.movement_emphasis.map((e) => (
+              <StatusPill key={e}>{labelize(e)}</StatusPill>
+            ))}
+          </div>
+        ) : null}
+
+        {day.warmup.length > 0 ? (
+          <div className="v2-section">
+            <h5>Warm-up</h5>
+            {day.warmup.map((item) => (
+              <div className="v2-warmup-row" key={item.warmup_id}>
+                <span className="v2-warmup-type">{labelize(item.component_type)}</span>
+                <strong>{item.activity_name}</strong>
+                <span className="v2-warmup-detail">
+                  {item.duration_seconds
+                    ? `${item.duration_seconds}s`
+                    : item.repetitions
+                      ? `${item.repetitions} reps`
+                      : ''}
+                  {item.related_exercise_id ? ' · linked' : ''}
+                </span>
+                {item.purpose ? <span className="v2-purpose">{item.purpose}</span> : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {day.exercises.length > 0 ? (
+          <div className="v2-section">
+            <h5>Exercises</h5>
+            {day.exercises.map((ex) => (
+              <div className="v2-exercise-card" key={ex.prescription_id}>
+                <div className="v2-exercise-header">
+                  <div className="exercise-order">
+                    {String(ex.display_order + 1).padStart(2, '0')}
+                  </div>
+                  <div className="exercise-main">
+                    <strong>{ex.exercise_name}</strong>
+                    <span>
+                      {labelize(ex.sequence_role)}
+                      {ex.movement_patterns.length > 0 ? ` · ${ex.movement_patterns.map(labelize).join(', ')}` : ''}
+                    </span>
+                  </div>
+                  <div className="v2-exercise-meta">
+                    <span>{ex.primary_muscles.map(labelize).join(', ')}</span>
+                    {ex.equipment.length > 0 ? (
+                      <span>{ex.equipment.map(labelize).join(', ')}</span>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="v2-sets">
+                  {setsAreIdentical(ex.sets) ? (
+                    <div className="v2-set-compact">
+                      {ex.sets.length} &times; {ex.sets[0]!.target_reps} &middot; RPE {ex.sets[0]!.target_rpe} &middot; Rest {ex.sets[0]!.rest_seconds}s
+                    </div>
+                  ) : (
+                    ex.sets.map((set) => (
+                      <div className="v2-set-row" key={set.set_number}>
+                        Set {set.set_number} &middot; {set.target_reps} reps &middot; RPE {set.target_rpe} &middot; Rest {set.rest_seconds}s
+                        {set.set_type !== 'working' ? (
+                          <StatusPill>{labelize(set.set_type)}</StatusPill>
+                        ) : null}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {ex.user_progression_rule ? (
+                  <div className="v2-progression">
+                    <span>Progression:</span> {ex.user_progression_rule}
+                  </div>
+                ) : null}
+
+                {ex.warnings.length > 0 ? (
+                  <div className="v2-warnings">
+                    {ex.warnings.map((w, i) => (
+                      <span key={i}><AlertCircle size={12} /> {w}</span>
+                    ))}
+                  </div>
+                ) : null}
+
+                {ex.coaching_cues.length > 0 ? (
+                  <div className="v2-cues">
+                    {ex.coaching_cues.map((c, i) => (
+                      <span key={i}>{c}</span>
+                    ))}
+                  </div>
+                ) : null}
+
+                <details className="v2-dev-details">
+                  <summary>IDs</summary>
+                  <code>{ex.prescription_id} / {ex.exercise_id}</code>
+                </details>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {day.conditioning.length > 0 ? (
+          <div className="v2-section">
+            <h5>
+              {day.conditioning.some((c) => c.conditioning_type === 'sport_conditioning')
+                ? 'Sport'
+                : 'Conditioning'}
+            </h5>
+            {day.conditioning.map((c) => (
+              <div className="v2-conditioning-card" key={c.conditioning_id}>
+                <div className="v2-conditioning-header">
+                  <strong>{c.activity_name}</strong>
+                  <StatusPill>{labelize(c.conditioning_type)}</StatusPill>
+                </div>
+                <dl className="v2-conditioning-meta">
+                  <div><dt>Duration</dt><dd>{c.duration_min} min</dd></div>
+                  <div><dt>Intensity</dt><dd>{c.intensity.target_label ?? `${c.intensity.method}${c.intensity.target_min != null ? ` ${c.intensity.target_min}–${c.intensity.target_max}` : ''}`}</dd></div>
+                  <div><dt>Placement</dt><dd>{labelize(c.placement)}</dd></div>
+                  <div><dt>Interference</dt><dd>{labelize(c.interference_risk)}</dd></div>
+                  <div><dt>Impact</dt><dd>{labelize(c.impact_level)}</dd></div>
+                  <div><dt>Fatigue</dt><dd>{labelize(c.fatigue_cost)}</dd></div>
+                  {c.same_day_separation ? (
+                    <div><dt>Separation</dt><dd>{labelize(c.same_day_separation.category)}</dd></div>
+                  ) : null}
+                </dl>
+                {c.intervals ? (
+                  <div className="v2-intervals">
+                    {c.intervals.interval_count} intervals &middot;{' '}
+                    {c.intervals.work_seconds}s work / {c.intervals.recovery_seconds}s recovery
+                  </div>
+                ) : null}
+                <div className="v2-purpose">{c.purpose}</div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {day.cooldown.length > 0 ? (
+          <div className="v2-section">
+            <h5>Cooldown</h5>
+            {day.cooldown.map((item) => (
+              <div className="v2-warmup-row" key={item.cooldown_id}>
+                <strong>{item.activity_name}</strong>
+                <span className="v2-warmup-detail">
+                  {item.duration_seconds
+                    ? `${item.duration_seconds}s`
+                    : item.repetitions
+                      ? `${item.repetitions} reps`
+                      : ''}
+                </span>
+                {item.purpose ? <span className="v2-purpose">{item.purpose}</span> : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </details>
+  );
+};
+
+const V2WeekCard = ({ week, calendarType, defaultOpen }: { week: V2Week; calendarType: 'weekly' | 'rolling'; defaultOpen: boolean }) => {
+  const isDeload = week.week_type === 'deload';
+
+  return (
+    <details className={`v2-week-card ${isDeload ? 'v2-deload' : ''}`} open={defaultOpen || undefined}>
+      <summary className="v2-week-header">
+        <ChevronRight size={16} className="v2-collapse-icon" />
+        <strong>Week {week.week_number}</strong>
+        <StatusPill tone={isDeload ? 'warning' : 'neutral'}>{labelize(week.week_type)}</StatusPill>
+        <span className="v2-week-factors">
+          Vol {week.planned_volume_factor.toFixed(2)} · Int {week.planned_intensity_factor.toFixed(2)} · Eff {week.planned_effort_factor.toFixed(2)}
+        </span>
+      </summary>
+      <div className="v2-week-content">
+        <p className="v2-objective">{week.objective}</p>
+        <div className="v2-day-list">
+          {week.days.map((day) => (
+            <V2DayCard key={day.day_id} day={day} calendarType={calendarType} />
+          ))}
+        </div>
+        {week.review_triggers.length > 0 ? (
+          <div className="v2-review-triggers">
+            <h5>Review Triggers</h5>
+            {week.review_triggers.map((t, i) => (
+              <div key={i} className="v2-trigger">
+                <StatusPill>{labelize(t.trigger_type)}</StatusPill>
+                <span>{t.message}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </details>
+  );
+};
+
+const V2PhaseCard = ({ phase, calendarType, defaultOpen }: { phase: V2Phase; calendarType: 'weekly' | 'rolling'; defaultOpen: boolean }) => (
+  <details className="v2-phase-card" open={defaultOpen || undefined}>
+    <summary className="v2-phase-header">
+      <ChevronRight size={18} className="v2-collapse-icon" />
+      <div className="v2-phase-title">
+        <strong>Phase {phase.phase_number}: {phase.name}</strong>
+        <span>
+          {labelize(phase.phase_type)} · Weeks {phase.start_week}–{phase.end_week}
+        </span>
+      </div>
+      <div className="v2-phase-directions">
+        <StatusPill>Vol {phase.volume_direction}</StatusPill>
+        <StatusPill>Int {phase.intensity_direction}</StatusPill>
+        <StatusPill>Eff {phase.effort_direction}</StatusPill>
+      </div>
+    </summary>
+    <div className="v2-phase-content">
+      <p className="v2-objective">{phase.objective}</p>
+      {phase.weeks.map((week, i) => (
+        <V2WeekCard
+          key={week.week_id}
+          week={week}
+          calendarType={calendarType}
+          defaultOpen={defaultOpen && i === 0}
+        />
+      ))}
+    </div>
+  </details>
+);
+
+const ProgrammeSummaryCard = ({ programme }: { programme: LongitudinalOdinProgramme }) => {
+  const p = programme.programme;
+  const s = programme.strategy;
+  const cal = programme.calendar;
+
+  const items: [string, string | number | undefined][] = [
+    ['Objective', p.goal_description],
+    ['Start date', p.start_date],
+    ['Target weeks', p.target_weeks],
+    ['Start weight', `${p.start_weight_kg} kg`],
+    ['Target weight', `${p.target_weight_kg} kg`],
+    ['Periodization', labelize(s.periodization_model)],
+    ['Progression', labelize(s.progression_model)],
+    ['Split', labelize(s.split_type)],
+    ['Resistance frequency', `${s.resistance_frequency}x/cycle`],
+    ['Conditioning frequency', `${s.conditioning_frequency}x/cycle`],
+    ['Calendar', labelize(cal.cycle_type)],
+    ['Cycle length', `${cal.cycle_length_days} days`],
+    ['Volume strategy', labelize(s.volume_strategy)],
+    ['Intensity strategy', labelize(s.intensity_strategy)],
+    ['Fatigue strategy', labelize(s.fatigue_strategy)],
+    ['Conditioning strategy', labelize(s.conditioning_strategy)],
+  ];
+
+  return (
+    <div className="v2-summary-card">
+      <dl className="v2-summary-grid">
+        {items.map(
+          ([label, value]) =>
+            value != null && value !== '' ? (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ) : null,
+        )}
+      </dl>
+    </div>
+  );
+};
+
+const LongitudinalProgrammeView = ({ programme }: { programme: LongitudinalOdinProgramme }) => (
+  <div className="v2-programme">
+    <ProgrammeSummaryCard programme={programme} />
+    <div className="v2-phase-list">
+      {programme.phases.map((phase, i) => (
+        <V2PhaseCard
+          key={phase.phase_id}
+          phase={phase}
+          calendarType={programme.calendar.cycle_type}
+          defaultOpen={i === 0}
+        />
+      ))}
+    </div>
+  </div>
+);
+
+// --- Generation Metadata ---
+
+const GenerationMeta = ({ data }: { data: ProgrammePreviewResponse }) => (
+  <div className="v2-gen-meta">
+    <div><dt>Planner</dt><dd>{labelize(data.planner_version)}</dd></div>
+    <div><dt>Schema</dt><dd>{data.schema_version}</dd></div>
+    <div><dt>Source</dt><dd>{labelize(data.source)}</dd></div>
+    <div><dt>Validation</dt><dd>{data.validation.passed ? 'Valid' : 'Invalid'}</dd></div>
+    <div><dt>Score</dt><dd>{Math.round(data.validation.overall_score)}</dd></div>
+    <div>
+      <dt>Refinement</dt>
+      <dd>
+        {data.refinement.status === 'applied' || data.refinement.status === 'accepted'
+          ? data.refinement.operation_count != null && data.refinement.operation_count > 0
+            ? `Applied (${data.refinement.operation_count} changes)`
+            : data.refinement.applied
+              ? 'Applied'
+              : 'No change'
+          : data.refinement.status === 'not_requested'
+            ? 'Not requested'
+            : data.refinement.status === 'fallback'
+              ? `Fallback${data.refinement.reason_code ? ` — ${data.refinement.reason_code}` : ''}`
+              : labelize(data.refinement.status)}
+      </dd>
+    </div>
+  </div>
+);
+
+// --- Unsupported version ---
+
+const UnsupportedVersionView = () => (
+  <div className="validation-card">
+    <h4>Unsupported programme version</h4>
+    <p>
+      This programme version is not supported by the current demo UI.
+      Inspect the Raw JSON response for details.
+    </p>
+  </div>
+);
+
+// --- Result tabs ---
+
+const ResultTabs = ({
+  active,
+  onChange,
+}: {
+  active: ResultTab;
+  onChange: (tab: ResultTab) => void;
+}) => (
+  <div className="result-tabs">
+    {(['programme', 'validation', 'json'] as const).map((tab) => (
+      <button
+        key={tab}
+        type="button"
+        className={active === tab ? 'active' : ''}
+        onClick={() => onChange(tab)}
+      >
+        {tab === 'programme' ? 'Programme' : tab === 'validation' ? 'Validation' : 'Raw JSON'}
+      </button>
+    ))}
+  </div>
+);
+
+// --- Raw JSON viewer ---
+
+const RawJsonViewer = ({ data }: { data: unknown }) => {
+  const json = useMemo(() => JSON.stringify(data, null, 2), [data]);
+  const [copied, setCopied] = useState(false);
+
+  const copyJson = () => {
+    void navigator.clipboard.writeText(json).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <div className="raw-json-viewer">
+      <div className="raw-json-toolbar">
+        <button type="button" onClick={copyJson} className="button button-ghost">
+          {copied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy</>}
+        </button>
+      </div>
+      <pre className="raw-json-content">{json}</pre>
+    </div>
+  );
+};
+
 function App() {
   const [token, setToken] = useState('');
   const [email, setEmail] = useState('');
@@ -302,26 +781,17 @@ function App() {
   const [refinementMode, setRefinementMode] =
     useState<RefinementMode>('deterministic');
   const [plannerVersion, setPlannerVersion] =
-    useState<PlannerVersion>('legacy_v1');
+    useState<PlannerVersion>('longitudinal_v1');
   const [programme, setProgramme] =
     useState<ProgrammePreviewResponse | null>(null);
   const [selectedPhase, setSelectedPhase] = useState(1);
+  const [resultTab, setResultTab] = useState<ResultTab>('programme');
   const [busy, setBusy] = useState<BusyAction>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [health, setHealth] = useState<{
     status: 'checking' | 'online' | 'offline';
     version?: string;
   }>({ status: 'checking' });
-
-  const activeDays = useMemo(() => {
-    if (!programme) return [];
-    if (!isLegacyProgramme(programme.programme)) return [];
-    return (
-      programme.programme.phase_week_templates.find(
-        (template) => template.phase_number === selectedPhase,
-      )?.days ?? []
-    );
-  }, [programme, selectedPhase]);
 
   const workflowStep: WorkflowStep = !token.trim()
     ? 'connect'
@@ -586,7 +1056,10 @@ function App() {
         ),
       (data) => {
         setProgramme(data);
-        setSelectedPhase(data.programme.phases[0]?.phase_number ?? 1);
+        setResultTab('programme');
+        if (isLegacyProgramme(data.programme)) {
+          setSelectedPhase(data.programme.phases[0]?.phase_number ?? 1);
+        }
         setNotice({
           tone: 'success',
           title: 'Programme preview generated',
@@ -598,6 +1071,15 @@ function App() {
       },
     );
   };
+
+  const programmeName = programme?.programme.programme.name ?? '';
+  const programmeDescription = programme
+    ? isLegacyProgramme(programme.programme)
+      ? programme.programme.programme.goal_description
+      : isLongitudinalProgramme(programme.programme)
+        ? programme.programme.programme.goal_description
+        : ''
+    : '';
 
   return (
     <div className="app-shell">
@@ -644,7 +1126,7 @@ function App() {
             <span>Train with intent.</span>
           </h1>
           <p>
-            A focused interface for Odin’s authenticated API—from transient
+            A focused interface for Odin's authenticated API—from transient
             athlete input to a validated, exercise-level programme preview.
           </p>
           <div className="hero-steps">
@@ -753,7 +1235,7 @@ function App() {
               ) : null}
             </div>
             <button onClick={() => setNotice(null)} aria-label="Dismiss message">
-              ×
+              &times;
             </button>
           </section>
         ) : null}
@@ -1057,9 +1539,9 @@ function App() {
 
               <div className="mode-grid">
                 {([
-                  ['deterministic', 'Baseline', 'Planner and validator only.'],
-                  ['llm_optional', 'Optional refine', 'Falls back safely if unavailable.'],
-                  ['llm_required', 'Required refine', 'Fails if refinement is unavailable.'],
+                  ['deterministic', 'Deterministic', 'Planner and validator only.'],
+                  ['llm_optional', 'AI Refined', 'Falls back safely if unavailable.'],
+                  ['llm_required', 'AI Required', 'Fails if refinement is unavailable. Developer only.'],
                 ] as const).map(([value, title, description]) => (
                   <label
                     key={value}
@@ -1079,16 +1561,16 @@ function App() {
                 ))}
               </div>
 
-              <label className="field">
-                <span>Planner version</span>
+              <label className="field" style={{ marginTop: 19 }}>
+                <span className="field-label">Planner version</span>
                 <select
                   value={plannerVersion}
                   onChange={(event) =>
                     setPlannerVersion(event.target.value as PlannerVersion)
                   }
                 >
+                  <option value="longitudinal_v1">Longitudinal V1</option>
                   <option value="legacy_v1">Legacy V1</option>
-                  <option value="longitudinal_v1">Longitudinal V2</option>
                 </select>
               </label>
 
@@ -1123,107 +1605,136 @@ function App() {
                   <div className="programme-overview">
                     <div>
                       <div className="eyebrow">Stateless preview</div>
-                      <h3>{programme.programme.programme.name}</h3>
-                      <p>{programme.programme.programme.goal_description}</p>
+                      <h3>{programmeName}</h3>
+                      <p>{programmeDescription}</p>
                       <div className="overview-pills">
-                        <StatusPill tone="positive">Validated</StatusPill>
+                        <StatusPill tone={programme.validation.passed ? 'positive' : 'negative'}>
+                          {programme.validation.passed ? 'Validated' : 'Invalid'}
+                        </StatusPill>
                         <StatusPill tone="purple">{labelize(programme.source)}</StatusPill>
                         <StatusPill>{labelize(programme.planner_version)}</StatusPill>
-                        <StatusPill>{programme.programme.programme.target_weeks} weeks</StatusPill>
+                        <StatusPill>Schema {programme.schema_version}</StatusPill>
                         {isLegacyProgramme(programme.programme) ? (
-                          <StatusPill>{programme.programme.programme.available_days} days</StatusPill>
+                          <>
+                            <StatusPill>{programme.programme.programme.target_weeks} weeks</StatusPill>
+                            <StatusPill>{programme.programme.programme.available_days} days</StatusPill>
+                          </>
+                        ) : isLongitudinalProgramme(programme.programme) ? (
+                          <StatusPill>{programme.programme.programme.target_weeks} weeks</StatusPill>
                         ) : null}
                       </div>
                     </div>
                     <ScoreRing score={programme.validation.overall_score} />
                   </div>
 
-                  <div className="phase-tabs">
-                    {programme.programme.phases.map((phase) => (
-                      <button
-                        type="button"
-                        key={phase.phase_number}
-                        className={selectedPhase === phase.phase_number ? 'active' : ''}
-                        onClick={() => setSelectedPhase(phase.phase_number)}
-                      >
-                        <span>Phase {phase.phase_number}</span>
-                        <strong>{phase.name}</strong>
-                        <small>{phase.weeks_count} weeks</small>
-                      </button>
-                    ))}
-                  </div>
+                  <GenerationMeta data={programme} />
+                  <ResultTabs active={resultTab} onChange={setResultTab} />
 
-                  {isLegacyProgramme(programme.programme) ? (
-                    <div className="workout-list">
-                      {activeDays.map((day) => (
-                        <WorkoutDay key={day.day_of_week} day={day} />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="validation-card">
-                      <h4>Longitudinal V2 preview</h4>
-                      <p>
-                        The detailed V2 renderer is deferred. The validated
-                        structured response is shown below.
-                      </p>
-                      <pre>{JSON.stringify(programme.programme, null, 2)}</pre>
-                    </div>
-                  )}
-
-                  <div className="validation-grid">
-                    <div className="validation-card">
-                      <div className="card-title">
-                        <FileCheck2 size={18} />
-                        <strong>Validation report</strong>
-                        <StatusPill
-                          tone={programme.validation.passed ? 'positive' : 'negative'}
-                        >
-                          {labelize(programme.validation.status)}
-                        </StatusPill>
-                      </div>
-                      <div className="score-bars">
-                        {Object.entries(programme.validation.scores).map(
-                          ([name, score]) => (
-                            <div key={name}>
-                              <span>{labelize(name)}</span>
-                              <i><b style={{ width: `${score}%` }} /></i>
-                              <strong>{Math.round(score)}</strong>
-                            </div>
-                          ),
+                  {resultTab === 'programme' ? (
+                    <>
+                      {isLegacyProgramme(programme.programme) ? (
+                        <>
+                          <div className="phase-tabs">
+                            {programme.programme.phases.map((phase) => (
+                              <button
+                                type="button"
+                                key={phase.phase_number}
+                                className={selectedPhase === phase.phase_number ? 'active' : ''}
+                                onClick={() => setSelectedPhase(phase.phase_number)}
+                              >
+                                <span>Phase {phase.phase_number}</span>
+                                <strong>{phase.name}</strong>
+                                <small>{phase.weeks_count} weeks</small>
+                              </button>
+                            ))}
+                          </div>
+                          <LegacyProgrammeView
+                            programme={programme.programme}
+                            selectedPhase={selectedPhase}
+                          />
+                        </>
+                      ) : isLongitudinalProgramme(programme.programme) ? (
+                        <LongitudinalProgrammeView programme={programme.programme} />
+                      ) : (
+                        <UnsupportedVersionView />
+                      )}
+                    </>
+                  ) : resultTab === 'validation' ? (
+                    <div className="validation-grid">
+                      <div className="validation-card">
+                        <div className="card-title">
+                          <FileCheck2 size={18} />
+                          <strong>Validation report</strong>
+                          <StatusPill
+                            tone={programme.validation.passed ? 'positive' : 'negative'}
+                          >
+                            {labelize(programme.validation.status)}
+                          </StatusPill>
+                        </div>
+                        <div className="score-bars">
+                          {Object.entries(programme.validation.scores).map(
+                            ([name, score]) => (
+                              <div key={name}>
+                                <span>{labelize(name)}</span>
+                                <i><b style={{ width: `${score}%` }} /></i>
+                                <strong>{Math.round(score)}</strong>
+                              </div>
+                            ),
+                          )}
+                        </div>
+                        {programme.validation.findings.length ? (
+                          <div className="findings">
+                            {programme.validation.findings.map((finding, index) => (
+                              <div key={`${finding.code}-${index}`} className={`finding-${finding.severity}`}>
+                                <AlertCircle size={14} />
+                                <span>
+                                  <strong>{finding.code}</strong>
+                                  {finding.message}
+                                  {finding.category ? <small>{labelize(finding.category)}</small> : null}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="empty-note"><Check size={15} /> No validation findings.</p>
                         )}
                       </div>
-                      {programme.validation.findings.length ? (
-                        <div className="findings">
-                          {programme.validation.findings.map((finding, index) => (
-                            <div key={`${finding.code}-${index}`}>
-                              <AlertCircle size={14} />
-                              <span><strong>{finding.code}</strong>{finding.message}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="empty-note"><Check size={15} /> No validation findings.</p>
-                      )}
-                    </div>
 
-                    <div className="validation-card">
-                      <div className="card-title">
-                        <Bot size={18} />
-                        <strong>Refinement</strong>
-                        <StatusPill tone="purple">
-                          {labelize(programme.refinement.status)}
-                        </StatusPill>
+                      <div className="validation-card">
+                        <div className="card-title">
+                          <Bot size={18} />
+                          <strong>Refinement</strong>
+                          <StatusPill tone="purple">
+                            {labelize(programme.refinement.status)}
+                          </StatusPill>
+                        </div>
+                        <dl className="metadata-list">
+                          <div><dt>Requested</dt><dd>{programme.refinement.requested ? 'Yes' : 'No'}</dd></div>
+                          <div><dt>Applied</dt><dd>{programme.refinement.applied ? 'Yes' : 'No'}</dd></div>
+                          {programme.refinement.model != null ? (
+                            <div><dt>Model</dt><dd>{programme.refinement.model}</dd></div>
+                          ) : null}
+                          <div><dt>Reason</dt><dd>{programme.refinement.reason_code ?? '—'}</dd></div>
+                          {programme.refinement.prompt_version != null ? (
+                            <div><dt>Prompt</dt><dd>{programme.refinement.prompt_version}</dd></div>
+                          ) : null}
+                          {programme.refinement.operation_count != null ? (
+                            <div><dt>Operations</dt><dd>{programme.refinement.operation_count} applied</dd></div>
+                          ) : programme.refinement.accepted_operation_count != null ? (
+                            <div><dt>Operations</dt><dd>{programme.refinement.accepted_operation_count} accepted</dd></div>
+                          ) : null}
+                          {programme.refinement.accepted_operation_types && programme.refinement.accepted_operation_types.length > 0 ? (
+                            <div><dt>Types</dt><dd>{programme.refinement.accepted_operation_types.map(labelize).join(', ')}</dd></div>
+                          ) : null}
+                          {programme.refinement.retry_attempted != null ? (
+                            <div><dt>Retry</dt><dd>{programme.refinement.retry_attempted ? 'Yes' : 'No'}</dd></div>
+                          ) : null}
+                        </dl>
                       </div>
-                      <dl className="metadata-list">
-                        <div><dt>Requested</dt><dd>{programme.refinement.requested ? 'Yes' : 'No'}</dd></div>
-                        <div><dt>Applied</dt><dd>{programme.refinement.applied ? 'Yes' : 'No'}</dd></div>
-                        <div><dt>Model</dt><dd>{programme.refinement.model ?? '—'}</dd></div>
-                        <div><dt>Reason</dt><dd>{programme.refinement.reason_code ?? '—'}</dd></div>
-                        <div><dt>Prompt</dt><dd>{programme.refinement.prompt_version ?? '—'}</dd></div>
-                        <div><dt>Operations</dt><dd>{programme.refinement.accepted_operation_count ?? 0} accepted</dd></div>
-                      </dl>
                     </div>
-                  </div>
+                  ) : (
+                    <RawJsonViewer data={programme} />
+                  )}
                 </div>
               ) : (
                 <div className="empty-programme">
