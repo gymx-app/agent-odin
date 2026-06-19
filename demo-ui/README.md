@@ -33,10 +33,6 @@ VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-or-publishable-key
 ```
 
-On Vercel, the demo also accepts the existing public `SUPABASE_URL` and
-`SUPABASE_ANON_KEY` project variables at build time. The service-role key is
-never exposed to the browser build.
-
 The UI signs in with a development test user's email and password, lets
 Supabase manage the browser session, optionally maps compatible fields from
 GymX `user_profiles`, and sends the resulting access token with transient
