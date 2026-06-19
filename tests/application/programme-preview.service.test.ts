@@ -198,7 +198,7 @@ describe('previewProgramme', () => {
       requested: true,
       applied: false,
       status: 'fallback',
-      reason_code: 'REFINEMENT_UNSUPPORTED_FOR_PLANNER_VERSION',
+      reason_code: 'OPENAI_CONFIGURATION_MISSING',
     });
   });
 
@@ -242,7 +242,7 @@ describe('previewProgramme', () => {
         startDate: '2026-06-22',
       }),
     ).rejects.toMatchObject({
-      code: 'LLM_REFINEMENT_UNSUPPORTED_FOR_PLANNER_VERSION',
+      code: 'LLM_REQUIRED_REFINEMENT_FAILED',
     });
   });
 

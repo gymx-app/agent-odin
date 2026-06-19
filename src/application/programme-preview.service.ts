@@ -4,10 +4,12 @@ import type { OdinProgramme } from '../domain/programme/programme.types.js';
 import type { LongitudinalOdinProgramme } from '../domain/programme/programme.types.js';
 import type { Logger } from '../infrastructure/logging/logger.js';
 import type { ProgrammeRefinementProvider } from '../llm/programme-refinement-provider.js';
+import type { V2ProgrammeRefinementProvider } from '../llm/v2-programme-refinement-provider.js';
 import type {
   RefinementMetadata,
   RefinementMode,
 } from '../llm/refinement.types.js';
+import type { V2RefinementMetadata } from '../llm/v2-refinement.types.js';
 import { normalizeAthlete } from '../normalization/athlete-normalizer.js';
 import { buildBaselineProgramme } from '../planning/baseline-programme-planner.js';
 import { buildLongitudinalProgramme } from '../planning/longitudinal-programme-planner.js';
@@ -19,6 +21,7 @@ import {
 import type { ProgrammeValidationReport } from '../validation/validation.types.js';
 import { toSafeGenerationError } from './programme-generation/generation-errors.js';
 import { refineProgramme } from './programme-refinement.service.js';
+import { refineV2Programme } from './v2-programme-refinement.service.js';
 import {
   resolvePlannerVersion,
   type PlannerVersion,
@@ -32,7 +35,7 @@ export type ProgrammePreviewResult = {
   schema_version: '1.0' | '2.0';
   programme: OdinProgramme | LongitudinalOdinProgramme;
   validation: ProgrammeValidationReport;
-  refinement: RefinementMetadata;
+  refinement: RefinementMetadata | V2RefinementMetadata;
   generation: {
     planner_version: PlannerVersion;
     schema_version: '1.0' | '2.0';
@@ -49,6 +52,7 @@ export type ProgrammePreviewContext = {
   requestId: string;
   exercises: Exercise[];
   refinementProvider?: ProgrammeRefinementProvider;
+  v2RefinementProvider?: V2ProgrammeRefinementProvider;
   configuredModel?: string | null;
   refinementUnavailableReason?:
     | 'LLM_REFINEMENT_DISABLED'
@@ -126,14 +130,6 @@ export const previewProgramme = async (
     );
     assertWithinDeadline('planner_resolution');
     if (resolution.selected_version === 'longitudinal_v1') {
-      if (refinementMode === 'llm_required') {
-        throw odinError(
-          'LLM_REFINEMENT_UNSUPPORTED_FOR_PLANNER_VERSION',
-          'Required LLM refinement is unsupported for longitudinal_v1.',
-          409,
-          { planner_version: resolution.selected_version },
-        );
-      }
       const longitudinalGenerator =
         context.longitudinalGenerator ?? buildLongitudinalProgramme;
       const generated = await timed('longitudinal_generation', () =>
@@ -180,35 +176,32 @@ export const previewProgramme = async (
           },
         );
       }
+      assertWithinDeadline('v2_refinement');
+      const v2RefinementResult = await timed('v2_refinement', () =>
+        refineV2Programme({
+          mode: refinementMode,
+          baseline: generated.programme,
+          baselineValidation: generated.validation,
+          profile: normalized,
+          exercises: context.exercises,
+          configuredModel: context.configuredModel ?? null,
+          unavailableReason:
+            context.refinementUnavailableReason ??
+            'OPENAI_CONFIGURATION_MISSING',
+          requestId: context.requestId,
+          ...(context.v2RefinementProvider
+            ? { provider: context.v2RefinementProvider }
+            : {}),
+        }),
+      );
       assertWithinDeadline('final_validation');
       return {
-        source: 'deterministic',
+        source: v2RefinementResult.source,
         planner_version: 'longitudinal_v1',
         schema_version: '2.0',
-        programme: generated.programme,
-        validation: generated.validation,
-        refinement:
-          refinementMode === 'llm_optional'
-            ? {
-                requested: true,
-                applied: false,
-                status: 'fallback',
-                reason_code: 'REFINEMENT_UNSUPPORTED_FOR_PLANNER_VERSION',
-                model: context.configuredModel ?? null,
-                prompt_version: null,
-                schema_version: null,
-                accepted_operation_count: 0,
-                rejected_operation_count: 0,
-              }
-            : {
-                requested: false,
-                applied: false,
-                status: 'not_requested',
-                reason_code: 'REFINEMENT_SKIPPED_LONGITUDINAL_V1',
-                model: null,
-                prompt_version: null,
-                schema_version: null,
-              },
+        programme: v2RefinementResult.programme,
+        validation: v2RefinementResult.validation,
+        refinement: v2RefinementResult.refinement,
         generation: {
           planner_version: 'longitudinal_v1',
           schema_version: '2.0',
