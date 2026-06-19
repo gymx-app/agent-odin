@@ -69,4 +69,21 @@ describe('fillMovementSlot', () => {
       'bodyweight_squat',
     );
   });
+
+  it('prefers an exact movement match over an easier substitution', () => {
+    const selected = fillMovementSlot(
+      {
+        ...slot,
+        movement_pattern: 'vertical_push',
+        allowed_substitution_patterns: ['shoulder_abduction'],
+      },
+      createProfile({
+        equipment: 'full_gym',
+        fitness_level: 'intermediate',
+      }),
+      seedExercises,
+    );
+
+    expect(selected.exercise.movement_patterns).toContain('vertical_push');
+  });
 });

@@ -39,13 +39,17 @@ const isDifficultyCompatible = (
 
 const sortExerciseCandidates = (
   profile: NormalizedAthleteProfile,
+  slot: MovementSlot,
   left: { exercise: Exercise; status: 'eligible' | 'modifiable' },
   right: { exercise: Exercise; status: 'eligible' | 'modifiable' },
 ): number => {
   const statusRank = { eligible: 0, modifiable: 1 };
+  const exactPatternRank = (exercise: Exercise): number =>
+    exercise.movement_patterns.includes(slot.movement_pattern) ? 0 : 1;
 
   return (
     statusRank[left.status] - statusRank[right.status] ||
+    exactPatternRank(left.exercise) - exactPatternRank(right.exercise) ||
     difficultyRank[left.exercise.difficulty] -
       difficultyRank[right.exercise.difficulty] ||
     (profile.recovery_capacity === 'low'
@@ -114,7 +118,10 @@ export const fillMovementSlot = (
         Number(recentlySelectedExerciseIds.includes(left.exercise.id)) -
         Number(recentlySelectedExerciseIds.includes(right.exercise.id));
 
-      return recentPenalty || sortExerciseCandidates(profile, left, right);
+      return (
+        recentPenalty ||
+        sortExerciseCandidates(profile, slot, left, right)
+      );
     });
 
   const selectedCandidate = candidates[0];

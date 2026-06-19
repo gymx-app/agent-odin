@@ -147,11 +147,17 @@ const createWorkoutDay = (
   recentlySelectedExerciseIds: string[],
 ): DayTemplate => {
   const slots = buildMovementSlotsForSession(session.kind);
+  const selectedExerciseIds = [...recentlySelectedExerciseIds];
   const filledSlots = slots.flatMap((slot) => {
     try {
-      return [
-        fillMovementSlot(slot, profile, exercises, recentlySelectedExerciseIds),
-      ];
+      const filledSlot = fillMovementSlot(
+        slot,
+        profile,
+        exercises,
+        selectedExerciseIds,
+      );
+      selectedExerciseIds.push(filledSlot.exercise.id);
+      return [filledSlot];
     } catch (error) {
       if (error instanceof PlannerError && !slot.required) {
         return [];

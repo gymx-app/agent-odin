@@ -60,6 +60,39 @@ describe('previewProgramme', () => {
     });
   });
 
+  it('returns a valid preview for the demo UI default profile', async () => {
+    const result = await previewProgramme(
+      {
+        name: 'Alex Morgan',
+        age: 32,
+        sex: 'male',
+        current_weight_kg: 84,
+        target_weight_kg: 79,
+        height_cm: 180,
+        goal: 'recomposition',
+        available_days_per_week: 4,
+        session_duration_min: 60,
+        equipment: 'full_gym',
+        fitness_level: 'intermediate',
+        injuries: [],
+        inbody: null,
+      },
+      'deterministic',
+      {
+        requestId: 'req-demo-preview',
+        exercises: seedExercises,
+      },
+    );
+
+    expect(result.validation.passed).toBe(true);
+    result.programme.phase_week_templates[0]?.days.forEach((day) => {
+      const exerciseIds = day.exercises.map(
+        (exercise) => exercise.exercise_id,
+      );
+      expect(new Set(exerciseIds).size).toBe(exerciseIds.length);
+    });
+  });
+
   it('fails safely when the bundled exercise library is invalid', async () => {
     await expect(
       previewProgramme(beginnerFatLossAthlete, 'deterministic', {
