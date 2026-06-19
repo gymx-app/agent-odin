@@ -60,6 +60,8 @@ type BusyAction =
   | 'lookup'
   | null;
 
+type WorkflowStep = 'connect' | 'profile' | 'generate' | 'review';
+
 type ProfileLoadState =
   | { status: 'default' }
   | { status: 'loading' }
@@ -204,7 +206,9 @@ const Button = ({
 }) => (
   <button
     {...props}
+    type={props.type ?? 'button'}
     className={`button button-${variant} ${props.className ?? ''}`}
+    aria-busy={busy || undefined}
   >
     {busy ? <Loader2 size={16} className="spin" /> : null}
     {children}
@@ -299,6 +303,7 @@ function App() {
   const [idempotencyKey, setIdempotencyKey] = useState('');
   const [programmeId, setProgrammeId] = useState('');
   const [programme, setProgramme] = useState<ProgrammeResponse | null>(null);
+  const [profileSaved, setProfileSaved] = useState(false);
   const [selectedPhase, setSelectedPhase] = useState(1);
   const [busy, setBusy] = useState<BusyAction>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -316,6 +321,16 @@ function App() {
     );
   }, [programme, selectedPhase]);
 
+  const workflowStep: WorkflowStep = !token.trim()
+    ? 'connect'
+    : !profileSaved
+      ? 'profile'
+      : !programme
+        ? 'generate'
+        : 'review';
+
+  const isBusy = busy !== null;
+
   const run = async <T,>(
     action: Exclude<BusyAction, null>,
     operation: () => Promise<T>,
@@ -332,19 +347,24 @@ function App() {
     }
   };
 
-  const checkHealth = () =>
-    run(
-      'health',
-      odinApi.health,
-      (data) => {
-        setHealth({ status: 'online', version: data.version });
-        setNotice({
-          tone: 'success',
-          title: 'API connected',
-          message: `Agent Odin ${data.version} is healthy.`,
-        });
-      },
-    ).catch(() => setHealth({ status: 'offline' }));
+  const checkHealth = async () => {
+    setBusy('health');
+    setNotice(null);
+    try {
+      const data = await odinApi.health();
+      setHealth({ status: 'online', version: data.version });
+      setNotice({
+        tone: 'success',
+        title: 'API connected',
+        message: `Agent Odin ${data.version} is healthy.`,
+      });
+    } catch (error) {
+      setHealth({ status: 'offline' });
+      setNotice(errorNotice(error));
+    } finally {
+      setBusy(null);
+    }
+  };
 
   useEffect(() => {
     odinApi
@@ -413,6 +433,7 @@ function App() {
       }
 
       setProfile(parsed.data);
+      setProfileSaved(true);
       setProfileLoad({
         status: 'loaded',
         updatedAt: typeof data.updated_at === 'string' ? data.updated_at : null,
@@ -524,6 +545,7 @@ function App() {
         setToken('');
         setSessionEmail(null);
         setProfile(defaultProfile);
+        setProfileSaved(false);
         setProfileLoad({ status: 'default' });
         setProgramme(null);
         setNotice({
@@ -538,25 +560,50 @@ function App() {
   const updateProfile = <K extends keyof AthleteInput>(
     key: K,
     value: AthleteInput[K],
-  ) => setProfile((current) => ({ ...current, [key]: value }));
+  ) => {
+    setProfileSaved(false);
+    setProfile((current) => ({ ...current, [key]: value }));
+  };
 
   const saveProfile = () => {
     if (!requireToken()) return;
+    const parsed = athleteInputSchema.safeParse(profile);
+    if (!parsed.success) {
+      setNotice({
+        tone: 'error',
+        title: 'PROFILE_VALIDATION_FAILED',
+        message: 'Review the validation details and correct the profile before saving.',
+        details: parsed.error.flatten().fieldErrors,
+      });
+      return;
+    }
     void run(
       'profile',
-      () => odinApi.saveProfile(token.trim(), profile),
-      () =>
+      () => odinApi.saveProfile(token.trim(), parsed.data),
+      () => {
+        setProfileSaved(true);
         setNotice({
           tone: 'success',
           title: 'Odin profile saved',
           message:
             'The profile was saved through Odin for the authenticated user.',
-        }),
+        });
+      },
     );
   };
 
   const generate = () => {
     if (!requireToken()) return;
+    if (!profileSaved) {
+      setNotice({
+        tone: 'info',
+        title: 'Save profile first',
+        message:
+          'Save the current athlete profile before generating a programme.',
+      });
+      document.querySelector('#athlete')?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
     void run(
       'generate',
       () =>
@@ -640,7 +687,10 @@ function App() {
         <button
           className={`health-chip health-${health.status}`}
           onClick={() => void checkHealth()}
-          disabled={busy === 'health'}
+          disabled={isBusy}
+          aria-label={`API ${health.status}${
+            health.version ? `, version ${health.version}` : ''
+          }. Check health`}
         >
           {busy === 'health' ? (
             <Loader2 size={14} className="spin" />
@@ -676,12 +726,12 @@ function App() {
           </div>
         </section>
 
-        <section className="auth-panel">
+        <section className="auth-panel" aria-labelledby="auth-title">
           <div className="section-icon"><KeyRound size={20} /></div>
           {sessionEmail ? (
             <>
               <div className="auth-copy">
-                <strong>Connected to Supabase</strong>
+                <strong id="auth-title">Connected to Supabase</strong>
                 <span>{sessionEmail}</span>
               </div>
               <StatusPill tone="positive">
@@ -691,6 +741,7 @@ function App() {
                 variant="secondary"
                 onClick={signOut}
                 busy={busy === 'auth'}
+                disabled={isBusy}
               >
                 <LogOut size={15} /> Sign out
               </Button>
@@ -698,7 +749,7 @@ function App() {
           ) : (
             <>
               <div className="auth-copy">
-                <strong>Sign in to Supabase</strong>
+                <strong id="auth-title">Sign in to Supabase</strong>
                 <span>Use a development test user. Session managed by Supabase.</span>
               </div>
               <div className="auth-fields">
@@ -735,7 +786,7 @@ function App() {
                   </button>
                 </label>
               </div>
-              <Button onClick={signIn} busy={busy === 'auth'}>
+              <Button onClick={signIn} busy={busy === 'auth'} disabled={isBusy}>
                 <LogIn size={15} /> Sign in
               </Button>
             </>
@@ -749,7 +800,11 @@ function App() {
         </section>
 
         {notice ? (
-          <section className={`notice notice-${notice.tone}`}>
+          <section
+            className={`notice notice-${notice.tone}`}
+            role={notice.tone === 'error' ? 'alert' : 'status'}
+            aria-live="polite"
+          >
             {notice.tone === 'success' ? (
               <Check size={18} />
             ) : (
@@ -813,12 +868,14 @@ function App() {
               <div className="form-grid">
                 <Field label="Name">
                   <input
+                    aria-label="Athlete name"
                     value={profile.name}
                     onChange={(event) => updateProfile('name', event.target.value)}
                   />
                 </Field>
                 <Field label="Age">
                   <input
+                    aria-label="Athlete age"
                     type="number"
                     min={16}
                     max={100}
@@ -830,6 +887,7 @@ function App() {
                 </Field>
                 <Field label="Sex">
                   <select
+                    aria-label="Athlete sex"
                     value={profile.sex}
                     onChange={(event) =>
                       updateProfile('sex', event.target.value as AthleteInput['sex'])
@@ -841,6 +899,7 @@ function App() {
                 </Field>
                 <Field label="Fitness level">
                   <select
+                    aria-label="Fitness level"
                     value={profile.fitness_level}
                     onChange={(event) =>
                       updateProfile(
@@ -856,6 +915,7 @@ function App() {
                 </Field>
                 <Field label="Current weight" hint="Kilograms">
                   <input
+                    aria-label="Current weight in kilograms"
                     type="number"
                     step="0.1"
                     min="1"
@@ -870,6 +930,7 @@ function App() {
                 </Field>
                 <Field label="Target weight" hint="Kilograms">
                   <input
+                    aria-label="Target weight in kilograms"
                     type="number"
                     step="0.1"
                     min="1"
@@ -884,6 +945,7 @@ function App() {
                 </Field>
                 <Field label="Height" hint="Centimetres">
                   <input
+                    aria-label="Height in centimetres"
                     type="number"
                     min="1"
                     value={profile.height_cm}
@@ -894,6 +956,7 @@ function App() {
                 </Field>
                 <Field label="Goal">
                   <select
+                    aria-label="Training goal"
                     value={profile.goal}
                     onChange={(event) =>
                       updateProfile(
@@ -915,6 +978,7 @@ function App() {
                 </Field>
                 <Field label="Training days" hint="2–7 days per week">
                   <input
+                    aria-label="Available training days per week"
                     type="number"
                     min={2}
                     max={7}
@@ -929,6 +993,7 @@ function App() {
                 </Field>
                 <Field label="Session duration" hint="20–180 minutes">
                   <input
+                    aria-label="Session duration in minutes"
                     type="number"
                     min={20}
                     max={180}
@@ -943,6 +1008,7 @@ function App() {
                 </Field>
                 <Field label="Equipment">
                   <select
+                    aria-label="Available equipment"
                     value={profile.equipment}
                     onChange={(event) =>
                       updateProfile(
@@ -1035,11 +1101,15 @@ function App() {
                     variant="secondary"
                     onClick={() => void loadAuthenticatedProfile(true)}
                     busy={busy === 'profile-load'}
-                    disabled={!token}
+                    disabled={!token || isBusy}
                   >
                     <RefreshCw size={16} /> Reload profile
                   </Button>
-                  <Button onClick={saveProfile} busy={busy === 'profile'}>
+                  <Button
+                    onClick={saveProfile}
+                    busy={busy === 'profile'}
+                    disabled={isBusy}
+                  >
                     <Save size={16} /> Save profile
                   </Button>
                 </div>
@@ -1099,7 +1169,11 @@ function App() {
                     placeholder="demo-generation-001"
                   />
                 </Field>
-                <Button onClick={generate} busy={busy === 'generate'}>
+                <Button
+                  onClick={generate}
+                  busy={busy === 'generate'}
+                  disabled={isBusy}
+                >
                   <Sparkles size={16} /> Generate programme
                 </Button>
               </div>
@@ -1119,6 +1193,7 @@ function App() {
                     variant="secondary"
                     onClick={loadCurrent}
                     busy={busy === 'current'}
+                    disabled={isBusy}
                   >
                     <RefreshCw size={15} /> Current draft
                   </Button>
@@ -1137,6 +1212,7 @@ function App() {
                   variant="ghost"
                   onClick={lookupProgramme}
                   busy={busy === 'lookup'}
+                  disabled={isBusy}
                 >
                   <Search size={15} /> Find
                 </Button>
@@ -1162,6 +1238,7 @@ function App() {
                   <div className="phase-tabs">
                     {programme.programme.phases.map((phase) => (
                       <button
+                        type="button"
                         key={phase.phase_number}
                         className={selectedPhase === phase.phase_number ? 'active' : ''}
                         onClick={() => setSelectedPhase(phase.phase_number)}
@@ -1239,7 +1316,12 @@ function App() {
                   <div className="empty-orbit"><Activity size={28} /></div>
                   <h3>No programme loaded</h3>
                   <p>Generate a new draft or retrieve the authenticated user’s current draft.</p>
-                  <Button variant="secondary" onClick={loadCurrent} busy={busy === 'current'}>
+                  <Button
+                    variant="secondary"
+                    onClick={loadCurrent}
+                    busy={busy === 'current'}
+                    disabled={isBusy}
+                  >
                     <RefreshCw size={15} /> Load current draft
                   </Button>
                 </div>
@@ -1258,15 +1340,15 @@ function App() {
                   <span>{token.trim() ? <Check size={13} /> : '1'}</span>
                   <div><strong>Connect</strong><small>Sign in to Supabase</small></div>
                 </li>
-                <li>
-                  <span>2</span>
+                <li className={profileSaved ? 'done' : workflowStep === 'profile' ? 'active' : ''}>
+                  <span>{profileSaved ? <Check size={13} /> : '2'}</span>
                   <div><strong>Save profile</strong><small>PUT /api/profile</small></div>
                 </li>
-                <li>
-                  <span>3</span>
+                <li className={workflowStep === 'generate' ? 'active' : programme ? 'done' : ''}>
+                  <span>{programme ? <Check size={13} /> : '3'}</span>
                   <div><strong>Generate</strong><small>POST /api/odin/generate</small></div>
                 </li>
-                <li className={programme ? 'done' : ''}>
+                <li className={programme ? 'done' : workflowStep === 'review' ? 'active' : ''}>
                   <span>{programme ? <Check size={13} /> : '4'}</span>
                   <div><strong>Review</strong><small>Validated programme</small></div>
                 </li>
