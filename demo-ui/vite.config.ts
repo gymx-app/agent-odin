@@ -6,6 +6,11 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    envPrefix: [
+      'VITE_',
+      'SUPABASE_URL',
+      'SUPABASE_ANON_KEY',
+    ],
     server: {
       port: 5173,
       strictPort: true,
