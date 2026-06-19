@@ -76,9 +76,20 @@ The preview request may not select or impersonate another user.
     "injuries": [],
     "inbody": null
   },
-  "refinement_mode": "deterministic"
+  "refinement_mode": "deterministic",
+  "planner_version": "longitudinal_v1",
+  "start_date": "2026-06-22"
 }
 ```
+
+`planner_version` is optional and controlled:
+
+- `legacy_v1`
+- `longitudinal_v1`
+
+Omitting it uses `ODIN_DEFAULT_PLANNER_VERSION`. Longitudinal generation must
+also be enabled by configuration. Explicit V2 requests never silently fall
+back to V1.
 
 `refinement_mode` values:
 
@@ -99,12 +110,18 @@ Preview bodies are limited to 64 KiB.
   "success": true,
   "data": {
     "source": "deterministic",
+    "planner_version": "longitudinal_v1",
+    "schema_version": "2.0",
     "programme": {},
     "validation": {},
-    "refinement": {}
+    "refinement": {},
+    "generation": {}
   }
 }
 ```
+
+Consumers should discriminate the response with `planner_version` and
+`schema_version`, not by guessing from the programme shape.
 
 The response intentionally contains no:
 
@@ -156,11 +173,22 @@ The validator is deterministic and non-mutating. Avoid-restriction violations
 are hard failures. Validation findings use stable machine-readable codes, and
 no model may override a validation error.
 
+Validation composition, rule versioning, and future rule registration are
+documented in [docs/validation-architecture.md](docs/validation-architecture.md).
+
+The additive enriched athlete request and normalized athlete-state model are
+documented in [docs/athlete-input-v2.md](docs/athlete-input-v2.md).
+
 ## Optional LLM refinement
 
 - `deterministic`: never calls a model
 - `llm_optional`: falls back to the deterministic baseline
 - `llm_required`: fails safely if refinement is unavailable or rejected
+
+For `longitudinal_v1`, deterministic mode is supported, `llm_optional` returns
+the valid deterministic V2 programme with
+`REFINEMENT_UNSUPPORTED_FOR_PLANNER_VERSION`, and `llm_required` fails safely.
+The V1 refinement applier is never used on V2 programmes.
 
 Model output cannot control persistence, exercise identity, programme naming,
 or validation.
@@ -177,6 +205,9 @@ Copy `.env.example` and configure:
 - `SUPABASE_ANON_KEY`
 - `ODIN_GENERATION_TIMEOUT_MS`
 - `ODIN_LLM_REFINEMENT_ENABLED`
+- `ODIN_DEFAULT_PLANNER_VERSION`
+- `ODIN_LONGITUDINAL_PLANNER_ENABLED`
+- `ODIN_ALLOWED_PLANNER_VERSIONS`
 - `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_TIMEOUT_MS`,
   `OPENAI_MAX_RETRIES` when refinement is enabled
 

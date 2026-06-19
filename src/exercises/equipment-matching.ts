@@ -35,6 +35,15 @@ const equipmentByAthleteProfile: Record<
   dumbbells_only: ['bodyweight', 'dumbbell', 'bench'],
   bodyweight: ['bodyweight'],
   home_gym: ['bodyweight', 'dumbbell', 'resistance_band', 'bench'],
+  hotel_gym: [
+    'bodyweight',
+    'dumbbell',
+    'cable',
+    'machine',
+    'bench',
+    'treadmill',
+    'bike',
+  ],
 };
 
 export const getAllowedEquipmentForAthlete = (

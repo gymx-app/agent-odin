@@ -31,6 +31,7 @@ import type {
   AthleteInput,
   ProgrammeDay,
   ProgrammePreviewResponse,
+  PlannerVersion,
   RefinementMode,
 } from './api/contracts';
 import { defaultProfile } from './fixtures/default-profile';
@@ -55,6 +56,13 @@ type BusyAction =
   | null;
 
 type WorkflowStep = 'connect' | 'preview' | 'review';
+
+const isLegacyProgramme = (
+  programme: ProgrammePreviewResponse['programme'],
+): programme is Extract<
+  ProgrammePreviewResponse['programme'],
+  { phase_week_templates: unknown }
+> => 'phase_week_templates' in programme;
 
 type ProfileLoadState =
   | { status: 'default' }
@@ -293,6 +301,8 @@ function App() {
     useState<ProfileLoadState>({ status: 'default' });
   const [refinementMode, setRefinementMode] =
     useState<RefinementMode>('deterministic');
+  const [plannerVersion, setPlannerVersion] =
+    useState<PlannerVersion>('legacy_v1');
   const [programme, setProgramme] =
     useState<ProgrammePreviewResponse | null>(null);
   const [selectedPhase, setSelectedPhase] = useState(1);
@@ -305,6 +315,7 @@ function App() {
 
   const activeDays = useMemo(() => {
     if (!programme) return [];
+    if (!isLegacyProgramme(programme.programme)) return [];
     return (
       programme.programme.phase_week_templates.find(
         (template) => template.phase_number === selectedPhase,
@@ -566,7 +577,13 @@ function App() {
     }
     void run(
       'preview',
-      () => odinApi.preview(token.trim(), parsed.data, refinementMode),
+      () =>
+        odinApi.preview(
+          token.trim(),
+          parsed.data,
+          refinementMode,
+          plannerVersion,
+        ),
       (data) => {
         setProgramme(data);
         setSelectedPhase(data.programme.phases[0]?.phase_number ?? 1);
@@ -1062,6 +1079,19 @@ function App() {
                 ))}
               </div>
 
+              <label className="field">
+                <span>Planner version</span>
+                <select
+                  value={plannerVersion}
+                  onChange={(event) =>
+                    setPlannerVersion(event.target.value as PlannerVersion)
+                  }
+                >
+                  <option value="legacy_v1">Legacy V1</option>
+                  <option value="longitudinal_v1">Longitudinal V2</option>
+                </select>
+              </label>
+
               <div className="preview-actions">
                 <span>
                   <ShieldCheck size={16} />
@@ -1098,8 +1128,11 @@ function App() {
                       <div className="overview-pills">
                         <StatusPill tone="positive">Validated</StatusPill>
                         <StatusPill tone="purple">{labelize(programme.source)}</StatusPill>
+                        <StatusPill>{labelize(programme.planner_version)}</StatusPill>
                         <StatusPill>{programme.programme.programme.target_weeks} weeks</StatusPill>
-                        <StatusPill>{programme.programme.programme.available_days} days</StatusPill>
+                        {isLegacyProgramme(programme.programme) ? (
+                          <StatusPill>{programme.programme.programme.available_days} days</StatusPill>
+                        ) : null}
                       </div>
                     </div>
                     <ScoreRing score={programme.validation.overall_score} />
@@ -1120,11 +1153,22 @@ function App() {
                     ))}
                   </div>
 
-                  <div className="workout-list">
-                    {activeDays.map((day) => (
-                      <WorkoutDay key={day.day_of_week} day={day} />
-                    ))}
-                  </div>
+                  {isLegacyProgramme(programme.programme) ? (
+                    <div className="workout-list">
+                      {activeDays.map((day) => (
+                        <WorkoutDay key={day.day_of_week} day={day} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="validation-card">
+                      <h4>Longitudinal V2 preview</h4>
+                      <p>
+                        The detailed V2 renderer is deferred. The validated
+                        structured response is shown below.
+                      </p>
+                      <pre>{JSON.stringify(programme.programme, null, 2)}</pre>
+                    </div>
+                  )}
 
                   <div className="validation-grid">
                     <div className="validation-card">

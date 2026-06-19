@@ -44,6 +44,7 @@ const isVagueArea = (area: string): boolean =>
 
 export const mapInjuriesToRestrictions = (
   injuries: AthleteInput['injuries'],
+  enrichedRestrictions: AthleteInput['movement_restrictions'] = [],
 ): InjuryRestrictionResult => {
   const restrictedMovementTags = new Set<string>();
   const movementRestrictions = new Map<string, MovementRestriction>();
@@ -76,6 +77,7 @@ export const mapInjuriesToRestrictions = (
         severity: injury.severity,
         source_area: injury.area,
         notes: injury.notes,
+        source_fields: ['injuries'],
       };
 
       if (!currentRestriction) {
@@ -119,6 +121,54 @@ export const mapInjuriesToRestrictions = (
         `Injury diagnosis and clinician restrictions were not provided for ${injury.area}.`,
       );
     }
+  });
+
+  enrichedRestrictions.forEach((restriction) => {
+    if (restriction.tolerance === 'eligible') {
+      return;
+    }
+
+    const severity = restriction.tolerance === 'excluded' ? 'avoid' : 'modify';
+    const currentRestriction = movementRestrictions.get(
+      restriction.movement_demand,
+    );
+    const nextRestriction: MovementRestriction = {
+      tag: restriction.movement_demand,
+      severity,
+      source_area: restriction.region,
+      notes: restriction.notes ?? '',
+      source_fields: ['movement_restrictions'],
+      clinician_restriction: restriction.clinician_restriction ?? false,
+    };
+
+    restrictedMovementTags.add(restriction.movement_demand);
+
+    if (!currentRestriction) {
+      movementRestrictions.set(restriction.movement_demand, nextRestriction);
+      return;
+    }
+
+    const nextWins =
+      currentRestriction.severity === 'modify' && severity === 'avoid';
+    const primary = nextWins ? nextRestriction : currentRestriction;
+    const secondary = nextWins ? currentRestriction : nextRestriction;
+
+    movementRestrictions.set(restriction.movement_demand, {
+      ...primary,
+      notes: [primary.notes, secondary.notes]
+        .filter((note) => note.trim().length > 0)
+        .join(' | '),
+      source_fields: [
+        ...new Set([
+          ...(primary.source_fields ?? []),
+          ...(secondary.source_fields ?? []),
+        ]),
+      ],
+      clinician_restriction:
+        primary.clinician_restriction ||
+        secondary.clinician_restriction ||
+        false,
+    });
   });
 
   return {

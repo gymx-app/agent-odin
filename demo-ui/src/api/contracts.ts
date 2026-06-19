@@ -15,6 +15,7 @@ export type RefinementMode =
   | 'deterministic'
   | 'llm_optional'
   | 'llm_required';
+export type PlannerVersion = 'legacy_v1' | 'longitudinal_v1';
 
 export type AthleteInput = {
   name: string;
@@ -182,9 +183,30 @@ export type OdinProgramme = {
 
 export type ProgrammePreviewResponse = {
   source: 'deterministic' | 'llm_refined';
-  programme: OdinProgramme;
+  planner_version: PlannerVersion;
+  schema_version: '1.0' | '2.0';
+  programme:
+    | OdinProgramme
+    | {
+        schema_version: '2.0';
+        planner_version: 'longitudinal_v1';
+        programme: {
+          name: string;
+          goal_type: AthleteGoal;
+          goal_description: string;
+          target_weeks: number;
+        };
+        phases: Array<{
+          phase_number: number;
+          name: string;
+          weeks_count: number;
+          weeks: unknown[];
+        }>;
+        [key: string]: unknown;
+      };
   validation: ProgrammeValidation;
   refinement: RefinementMetadata;
+  generation: Record<string, unknown>;
 };
 
 export type SuccessEnvelope<T> = { success: true; data: T };

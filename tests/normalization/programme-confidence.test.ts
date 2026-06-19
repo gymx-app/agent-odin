@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { calculateProgrammeConfidence } from '../../src/normalization/programme-confidence.js';
 import { calculateWeightChange } from '../../src/normalization/weight-change.js';
 import { createBaseAssumptions } from '../../src/normalization/assumptions.js';
+import { normalizeAthlete } from '../../src/normalization/athlete-normalizer.js';
+import { enrichedRecompositionAthlete } from '../../fixtures/athletes/valid-athletes.js';
 import { completeInBody, createAthlete } from './test-athletes.js';
 
 describe('calculateProgrammeConfidence', () => {
@@ -84,5 +86,13 @@ describe('calculateProgrammeConfidence', () => {
         createBaseAssumptions(athlete),
       ),
     ).toBe('medium');
+  });
+
+  it('reduces confidence for missing important inputs without blocking generation', () => {
+    const legacy = normalizeAthlete(createAthlete());
+    const enriched = normalizeAthlete(enrichedRecompositionAthlete);
+
+    expect(legacy.programme_confidence).toBe('low');
+    expect(enriched.programme_confidence).toBe('high');
   });
 });

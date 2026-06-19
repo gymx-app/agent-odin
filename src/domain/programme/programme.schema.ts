@@ -8,6 +8,7 @@ import {
   ValidationWarningSeveritySchema,
   WorkoutTypeSchema,
 } from '../shared/domain-enums.js';
+import { LongitudinalOdinProgrammeSchema } from './longitudinal-programme.schema.js';
 
 const isoDateString = z
   .string()
@@ -196,7 +197,7 @@ const PhaseWeekTemplateSchema = z
 
 const ScoreSchema = z.number().min(0).max(100);
 
-export const OdinProgrammeSchema = z
+export const LegacyOdinProgrammeSchema = z
   .object({
     programme: z.object({
       name: z.string(),
@@ -269,3 +270,23 @@ export const OdinProgrammeSchema = z
       });
     }
   });
+
+/**
+ * Backward-compatible alias used by the current deterministic planner,
+ * preview API, persistence layer, and V1 refinement pipeline.
+ */
+export const OdinProgrammeSchema = LegacyOdinProgrammeSchema;
+
+export const VersionedLegacyOdinProgrammeSchema = LegacyOdinProgrammeSchema.and(
+  z.object({
+    schema_version: z.literal('1.0'),
+    planner_version: z.literal('legacy_v1'),
+  }),
+);
+
+export { LongitudinalOdinProgrammeSchema };
+
+export const VersionedOdinProgrammeSchema = z.union([
+  VersionedLegacyOdinProgrammeSchema,
+  LongitudinalOdinProgrammeSchema,
+]);

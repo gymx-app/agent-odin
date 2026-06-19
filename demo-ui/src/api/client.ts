@@ -2,6 +2,7 @@ import type {
   AthleteInput,
   ErrorEnvelope,
   ProgrammePreviewResponse,
+  PlannerVersion,
   RefinementMode,
   SuccessEnvelope,
 } from './contracts';
@@ -84,6 +85,7 @@ export const odinApi = {
     token: string,
     athlete: AthleteInput,
     refinementMode: RefinementMode,
+    plannerVersion: PlannerVersion,
   ) =>
     request<ProgrammePreviewResponse>('/api/odin/preview', {
       method: 'POST',
@@ -91,6 +93,7 @@ export const odinApi = {
       body: {
         athlete,
         refinement_mode: refinementMode,
+        planner_version: plannerVersion,
       },
     }),
 };

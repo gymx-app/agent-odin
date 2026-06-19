@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  PlannerVersionSchema,
+  type PlannerVersion,
+} from '../../domain/programme/planner-version.js';
 
 const commaSeparatedOriginsSchema = z
   .string()
@@ -16,6 +20,25 @@ const booleanStringSchema = z
   .enum(['true', 'false'])
   .optional()
   .transform((value) => value === 'true');
+
+const plannerVersionsSchema = z
+  .string()
+  .default('legacy_v1,longitudinal_v1')
+  .transform((value, context) => {
+    const versions = value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const parsed = z.array(PlannerVersionSchema).safeParse(versions);
+    if (!parsed.success || parsed.data.length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'ODIN_ALLOWED_PLANNER_VERSIONS is invalid.',
+      });
+      return z.NEVER;
+    }
+    return [...new Set(parsed.data)];
+  });
 
 const optionalSecretSchema = z.preprocess(
   (value) => (value === '' ? undefined : value),
@@ -50,25 +73,39 @@ export const envSchema = z
       .min(5000)
       .max(120000)
       .default(60000),
+    ODIN_DEFAULT_PLANNER_VERSION: PlannerVersionSchema.default('legacy_v1'),
+    ODIN_LONGITUDINAL_PLANNER_ENABLED: booleanStringSchema,
+    ODIN_ALLOWED_PLANNER_VERSIONS: plannerVersionsSchema,
   })
   .superRefine((env, context) => {
     if (!env.ODIN_LLM_REFINEMENT_ENABLED) {
-      return;
-    }
+      // Planner rollout validation remains active without LLM refinement.
+    } else {
+      if (!env.OPENAI_API_KEY) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['OPENAI_API_KEY'],
+          message: 'OPENAI_API_KEY is required when refinement is enabled.',
+        });
+      }
 
-    if (!env.OPENAI_API_KEY) {
+      if (!env.OPENAI_MODEL) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['OPENAI_MODEL'],
+          message: 'OPENAI_MODEL is required when refinement is enabled.',
+        });
+      }
+    }
+    if (
+      !env.ODIN_ALLOWED_PLANNER_VERSIONS.includes(
+        env.ODIN_DEFAULT_PLANNER_VERSION,
+      )
+    ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['OPENAI_API_KEY'],
-        message: 'OPENAI_API_KEY is required when refinement is enabled.',
-      });
-    }
-
-    if (!env.OPENAI_MODEL) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['OPENAI_MODEL'],
-        message: 'OPENAI_MODEL is required when refinement is enabled.',
+        path: ['ODIN_DEFAULT_PLANNER_VERSION'],
+        message: 'Default planner version must be allowed.',
       });
     }
   });
@@ -87,6 +124,9 @@ export type AppConfig = {
   openaiMaxRetries: number;
   llmRefinementEnabled: boolean;
   generationTimeoutMs: number;
+  defaultPlannerVersion: PlannerVersion;
+  longitudinalPlannerEnabled: boolean;
+  allowedPlannerVersions: PlannerVersion[];
 };
 
 export type RawEnv = Partial<Record<keyof z.input<typeof envSchema>, string>>;
@@ -123,5 +163,8 @@ export const parseEnv = (rawEnv: RawEnv): AppConfig => {
     openaiMaxRetries: parsed.data.OPENAI_MAX_RETRIES,
     llmRefinementEnabled: parsed.data.ODIN_LLM_REFINEMENT_ENABLED,
     generationTimeoutMs: parsed.data.ODIN_GENERATION_TIMEOUT_MS,
+    defaultPlannerVersion: parsed.data.ODIN_DEFAULT_PLANNER_VERSION,
+    longitudinalPlannerEnabled: parsed.data.ODIN_LONGITUDINAL_PLANNER_ENABLED,
+    allowedPlannerVersions: parsed.data.ODIN_ALLOWED_PLANNER_VERSIONS,
   };
 };

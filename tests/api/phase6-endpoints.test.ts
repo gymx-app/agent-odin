@@ -5,7 +5,10 @@ import { createProfileHandler } from '../../api/profile.js';
 import { createGetProgrammeHandler } from '../../api/programmes/[id].js';
 import type { AppConfig } from '../../src/infrastructure/config/env.schema.js';
 import type { SupabaseAuthClientLike } from '../../src/infrastructure/supabase/supabase.types.js';
-import { beginnerFatLossAthlete } from '../../fixtures/athletes/valid-athletes.js';
+import {
+  beginnerFatLossAthlete,
+  enrichedRecompositionAthlete,
+} from '../../fixtures/athletes/valid-athletes.js';
 import {
   createTestRequest,
   createTestResponse,
@@ -25,6 +28,9 @@ const config: AppConfig = {
   openaiMaxRetries: 1,
   llmRefinementEnabled: false,
   generationTimeoutMs: 60000,
+  defaultPlannerVersion: 'legacy_v1',
+  longitudinalPlannerEnabled: false,
+  allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1'],
 };
 
 const authClient = (userId: string | null): SupabaseAuthClientLike =>
@@ -92,6 +98,8 @@ describe('public API boundaries', () => {
       success: true,
       data: {
         source: 'deterministic',
+        planner_version: 'legacy_v1',
+        schema_version: '1.0',
         programme: {
           programme: {
             goal_type: beginnerFatLossAthlete.goal,
@@ -137,6 +145,101 @@ describe('public API boundaries', () => {
     expect(response.json()).toMatchObject({
       success: false,
       error: { code: 'BAD_REQUEST' },
+    });
+  });
+
+  it('accepts enriched Athlete Input V2 through the existing preview endpoint', async () => {
+    const response = createTestResponse();
+
+    await createPreviewHandler(config, {
+      authClient: authClient('verified-user'),
+    })(
+      createTestRequest({
+        method: 'POST',
+        url: '/api/odin/preview',
+        headers: {
+          authorization: 'Bearer valid',
+        },
+        body: {
+          athlete: enrichedRecompositionAthlete,
+          refinement_mode: 'deterministic',
+        },
+      }),
+      response,
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      success: true,
+      data: {
+        source: 'deterministic',
+        validation: { passed: true },
+      },
+    });
+  });
+
+  it('returns a validated longitudinal preview when enabled and requested', async () => {
+    const response = createTestResponse();
+    await createPreviewHandler(
+      {
+        ...config,
+        longitudinalPlannerEnabled: true,
+      },
+      { authClient: authClient('verified-user') },
+    )(
+      createTestRequest({
+        method: 'POST',
+        url: '/api/odin/preview',
+        headers: { authorization: 'Bearer valid' },
+        body: {
+          athlete: beginnerFatLossAthlete,
+          refinement_mode: 'deterministic',
+          planner_version: 'longitudinal_v1',
+          start_date: '2026-06-22',
+        },
+      }),
+      response,
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      success: true,
+      data: {
+        planner_version: 'longitudinal_v1',
+        schema_version: '2.0',
+        source: 'deterministic',
+        programme: {
+          schema_version: '2.0',
+          planner_version: 'longitudinal_v1',
+        },
+        validation: { passed: true },
+      },
+    });
+  });
+
+  it('rejects an unsupported planner version with a stable error', async () => {
+    const response = createTestResponse();
+    await createPreviewHandler(config, {
+      authClient: authClient('verified-user'),
+    })(
+      createTestRequest({
+        method: 'POST',
+        url: '/api/odin/preview',
+        headers: { authorization: 'Bearer valid' },
+        body: {
+          athlete: beginnerFatLossAthlete,
+          planner_version: 'future_v9',
+        },
+      }),
+      response,
+    );
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      success: false,
+      error: {
+        code: 'PLANNER_VERSION_UNSUPPORTED',
+      },
     });
   });
 

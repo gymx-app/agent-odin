@@ -45,4 +45,23 @@ describe('buildRefinementContext', () => {
       expect(entry.options[0]!.exercise_id).toBe(entry.exercise_id);
     });
   });
+
+  it('includes compact derived state without raw enriched or origin data', () => {
+    const fixture = refinementFixture();
+    const context = buildRefinementContext(
+      fixture.profile,
+      fixture.programme,
+      fixture.validation,
+      fixture.exercises,
+    );
+    const serialized = JSON.stringify(context);
+
+    expect(context.athlete.athlete_state.training_status.reason_codes).toEqual(
+      expect.any(Array),
+    );
+    expect(serialized).not.toContain('origin_metadata');
+    expect(serialized).not.toContain('ethnicity');
+    expect(serialized).not.toContain('known_deficiencies');
+    expect(serialized).not.toContain('recent_weekly_sets_by_muscle');
+  });
 });

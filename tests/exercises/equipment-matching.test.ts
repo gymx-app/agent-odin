@@ -45,4 +45,13 @@ describe('matchExerciseEquipment', () => {
     expect(result.missing_equipment).toEqual(['cable']);
     expect(result.reasons[0]).toContain('cable');
   });
+
+  it('supports the additive hotel-gym preset', () => {
+    expect(
+      matchExerciseEquipment(
+        findSeedExercise('machine_chest_press'),
+        'hotel_gym',
+      ).compatible,
+    ).toBe(true);
+  });
 });

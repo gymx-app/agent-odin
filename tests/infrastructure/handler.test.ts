@@ -19,6 +19,9 @@ const config: AppConfig = {
   openaiMaxRetries: 1,
   llmRefinementEnabled: false,
   generationTimeoutMs: 60000,
+  defaultPlannerVersion: 'legacy_v1',
+  longitudinalPlannerEnabled: false,
+  allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1'],
 };
 
 const logger = {

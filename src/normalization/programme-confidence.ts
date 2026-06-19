@@ -1,11 +1,16 @@
 import type { AthleteInput } from '../domain/athlete/athlete.types.js';
-import type { HealthFlag, WeightChangeResult } from './normalization.types.js';
+import type {
+  HealthFlag,
+  MissingInput,
+  WeightChangeResult,
+} from './normalization.types.js';
 
 export const calculateProgrammeConfidence = (
   input: AthleteInput,
   weightChange: WeightChangeResult,
   healthFlags: HealthFlag[],
   assumptions: string[],
+  missingInputs: MissingInput[] = [],
 ): 'low' | 'medium' | 'high' => {
   if (healthFlags.some((flag) => flag.severity === 'blocking')) {
     return 'low';
@@ -51,6 +56,24 @@ export const calculateProgrammeConfidence = (
     score -= 1;
   }
 
+  score -= missingInputs.filter(
+    (missing) => missing.importance === 'important',
+  ).length;
+  score -= Math.floor(
+    missingInputs.filter((missing) => missing.importance === 'recommended')
+      .length / 2,
+  );
+
+  if (
+    input.training_history &&
+    input.schedule?.available_days &&
+    input.lifestyle &&
+    input.nutrition?.calorie_status &&
+    input.nutrition.calorie_status !== 'unknown'
+  ) {
+    score += 3;
+  }
+
   if (weightChange.direction === 'maintain') {
     score += 0;
   }
@@ -61,8 +84,8 @@ export const calculateProgrammeConfidence = (
 
   if (
     score >= 6 &&
-    input.inbody !== null &&
-    assumptions.length <= 3 &&
+    (input.inbody !== null || input.training_history !== undefined) &&
+    assumptions.length <= 4 &&
     healthFlags.length === 0
   ) {
     return 'high';

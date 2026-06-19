@@ -17,6 +17,9 @@ describe('environment configuration', () => {
       openaiMaxRetries: 1,
       llmRefinementEnabled: false,
       generationTimeoutMs: 60000,
+      defaultPlannerVersion: 'legacy_v1',
+      longitudinalPlannerEnabled: false,
+      allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1'],
     });
   });
 
@@ -123,5 +126,27 @@ describe('environment configuration', () => {
     expect(() =>
       parseEnv({ NODE_ENV: 'test', OPENAI_MAX_RETRIES: '2' }),
     ).toThrow('Invalid environment configuration');
+  });
+
+  it('loads and validates planner rollout configuration', () => {
+    expect(
+      parseEnv({
+        NODE_ENV: 'test',
+        ODIN_DEFAULT_PLANNER_VERSION: 'longitudinal_v1',
+        ODIN_LONGITUDINAL_PLANNER_ENABLED: 'true',
+        ODIN_ALLOWED_PLANNER_VERSIONS: 'legacy_v1,longitudinal_v1',
+      }),
+    ).toMatchObject({
+      defaultPlannerVersion: 'longitudinal_v1',
+      longitudinalPlannerEnabled: true,
+      allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1'],
+    });
+    expect(() =>
+      parseEnv({
+        NODE_ENV: 'test',
+        ODIN_DEFAULT_PLANNER_VERSION: 'longitudinal_v1',
+        ODIN_ALLOWED_PLANNER_VERSIONS: 'legacy_v1',
+      }),
+    ).toThrow('Default planner version must be allowed.');
   });
 });

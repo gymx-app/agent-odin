@@ -119,8 +119,7 @@ export const fillMovementSlot = (
         Number(recentlySelectedExerciseIds.includes(right.exercise.id));
 
       return (
-        recentPenalty ||
-        sortExerciseCandidates(profile, slot, left, right)
+        recentPenalty || sortExerciseCandidates(profile, slot, left, right)
       );
     });
 

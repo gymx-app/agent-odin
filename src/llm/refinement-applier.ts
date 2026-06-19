@@ -47,6 +47,16 @@ export const applyProgrammeRefinement = (
   exercises: Exercise[],
   profile: NormalizedAthleteProfile,
 ): OdinProgramme => {
+  if (
+    (baseline as OdinProgramme & { schema_version?: string }).schema_version ===
+    '2.0'
+  ) {
+    throw refinementError(
+      'REFINEMENT_PROGRAMME_VERSION_UNSUPPORTED',
+      'V1 refinement operations cannot be applied to schema version 2.0.',
+    );
+  }
+
   const programme = structuredClone(baseline);
   const exerciseById = new Map(
     exercises.map((exercise) => [exercise.id, exercise]),

@@ -37,6 +37,30 @@ export type MovementRestriction = {
   severity: 'modify' | 'avoid';
   source_area: string;
   notes: string;
+  source_fields?: string[];
+  clinician_restriction?: boolean;
+};
+
+export type DerivedStateConfidence = 'low' | 'moderate' | 'high';
+
+export type DerivedStateValue<T extends string> = {
+  value: T;
+  reason_codes: string[];
+  source_fields: string[];
+  confidence: DerivedStateConfidence;
+};
+
+export type PlanningAssumption = {
+  code: string;
+  message: string;
+  source_fields: string[];
+  confidence: DerivedStateConfidence;
+};
+
+export type MissingInput = {
+  field: string;
+  importance: 'optional' | 'recommended' | 'important';
+  impact: string;
 };
 
 export type NormalizationContext = {

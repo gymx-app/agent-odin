@@ -78,4 +78,66 @@ describe('structured movement restrictions', () => {
         .sort(),
     );
   });
+
+  it('normalizes an enriched movement restriction', () => {
+    const profile = normalizeAthlete(
+      createAthlete({
+        movement_restrictions: [
+          {
+            region: 'shoulder',
+            movement_demand: 'overhead_loading',
+            tolerance: 'excluded',
+            clinician_restriction: true,
+          },
+        ],
+      }),
+    );
+
+    expect(profile.movement_restrictions).toContainEqual(
+      expect.objectContaining({
+        tag: 'overhead_loading',
+        severity: 'avoid',
+        source_fields: ['movement_restrictions'],
+        clinician_restriction: true,
+      }),
+    );
+  });
+
+  it('merges legacy and enriched restrictions with the stricter rule winning', () => {
+    const profile = normalizeAthlete(
+      createAthlete({
+        injuries: [
+          {
+            area: 'knee',
+            severity: 'modify',
+            notes: 'Modify impact.',
+          },
+        ],
+        movement_restrictions: [
+          {
+            region: 'knee',
+            movement_demand: 'high_impact',
+            tolerance: 'excluded',
+            notes: 'Clinician says avoid impact.',
+            clinician_restriction: true,
+          },
+        ],
+      }),
+    );
+    const restriction = profile.movement_restrictions.find(
+      ({ tag }) => tag === 'high_impact',
+    );
+
+    expect(restriction).toMatchObject({
+      severity: 'avoid',
+      clinician_restriction: true,
+    });
+    expect(restriction?.source_fields?.sort()).toEqual([
+      'injuries',
+      'movement_restrictions',
+    ]);
+    expect(
+      profile.movement_restrictions.filter(({ tag }) => tag === 'high_impact'),
+    ).toHaveLength(1);
+  });
 });

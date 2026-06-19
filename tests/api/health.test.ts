@@ -21,6 +21,9 @@ const config: AppConfig = {
   openaiMaxRetries: 1,
   llmRefinementEnabled: false,
   generationTimeoutMs: 60000,
+  defaultPlannerVersion: 'legacy_v1',
+  longitudinalPlannerEnabled: false,
+  allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1'],
 };
 
 describe('GET /api/health', () => {
@@ -36,6 +39,9 @@ describe('GET /api/health', () => {
         service: 'agent-odin',
         version: '9.8.7',
         status: 'ok',
+        default_planner_version: 'legacy_v1',
+        longitudinal_planner_enabled: false,
+        supported_planner_versions: ['legacy_v1', 'longitudinal_v1'],
       },
     });
   });

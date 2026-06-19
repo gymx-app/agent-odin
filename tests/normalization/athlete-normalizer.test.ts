@@ -3,8 +3,10 @@ import { NormalizedAthleteProfileSchema } from '../../src/domain/athlete/normali
 import { normalizeAthlete } from '../../src/normalization/athlete-normalizer.js';
 import {
   beginnerFatLossAthlete,
+  enrichedRecompositionAthlete,
   validAthleteFixtures,
 } from '../../fixtures/athletes/valid-athletes.js';
+import { selectProgrammeStrategy } from '../../src/planning/strategy-selector.js';
 import { completeInBody, createAthlete } from './test-athletes.js';
 
 describe('normalizeAthlete', () => {
@@ -113,5 +115,62 @@ describe('normalizeAthlete', () => {
         code: 'ELEVATED_VISCERAL_FAT',
       }),
     );
+  });
+
+  it('normalizes a complete enriched profile into structured athlete state', () => {
+    const profile = normalizeAthlete(enrichedRecompositionAthlete);
+
+    expect(profile.athlete_state).toMatchObject({
+      training_status: { value: 'intermediate', confidence: 'high' },
+      schedule_capacity: { value: 'standard', confidence: 'high' },
+      recovery_capacity: { value: 'high' },
+      energy_availability: { value: 'maintenance', confidence: 'high' },
+      protein_adequacy: { value: 'likely_adequate' },
+      sport_interference_risk: { value: 'moderate' },
+    });
+    expect(profile.equipment_capabilities.source).toBe('explicit');
+    expect(profile.planning_assumptions).toEqual([]);
+    expect(profile.missing_inputs).toEqual([]);
+  });
+
+  it('keeps origin metadata neutral to state and strategy-facing values', () => {
+    const first = normalizeAthlete(
+      createAthlete({
+        origin_metadata: {
+          country: 'India',
+          ethnicity: 'South Asian',
+        },
+      }),
+    );
+    const second = normalizeAthlete(
+      createAthlete({
+        origin_metadata: {
+          country: 'Brazil',
+          ethnicity: 'Latino',
+        },
+      }),
+    );
+
+    expect(first.athlete_state).toStrictEqual(second.athlete_state);
+    expect(first.recovery_capacity).toBe(second.recovery_capacity);
+    expect(first.training_age_category).toBe(second.training_age_category);
+    expect(selectProgrammeStrategy(first)).toStrictEqual(
+      selectProgrammeStrategy(second),
+    );
+  });
+
+  it('records structured missing inputs without blocking normalization', () => {
+    const profile = normalizeAthlete(beginnerFatLossAthlete);
+
+    expect(profile.missing_inputs).toContainEqual(
+      expect.objectContaining({
+        field: 'training_history',
+        importance: 'important',
+      }),
+    );
+    expect(profile.planning_assumptions).toContainEqual(
+      expect.objectContaining({ code: 'TRAINING_HISTORY_MISSING' }),
+    );
+    expect(profile.programme_confidence).toBe('low');
   });
 });

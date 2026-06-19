@@ -1,6 +1,7 @@
 import type { AthleteInput } from '../domain/athlete/athlete.types.js';
 import type { Exercise } from '../domain/exercise/exercise.types.js';
 import type { OdinProgramme } from '../domain/programme/programme.types.js';
+import type { LongitudinalOdinProgramme } from '../domain/programme/programme.types.js';
 import type { Logger } from '../infrastructure/logging/logger.js';
 import type { ProgrammeRefinementProvider } from '../llm/programme-refinement-provider.js';
 import type {
@@ -9,6 +10,7 @@ import type {
 } from '../llm/refinement.types.js';
 import { normalizeAthlete } from '../normalization/athlete-normalizer.js';
 import { buildBaselineProgramme } from '../planning/baseline-programme-planner.js';
+import { buildLongitudinalProgramme } from '../planning/longitudinal-programme-planner.js';
 import { odinError } from '../shared/errors/odin-errors.js';
 import {
   applyValidationSummary,
@@ -17,12 +19,30 @@ import {
 import type { ProgrammeValidationReport } from '../validation/validation.types.js';
 import { toSafeGenerationError } from './programme-generation/generation-errors.js';
 import { refineProgramme } from './programme-refinement.service.js';
+import {
+  resolvePlannerVersion,
+  type PlannerVersion,
+  type PlannerVersionResolution,
+} from './programme-generation/planner-version.js';
+import { LONGITUDINAL_VALIDATION_RULE_VERSION } from '../validation/longitudinal-validation-registry.js';
 
 export type ProgrammePreviewResult = {
   source: 'deterministic' | 'llm_refined';
-  programme: OdinProgramme;
+  planner_version: PlannerVersion;
+  schema_version: '1.0' | '2.0';
+  programme: OdinProgramme | LongitudinalOdinProgramme;
   validation: ProgrammeValidationReport;
   refinement: RefinementMetadata;
+  generation: {
+    planner_version: PlannerVersion;
+    schema_version: '1.0' | '2.0';
+    validation_rule_version: string;
+    exercise_library_version: string;
+    repair_attempted: boolean;
+    repair_applied: boolean;
+    planner_resolution: PlannerVersionResolution;
+    stage_durations_ms: Record<string, number>;
+  };
 };
 
 export type ProgrammePreviewContext = {
@@ -35,6 +55,15 @@ export type ProgrammePreviewContext = {
     | 'OPENAI_CONFIGURATION_MISSING';
   logger?: Logger;
   generationTimeoutMs?: number;
+  requestedPlannerVersion?: PlannerVersion;
+  defaultPlannerVersion?: PlannerVersion;
+  longitudinalPlannerEnabled?: boolean;
+  allowedPlannerVersions?: PlannerVersion[];
+  startDate?: string;
+  generatedAt?: string;
+  exerciseLibraryVersion?: string;
+  now?: () => number;
+  longitudinalGenerator?: typeof buildLongitudinalProgramme;
 };
 
 export const previewProgramme = async (
@@ -42,13 +71,27 @@ export const previewProgramme = async (
   refinementMode: RefinementMode,
   context: ProgrammePreviewContext,
 ): Promise<ProgrammePreviewResult> => {
-  const deadline = Date.now() + (context.generationTimeoutMs ?? 60_000);
-  const assertWithinDeadline = (): void => {
-    if (Date.now() > deadline) {
+  const now = context.now ?? Date.now;
+  const deadline = now() + (context.generationTimeoutMs ?? 60_000);
+  const stageDurations: Record<string, number> = {};
+  const resolution = resolvePlannerVersion({
+    ...(context.requestedPlannerVersion
+      ? { requestedVersion: context.requestedPlannerVersion }
+      : {}),
+    defaultVersion: context.defaultPlannerVersion ?? 'legacy_v1',
+    longitudinalEnabled: context.longitudinalPlannerEnabled ?? false,
+    allowedVersions: context.allowedPlannerVersions ?? [
+      'legacy_v1',
+      'longitudinal_v1',
+    ],
+  });
+  const assertWithinDeadline = (stage: string): void => {
+    if (now() > deadline) {
       throw odinError(
         'GENERATION_TIMEOUT',
         'Programme generation exceeded its deadline.',
         504,
+        { stage, planner_version: resolution.selected_version },
       );
     }
   };
@@ -56,14 +99,23 @@ export const previewProgramme = async (
     stage: string,
     operation: () => Promise<T> | T,
   ): Promise<T> => {
-    const startedAt = Date.now();
+    assertWithinDeadline(stage);
+    const startedAt = now();
+    let success = false;
     try {
-      return await operation();
+      const value = await operation();
+      success = true;
+      return value;
     } finally {
+      const durationMs = Math.max(0, now() - startedAt);
+      stageDurations[stage] = durationMs;
       context.logger?.info('preview stage completed', {
         requestId: context.requestId,
+        plannerVersion: resolution.selected_version,
         stage,
-        durationMs: Date.now() - startedAt,
+        durationMs,
+        success,
+        warningCount: 0,
       });
     }
   };
@@ -72,9 +124,112 @@ export const previewProgramme = async (
     const normalized = await timed('athlete_normalization', () =>
       normalizeAthlete(athlete),
     );
-    assertWithinDeadline();
-    const baseline = await timed('planner', () =>
-      buildBaselineProgramme(normalized, context.exercises),
+    assertWithinDeadline('planner_resolution');
+    if (resolution.selected_version === 'longitudinal_v1') {
+      if (refinementMode === 'llm_required') {
+        throw odinError(
+          'LLM_REFINEMENT_UNSUPPORTED_FOR_PLANNER_VERSION',
+          'Required LLM refinement is unsupported for longitudinal_v1.',
+          409,
+          { planner_version: resolution.selected_version },
+        );
+      }
+      const longitudinalGenerator =
+        context.longitudinalGenerator ?? buildLongitudinalProgramme;
+      const generated = await timed('longitudinal_generation', () =>
+        longitudinalGenerator(normalized, context.exercises, {
+          startDate:
+            context.startDate ?? new Date(now()).toISOString().slice(0, 10),
+          generatedAt: context.generatedAt ?? new Date(now()).toISOString(),
+          exerciseLibraryVersion:
+            context.exerciseLibraryVersion ?? 'approved-library-v1',
+          stageRunner: <T>(stage: string, operation: () => T): T => {
+            assertWithinDeadline(stage);
+            const startedAt = now();
+            let success = false;
+            try {
+              const value = operation();
+              success = true;
+              return value;
+            } finally {
+              const durationMs = Math.max(0, now() - startedAt);
+              stageDurations[stage] = durationMs;
+              context.logger?.info('preview stage completed', {
+                requestId: context.requestId,
+                plannerVersion: resolution.selected_version,
+                stage,
+                durationMs,
+                success,
+                warningCount: 0,
+              });
+            }
+          },
+        }),
+      );
+      if (!generated.validation.passed) {
+        throw odinError(
+          'GENERATED_PROGRAMME_INVALID',
+          'Generated longitudinal programme failed final validation.',
+          422,
+          {
+            status: generated.validation.status,
+            summary: generated.validation.summary,
+            finding_codes: generated.validation.findings.map(
+              (finding) => finding.code,
+            ),
+          },
+        );
+      }
+      assertWithinDeadline('final_validation');
+      return {
+        source: 'deterministic',
+        planner_version: 'longitudinal_v1',
+        schema_version: '2.0',
+        programme: generated.programme,
+        validation: generated.validation,
+        refinement:
+          refinementMode === 'llm_optional'
+            ? {
+                requested: true,
+                applied: false,
+                status: 'fallback',
+                reason_code: 'REFINEMENT_UNSUPPORTED_FOR_PLANNER_VERSION',
+                model: context.configuredModel ?? null,
+                prompt_version: null,
+                schema_version: null,
+                accepted_operation_count: 0,
+                rejected_operation_count: 0,
+              }
+            : {
+                requested: false,
+                applied: false,
+                status: 'not_requested',
+                reason_code: 'REFINEMENT_SKIPPED_LONGITUDINAL_V1',
+                model: null,
+                prompt_version: null,
+                schema_version: null,
+              },
+        generation: {
+          planner_version: 'longitudinal_v1',
+          schema_version: '2.0',
+          validation_rule_version: LONGITUDINAL_VALIDATION_RULE_VERSION,
+          exercise_library_version:
+            context.exerciseLibraryVersion ?? 'approved-library-v1',
+          repair_attempted: generated.validation.repair?.attempted ?? false,
+          repair_applied: generated.validation.repair?.applied ?? false,
+          planner_resolution: resolution,
+          stage_durations_ms: stageDurations,
+        },
+      };
+    }
+    const baseline = await timed('legacy_planner', () =>
+      buildBaselineProgramme(
+        normalized,
+        context.exercises,
+        context.startDate
+          ? { startDate: `${context.startDate}T00:00:00.000Z` }
+          : {},
+      ),
     );
     const baselineValidation = await timed('validator', () =>
       validateProgramme(baseline, normalized, context.exercises),
@@ -92,7 +247,7 @@ export const previewProgramme = async (
       );
     }
 
-    assertWithinDeadline();
+    assertWithinDeadline('llm_refinement');
     const refinementResult = await timed('llm_refinement', () =>
       refineProgramme({
         mode: refinementMode,
@@ -109,16 +264,29 @@ export const previewProgramme = async (
           : {}),
       }),
     );
-    assertWithinDeadline();
+    assertWithinDeadline('response');
 
     return {
       source: refinementResult.source,
+      planner_version: 'legacy_v1',
+      schema_version: '1.0',
       programme: applyValidationSummary(
         refinementResult.programme,
         refinementResult.validation,
       ),
       validation: refinementResult.validation,
       refinement: refinementResult.refinement,
+      generation: {
+        planner_version: 'legacy_v1',
+        schema_version: '1.0',
+        validation_rule_version: 'programme-validation/v1',
+        exercise_library_version:
+          context.exerciseLibraryVersion ?? 'approved-library-v1',
+        repair_attempted: false,
+        repair_applied: false,
+        planner_resolution: resolution,
+        stage_durations_ms: stageDurations,
+      },
     };
   } catch (error) {
     throw toSafeGenerationError(error);

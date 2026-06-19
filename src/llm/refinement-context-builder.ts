@@ -75,6 +75,17 @@ export const buildRefinementContext = (
       session_duration_min: profile.source.session_duration_min,
       equipment: profile.source.equipment,
       recovery_capacity: profile.recovery_capacity,
+      athlete_state: {
+        training_status: profile.athlete_state.training_status,
+        schedule_capacity: profile.athlete_state.schedule_capacity,
+        recovery_capacity: profile.athlete_state.recovery_capacity,
+        energy_availability: profile.athlete_state.energy_availability,
+        protein_adequacy: profile.athlete_state.protein_adequacy,
+        adherence_confidence: profile.athlete_state.adherence_confidence,
+        sport_interference_risk: profile.athlete_state.sport_interference_risk,
+        conditioning_readiness: profile.athlete_state.conditioning_readiness,
+        impact_tolerance: profile.athlete_state.impact_tolerance,
+      },
       movement_restrictions: profile.movement_restrictions,
       health_flags: profile.health_flags.map(({ code, severity, message }) => ({
         code,

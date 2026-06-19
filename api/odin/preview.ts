@@ -19,6 +19,8 @@ import { previewProgramme } from '../../src/application/programme-preview.servic
 import type { ProgrammeRefinementProvider } from '../../src/llm/programme-refinement-provider.js';
 import { OpenAIProgrammeRefinementProvider } from '../../src/llm/openai-programme-refinement-provider.js';
 import { createOpenAIClient } from '../../src/llm/openai-client.js';
+import { PlannerVersionSchema } from '../../src/domain/programme/planner-version.js';
+import { odinError } from '../../src/shared/errors/odin-errors.js';
 
 const previewRequestSchema = z
   .object({
@@ -26,6 +28,8 @@ const previewRequestSchema = z
     refinement_mode: z
       .enum(['deterministic', 'llm_optional', 'llm_required'])
       .default('deterministic'),
+    planner_version: z.string().trim().min(1).optional(),
+    start_date: z.string().date().optional(),
   })
   .strict();
 
@@ -66,6 +70,16 @@ export const createPreviewHandler = (
         previewRequestSchema,
         REQUEST_BODY_LIMITS.preview,
       );
+      const requestedPlannerVersion = body.planner_version
+        ? PlannerVersionSchema.safeParse(body.planner_version)
+        : null;
+      if (requestedPlannerVersion && !requestedPlannerVersion.success) {
+        throw odinError(
+          'PLANNER_VERSION_UNSUPPORTED',
+          'Requested planner version is not supported.',
+          400,
+        );
+      }
       const result = await previewProgramme(
         body.athlete,
         body.refinement_mode,
@@ -78,6 +92,14 @@ export const createPreviewHandler = (
           refinementUnavailableReason: appConfig.llmRefinementEnabled
             ? 'OPENAI_CONFIGURATION_MISSING'
             : 'LLM_REFINEMENT_DISABLED',
+          ...(requestedPlannerVersion?.success
+            ? { requestedPlannerVersion: requestedPlannerVersion.data }
+            : {}),
+          defaultPlannerVersion: appConfig.defaultPlannerVersion,
+          longitudinalPlannerEnabled: appConfig.longitudinalPlannerEnabled,
+          allowedPlannerVersions: appConfig.allowedPlannerVersions,
+          ...(body.start_date ? { startDate: body.start_date } : {}),
+          exerciseLibraryVersion: 'approved-library-v1',
           ...(dependencies.refinementProvider
             ? { refinementProvider: dependencies.refinementProvider }
             : {}),

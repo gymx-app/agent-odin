@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyProgrammeRefinement } from '../../src/llm/refinement-applier.js';
+import { validLongitudinalProgramme } from '../../fixtures/programmes/valid-longitudinal-programme.js';
+import type { OdinProgramme } from '../../src/domain/programme/programme.types.js';
 import { findExerciseSubstitutions } from '../../src/exercises/substitutions.js';
 import { operation, proposal, refinementFixture } from './test-refinement.js';
 
@@ -9,6 +11,17 @@ const firstWorkoutExercise = (fixture: ReturnType<typeof refinementFixture>) =>
   )!.exercises[0]!;
 
 describe('applyProgrammeRefinement', () => {
+  it('rejects V2 programmes before applying V1 operations', () => {
+    const fixture = refinementFixture();
+    expect(() =>
+      applyProgrammeRefinement(
+        validLongitudinalProgramme as unknown as OdinProgramme,
+        proposal([]),
+        fixture.exercises,
+        fixture.profile,
+      ),
+    ).toThrow('V1 refinement operations cannot be applied');
+  });
   it('applies a bounded rep change without mutating the baseline', () => {
     const fixture = refinementFixture();
     const baseline = structuredClone(fixture.programme);

@@ -13,6 +13,7 @@ export const EquipmentAvailabilitySchema = z.enum([
   'dumbbells_only',
   'bodyweight',
   'home_gym',
+  'hotel_gym',
 ]);
 export const FitnessLevelSchema = z.enum([
   'beginner',
@@ -43,6 +44,7 @@ export const DayOfWeekSchema = z.enum([
   'SAT',
   'SUN',
 ]);
+export const DerivedStateConfidenceSchema = z.enum(['low', 'moderate', 'high']);
 export const WorkoutTypeSchema = z.enum(['workout', 'liss', 'rest']);
 export const ValidationWarningSeveritySchema = z.enum([
   'info',
