@@ -1,7 +1,7 @@
 import type {
   AthleteInput,
   ErrorEnvelope,
-  ProgrammeResponse,
+  ProgrammePreviewResponse,
   RefinementMode,
   SuccessEnvelope,
 } from './contracts';
@@ -25,7 +25,6 @@ type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT';
   token?: string;
   body?: unknown;
-  idempotencyKey?: string;
 };
 
 const request = async <T>(
@@ -40,10 +39,6 @@ const request = async <T>(
   if (options.token) {
     headers.set('Authorization', `Bearer ${options.token}`);
   }
-  if (options.idempotencyKey) {
-    headers.set('Idempotency-Key', options.idempotencyKey);
-  }
-
   let response: Response;
   try {
     response = await fetch(`${apiBase}${path}`, {
@@ -85,34 +80,17 @@ export const odinApi = {
       '/api/health',
     ),
 
-  saveProfile: (token: string, profile: AthleteInput) =>
-    request<{ profile: AthleteInput }>('/api/profile', {
-      method: 'PUT',
-      token,
-      body: profile,
-    }),
-
-  generate: (
+  preview: (
     token: string,
-    body: {
-      replace_existing_draft: boolean;
-      refinement_mode: RefinementMode;
-    },
-    idempotencyKey?: string,
+    athlete: AthleteInput,
+    refinementMode: RefinementMode,
   ) =>
-    request<ProgrammeResponse>('/api/odin/generate', {
+    request<ProgrammePreviewResponse>('/api/odin/preview', {
       method: 'POST',
       token,
-      body,
-      ...(idempotencyKey ? { idempotencyKey } : {}),
+      body: {
+        athlete,
+        refinement_mode: refinementMode,
+      },
     }),
-
-  currentProgramme: (token: string) =>
-    request<ProgrammeResponse>('/api/programmes/current', { token }),
-
-  programmeById: (token: string, programmeId: string) =>
-    request<ProgrammeResponse>(
-      `/api/programmes/${encodeURIComponent(programmeId)}`,
-      { token },
-    ),
 };

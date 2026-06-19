@@ -10,7 +10,6 @@ import {
   Clock3,
   Dumbbell,
   FileCheck2,
-  Fingerprint,
   HeartPulse,
   Eye,
   EyeOff,
@@ -22,8 +21,6 @@ import {
   Mail,
   Play,
   RefreshCw,
-  Save,
-  Search,
   ShieldCheck,
   Sparkles,
   Database,
@@ -33,7 +30,7 @@ import { ApiError, odinApi } from './api/client';
 import type {
   AthleteInput,
   ProgrammeDay,
-  ProgrammeResponse,
+  ProgrammePreviewResponse,
   RefinementMode,
 } from './api/contracts';
 import { defaultProfile } from './fixtures/default-profile';
@@ -54,13 +51,10 @@ type BusyAction =
   | 'health'
   | 'auth'
   | 'profile-load'
-  | 'profile'
-  | 'generate'
-  | 'current'
-  | 'lookup'
+  | 'preview'
   | null;
 
-type WorkflowStep = 'connect' | 'profile' | 'generate' | 'review';
+type WorkflowStep = 'connect' | 'preview' | 'review';
 
 type ProfileLoadState =
   | { status: 'default' }
@@ -299,11 +293,8 @@ function App() {
     useState<ProfileLoadState>({ status: 'default' });
   const [refinementMode, setRefinementMode] =
     useState<RefinementMode>('deterministic');
-  const [replaceDraft, setReplaceDraft] = useState(false);
-  const [idempotencyKey, setIdempotencyKey] = useState('');
-  const [programmeId, setProgrammeId] = useState('');
-  const [programme, setProgramme] = useState<ProgrammeResponse | null>(null);
-  const [profileSaved, setProfileSaved] = useState(false);
+  const [programme, setProgramme] =
+    useState<ProgrammePreviewResponse | null>(null);
   const [selectedPhase, setSelectedPhase] = useState(1);
   const [busy, setBusy] = useState<BusyAction>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -323,11 +314,9 @@ function App() {
 
   const workflowStep: WorkflowStep = !token.trim()
     ? 'connect'
-    : !profileSaved
-      ? 'profile'
-      : !programme
-        ? 'generate'
-        : 'review';
+    : !programme
+      ? 'preview'
+      : 'review';
 
   const isBusy = busy !== null;
 
@@ -433,7 +422,6 @@ function App() {
       }
 
       setProfile(parsed.data);
-      setProfileSaved(true);
       setProfileLoad({
         status: 'loaded',
         updatedAt: typeof data.updated_at === 'string' ? data.updated_at : null,
@@ -545,7 +533,6 @@ function App() {
         setToken('');
         setSessionEmail(null);
         setProfile(defaultProfile);
-        setProfileSaved(false);
         setProfileLoad({ status: 'default' });
         setProgramme(null);
         setNotice({
@@ -561,108 +548,36 @@ function App() {
     key: K,
     value: AthleteInput[K],
   ) => {
-    setProfileSaved(false);
     setProfile((current) => ({ ...current, [key]: value }));
   };
 
-  const saveProfile = () => {
+  const generatePreview = () => {
     if (!requireToken()) return;
     const parsed = athleteInputSchema.safeParse(profile);
     if (!parsed.success) {
       setNotice({
         tone: 'error',
         title: 'PROFILE_VALIDATION_FAILED',
-        message: 'Review the validation details and correct the profile before saving.',
+        message:
+          'Review the validation details and correct the profile before generating a preview.',
         details: parsed.error.flatten().fieldErrors,
       });
       return;
     }
     void run(
-      'profile',
-      () => odinApi.saveProfile(token.trim(), parsed.data),
-      () => {
-        setProfileSaved(true);
-        setNotice({
-          tone: 'success',
-          title: 'Odin profile saved',
-          message:
-            'The profile was saved through Odin for the authenticated user.',
-        });
-      },
-    );
-  };
-
-  const generate = () => {
-    if (!requireToken()) return;
-    if (!profileSaved) {
-      setNotice({
-        tone: 'info',
-        title: 'Save profile first',
-        message:
-          'Save the current athlete profile before generating a programme.',
-      });
-      document.querySelector('#athlete')?.scrollIntoView({ behavior: 'smooth' });
-      return;
-    }
-    void run(
-      'generate',
-      () =>
-        odinApi.generate(
-          token.trim(),
-          {
-            replace_existing_draft: replaceDraft,
-            refinement_mode: refinementMode,
-          },
-          idempotencyKey.trim() || undefined,
-        ),
-      (data) => {
-        setProgramme(data);
-        setProgrammeId(data.programme_id);
-        setSelectedPhase(data.programme.phases[0]?.phase_number ?? 1);
-        setNotice({
-          tone: 'success',
-          title: 'Programme generated',
-          message: `${data.programme.programme.name} was saved as version ${data.version}.`,
-        });
-      },
-    );
-  };
-
-  const loadCurrent = () => {
-    if (!requireToken()) return;
-    void run('current', () => odinApi.currentProgramme(token.trim()), (data) => {
-      setProgramme(data);
-      setProgrammeId(data.programme_id);
-      setSelectedPhase(data.programme.phases[0]?.phase_number ?? 1);
-      setNotice({
-        tone: 'success',
-        title: 'Current draft loaded',
-        message: `Loaded programme version ${data.version}.`,
-      });
-    });
-  };
-
-  const lookupProgramme = () => {
-    if (!requireToken()) return;
-    if (!programmeId.trim()) {
-      setNotice({
-        tone: 'info',
-        title: 'Programme ID required',
-        message: 'Enter a programme UUID to retrieve it.',
-      });
-      return;
-    }
-    void run(
-      'lookup',
-      () => odinApi.programmeById(token.trim(), programmeId.trim()),
+      'preview',
+      () => odinApi.preview(token.trim(), parsed.data, refinementMode),
       (data) => {
         setProgramme(data);
         setSelectedPhase(data.programme.phases[0]?.phase_number ?? 1);
         setNotice({
           tone: 'success',
-          title: 'Programme loaded',
-          message: `Loaded ${data.programme.programme.name}.`,
+          title: 'Programme preview generated',
+          message: `${data.programme.programme.name} is ready to review. Nothing was persisted.`,
         });
+        document
+          .querySelector('#programme')
+          ?.scrollIntoView({ behavior: 'smooth' });
       },
     );
   };
@@ -681,7 +596,7 @@ function App() {
         </a>
         <nav>
           <a href="#athlete">Athlete</a>
-          <a href="#generate">Generate</a>
+          <a href="#generate">Preview</a>
           <a href="#programme">Programme</a>
         </nav>
         <button
@@ -712,8 +627,8 @@ function App() {
             <span>Train with intent.</span>
           </h1>
           <p>
-            A focused interface for Odin’s public API—from athlete profile to a
-            validated, exercise-level training programme.
+            A focused interface for Odin’s authenticated API—from transient
+            athlete input to a validated, exercise-level programme preview.
           </p>
           <div className="hero-steps">
             <span><b>01</b> Connect</span>
@@ -834,7 +749,7 @@ function App() {
                   <span className="section-number">01</span>
                   <div>
                     <h2>Athlete profile</h2>
-                    <p>Inputs match the current public profile contract.</p>
+                    <p>Inputs match the current transient athlete contract.</p>
                   </div>
                 </div>
                 <StatusPill
@@ -1105,13 +1020,6 @@ function App() {
                   >
                     <RefreshCw size={16} /> Reload profile
                   </Button>
-                  <Button
-                    onClick={saveProfile}
-                    busy={busy === 'profile'}
-                    disabled={isBusy}
-                  >
-                    <Save size={16} /> Save profile
-                  </Button>
                 </div>
               </div>
             </section>
@@ -1121,8 +1029,10 @@ function App() {
                 <div>
                   <span className="section-number">02</span>
                   <div>
-                    <h2>Generate programme</h2>
-                    <p>Choose the deterministic baseline or bounded refinement.</p>
+                    <h2>Generate preview</h2>
+                    <p>
+                      Athlete input is sent transiently and is not persisted by Odin.
+                    </p>
                   </div>
                 </div>
                 <StatusPill tone="purple"><Bot size={13} /> Odin</StatusPill>
@@ -1152,29 +1062,17 @@ function App() {
                 ))}
               </div>
 
-              <div className="generation-options">
-                <label className="check-control">
-                  <input
-                    type="checkbox"
-                    checked={replaceDraft}
-                    onChange={(event) => setReplaceDraft(event.target.checked)}
-                  />
-                  <span><Check size={12} /></span>
-                  Replace existing draft
-                </label>
-                <Field label="Idempotency key" hint="Optional; safe retry identifier">
-                  <input
-                    value={idempotencyKey}
-                    onChange={(event) => setIdempotencyKey(event.target.value)}
-                    placeholder="demo-generation-001"
-                  />
-                </Field>
+              <div className="preview-actions">
+                <span>
+                  <ShieldCheck size={16} />
+                  Authenticated, stateless preview
+                </span>
                 <Button
-                  onClick={generate}
-                  busy={busy === 'generate'}
+                  onClick={generatePreview}
+                  busy={busy === 'preview'}
                   disabled={isBusy}
                 >
-                  <Sparkles size={16} /> Generate programme
+                  <Sparkles size={16} /> Generate preview
                 </Button>
               </div>
             </section>
@@ -1185,48 +1083,20 @@ function App() {
                   <span className="section-number">03</span>
                   <div>
                     <h2>Programme review</h2>
-                    <p>Inspect saved output, validation, and refinement metadata.</p>
+                    <p>Inspect the transient output, validation, and refinement metadata.</p>
                   </div>
                 </div>
-                <div className="programme-fetch">
-                  <Button
-                    variant="secondary"
-                    onClick={loadCurrent}
-                    busy={busy === 'current'}
-                    disabled={isBusy}
-                  >
-                    <RefreshCw size={15} /> Current draft
-                  </Button>
-                </div>
-              </div>
-
-              <div className="id-lookup">
-                <Fingerprint size={17} />
-                <input
-                  aria-label="Programme UUID"
-                  value={programmeId}
-                  onChange={(event) => setProgrammeId(event.target.value)}
-                  placeholder="Programme UUID"
-                />
-                <Button
-                  variant="ghost"
-                  onClick={lookupProgramme}
-                  busy={busy === 'lookup'}
-                  disabled={isBusy}
-                >
-                  <Search size={15} /> Find
-                </Button>
               </div>
 
               {programme ? (
                 <div className="programme-result">
                   <div className="programme-overview">
                     <div>
-                      <div className="eyebrow">Version {programme.version}</div>
+                      <div className="eyebrow">Stateless preview</div>
                       <h3>{programme.programme.programme.name}</h3>
                       <p>{programme.programme.programme.goal_description}</p>
                       <div className="overview-pills">
-                        <StatusPill tone="positive">{labelize(programme.status)}</StatusPill>
+                        <StatusPill tone="positive">Validated</StatusPill>
                         <StatusPill tone="purple">{labelize(programme.source)}</StatusPill>
                         <StatusPill>{programme.programme.programme.target_weeks} weeks</StatusPill>
                         <StatusPill>{programme.programme.programme.available_days} days</StatusPill>
@@ -1314,15 +1184,17 @@ function App() {
               ) : (
                 <div className="empty-programme">
                   <div className="empty-orbit"><Activity size={28} /></div>
-                  <h3>No programme loaded</h3>
-                  <p>Generate a new draft or retrieve the authenticated user’s current draft.</p>
+                  <h3>No preview generated</h3>
+                  <p>
+                    Configure the athlete and generate a validated, stateless programme preview.
+                  </p>
                   <Button
                     variant="secondary"
-                    onClick={loadCurrent}
-                    busy={busy === 'current'}
+                    onClick={generatePreview}
+                    busy={busy === 'preview'}
                     disabled={isBusy}
                   >
-                    <RefreshCw size={15} /> Load current draft
+                    <Sparkles size={15} /> Generate preview
                   </Button>
                 </div>
               )}
@@ -1340,13 +1212,13 @@ function App() {
                   <span>{token.trim() ? <Check size={13} /> : '1'}</span>
                   <div><strong>Connect</strong><small>Sign in to Supabase</small></div>
                 </li>
-                <li className={profileSaved ? 'done' : workflowStep === 'profile' ? 'active' : ''}>
-                  <span>{profileSaved ? <Check size={13} /> : '2'}</span>
-                  <div><strong>Save profile</strong><small>PUT /api/profile</small></div>
+                <li className={token.trim() ? 'done' : ''}>
+                  <span>{token.trim() ? <Check size={13} /> : '2'}</span>
+                  <div><strong>Configure athlete</strong><small>Transient input</small></div>
                 </li>
-                <li className={workflowStep === 'generate' ? 'active' : programme ? 'done' : ''}>
+                <li className={workflowStep === 'preview' ? 'active' : programme ? 'done' : ''}>
                   <span>{programme ? <Check size={13} /> : '3'}</span>
-                  <div><strong>Generate</strong><small>POST /api/odin/generate</small></div>
+                  <div><strong>Generate preview</strong><small>POST /api/odin/preview</small></div>
                 </li>
                 <li className={programme ? 'done' : workflowStep === 'review' ? 'active' : ''}>
                   <span>{programme ? <Check size={13} /> : '4'}</span>
@@ -1362,10 +1234,7 @@ function App() {
               </div>
               <ul className="endpoint-list">
                 <li><code>GET</code><span>/api/health</span></li>
-                <li><code>PUT</code><span>/api/profile</span></li>
-                <li><code>POST</code><span>/api/odin/generate</span></li>
-                <li><code>GET</code><span>/api/programmes/current</span></li>
-                <li><code>GET</code><span>/api/programmes/:id</span></li>
+                <li><code>POST</code><span>/api/odin/preview</span></li>
               </ul>
             </div>
 

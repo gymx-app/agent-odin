@@ -217,6 +217,8 @@ main { max-width: 1400px; margin: 0 auto; padding: 0 24px 80px; }
 .mode-card strong { font-size: 12px; }
 .mode-card small { color: var(--muted); font-size: 9px; margin-top: 5px; line-height: 1.4; }
 .generation-options { margin-top: 19px; border-top: 1px solid var(--line); padding-top: 18px; display: grid; grid-template-columns: auto minmax(220px, 1fr) auto; align-items: end; gap: 18px; }
+.preview-actions { margin-top: 19px; border-top: 1px solid var(--line); padding-top: 18px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.preview-actions > span { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 10px; }
 .check-control { align-self: center; display: flex; align-items: center; gap: 8px; color: #3d4841; font-size: 11px; font-weight: 700; cursor: pointer; }
 .check-control input { position: absolute; opacity: 0; }
 .check-control > span { width: 17px; height: 17px; border: 1px solid #b8beb9; border-radius: 5px; display: grid; place-items: center; color: transparent; background: white; }
@@ -352,6 +354,8 @@ footer p { margin-left: auto; font-size: 9px; }
   .form-grid, .mode-grid, .validation-grid { grid-template-columns: 1fr; }
   .span-2 { grid-column: span 1; }
   .generation-options { grid-template-columns: 1fr; align-items: stretch; }
+  .preview-actions { align-items: stretch; flex-direction: column; }
+  .preview-actions .button { width: 100%; }
   .injury-row { grid-template-columns: 1fr; }
   .panel-actions { gap: 14px; align-items: stretch; flex-direction: column; }
   .profile-actions { flex-direction: column; align-items: stretch; }

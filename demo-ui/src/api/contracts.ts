@@ -180,10 +180,7 @@ export type OdinProgramme = {
   };
 };
 
-export type ProgrammeResponse = {
-  programme_id: string;
-  version: number;
-  status: 'draft' | 'active' | 'archived';
+export type ProgrammePreviewResponse = {
   source: 'deterministic' | 'llm_refined';
   programme: OdinProgramme;
   validation: ProgrammeValidation;
