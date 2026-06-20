@@ -196,6 +196,20 @@ main { max-width: 1400px; margin: 0 auto; padding: 0 24px 80px; }
 .injury-row { display: grid; grid-template-columns: 1fr 110px 1.3fr; gap: 8px; }
 .injury-row :disabled { opacity: .55; background: #f2f3f0; }
 
+.advanced-section { border: 1px solid var(--line); border-radius: 12px; margin-top: 14px; background: var(--panel); }
+.advanced-section summary { padding: 11px 14px; cursor: pointer; font-size: 10px; font-weight: 800; letter-spacing: .045em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 7px; list-style: none; }
+.advanced-section summary::-webkit-details-marker { display: none; }
+.advanced-section summary::before { content: '▸'; font-size: 9px; transition: transform .2s; }
+.advanced-section[open] summary::before { transform: rotate(90deg); }
+.advanced-section[open] summary { border-bottom: 1px solid var(--line); }
+.section-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; padding: 14px; }
+.day-toggles { display: flex; gap: 6px; flex-wrap: wrap; }
+.day-toggle { display: flex; }
+.day-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.day-toggle span { display: grid; place-items: center; width: 38px; height: 34px; border: 1px solid #d3d8d2; border-radius: 8px; background: white; font-size: 10px; font-weight: 700; color: var(--muted); cursor: pointer; transition: border .15s, background .15s, color .15s; }
+.day-toggle input:checked + span { background: var(--green-soft); border-color: #82c5a0; color: var(--green-dark); }
+.day-toggle input:focus-visible + span { outline: 3px solid rgba(29, 154, 98, .28); outline-offset: 2px; }
+
 .panel-actions { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 18px; display: flex; justify-content: space-between; align-items: center; }
 .panel-actions > span { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 10px; }
 .profile-actions { display: flex; align-items: center; gap: 8px; }
@@ -338,7 +352,7 @@ footer p { margin-left: auto; font-size: 9px; }
 }
 
 @media (max-width: 760px) {
-  .topbar { height: 64px; padding: 0 16px; }
+  .topbar { height: 64px; padding: 0 16px; gap: 12px; }
   .topbar nav { display: none; }
   .health-chip { padding: 8px 10px; }
   .health-chip { font-size: 0; }
@@ -351,7 +365,7 @@ footer p { margin-left: auto; font-size: 9px; }
   .auth-fields { order: 3; flex-basis: 100%; grid-template-columns: 1fr; }
   .auth-copy { flex: 1; min-width: 0; }
   .panel { padding: 18px; }
-  .form-grid, .mode-grid, .validation-grid { grid-template-columns: 1fr; }
+  .form-grid, .mode-grid, .validation-grid, .section-grid { grid-template-columns: 1fr; }
   .span-2 { grid-column: span 1; }
   .generation-options { grid-template-columns: 1fr; align-items: stretch; }
   .preview-actions { align-items: stretch; flex-direction: column; }
@@ -360,13 +374,23 @@ footer p { margin-left: auto; font-size: 9px; }
   .panel-actions { gap: 14px; align-items: stretch; flex-direction: column; }
   .profile-actions { flex-direction: column; align-items: stretch; }
   .profile-actions .button { width: 100%; }
-  .programme-overview { align-items: flex-start; gap: 20px; }
+  .programme-overview { align-items: flex-start; gap: 20px; flex-direction: column; }
   .score-ring { width: 78px; height: 78px; }
   .score-ring::before { width: 62px; height: 62px; }
   .score-ring strong { font-size: 20px; }
   .exercise-row { grid-template-columns: 25px 1fr; }
   .set-chips, .rest-copy { grid-column: 2; text-align: left; }
   .side-column { grid-template-columns: 1fr; }
+  .day-toggle span { width: 44px; height: 44px; font-size: 11px; }
+  .day-toggles { gap: 8px; }
+  .result-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .result-tabs button { white-space: nowrap; flex-shrink: 0; }
+  .advanced-section summary { padding: 14px; font-size: 11px; }
+  .section-grid { padding: 14px; gap: 16px; }
+  .phase-tabs { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); }
+  .v2-phase-header { padding: 12px; gap: 8px; }
+  .v2-week-header { padding: 10px; }
+  .v2-day-header { padding: 10px; gap: 8px; }
   footer { flex-direction: column; gap: 14px; }
   footer p { margin: 0; text-align: center; }
 }
@@ -374,10 +398,12 @@ footer p { margin-left: auto; font-size: 9px; }
 @media (max-width: 480px) {
   .brand small { display: none; }
   .hero h1 { font-size: 38px; }
+  .hero > p { font-size: 14px; }
   .hero-steps svg { display: none; }
   .hero-steps { gap: 10px 16px; }
   .auth-panel > .button { width: 100%; }
-  .panel-heading { gap: 12px; }
+  .panel { padding: 14px; }
+  .panel-heading { gap: 12px; flex-direction: column; }
   .panel-heading > .status-pill { display: none; }
   .programme-heading { flex-direction: column; }
   .programme-fetch, .programme-fetch .button { width: 100%; }
@@ -386,10 +412,18 @@ footer p { margin-left: auto; font-size: 9px; }
   .id-lookup input { min-width: 0; }
   .id-lookup .button { flex-basis: 100%; }
   .programme-overview { flex-direction: column; }
+  .programme-overview h3 { font-size: 22px; }
   .day-meta > span:first-child { display: none; }
   .workout-day summary { grid-template-columns: 39px minmax(0, 1fr) auto; gap: 9px; }
   .day-heading strong, .day-heading span { overflow-wrap: anywhere; }
   .score-bars > div { grid-template-columns: 95px 1fr 24px; }
+  .button { min-height: 44px; font-size: 12px; }
+  .field input, .field select { height: 44px; font-size: 14px; }
+  .advanced-section summary { min-height: 44px; }
+  .section-grid { padding: 12px; }
+  .phase-tabs { grid-template-columns: 1fr 1fr; }
+  .v2-phase-title strong { font-size: 12px; }
+  .overview-pills { gap: 5px; }
 }
 
 /* --- Result tabs --- */

@@ -5,8 +5,14 @@ import { budgetMuscleGroups } from './muscle-volume-budgeter.js';
 
 const baseWeeklySets = (input: WeekPlannerInput): number => {
   const status = input.profile.athlete_state.training_status.value;
-  const perSession =
-    status === 'advanced' ? 16 : status === 'intermediate' ? 14 : 11;
+  const fillRate = status === 'advanced' ? 0.92 : status === 'intermediate' ? 0.85 : 0.75;
+  const maxPerSession = estimateMaximumSessionSets(
+    input.profile.source.session_duration_min,
+  );
+  const perSession = Math.max(
+    status === 'advanced' ? 12 : status === 'intermediate' ? 10 : 8,
+    Math.round(maxPerSession * fillRate),
+  );
   return perSession * input.strategy.resistance_frequency;
 };
 

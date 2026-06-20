@@ -230,6 +230,32 @@ const excludedBudget = (
   pattern in budget.movement_pattern_budgets &&
   budget.movement_pattern_budgets[pattern] === 0;
 
+const goalDesiredSets = (
+  primaryObjective: string,
+  role: MovementSlotV2['sequence_role'],
+): number => {
+  switch (primaryObjective) {
+    case 'strength':
+      if (role === 'primary') return 3;
+      if (role === 'secondary') return 2;
+      return 1;
+    case 'muscle_gain':
+      if (role === 'primary') return 3;
+      if (role === 'secondary') return 3;
+      if (role === 'isolation') return 2;
+      return 1;
+    case 'endurance':
+      if (role === 'primary') return 2;
+      if (role === 'secondary') return 2;
+      if (role === 'core') return 2;
+      return 1;
+    default:
+      if (role === 'primary') return 3;
+      if (role === 'secondary') return 2;
+      return 1;
+  }
+};
+
 const repZone = (
   input: ResistanceSessionBuilderInput,
   role: MovementSlotV2['sequence_role'],
@@ -268,8 +294,10 @@ export const planMovementSlotsV2 = (
   const slots = available
     .map((template, index) => {
       const minimum = template.required ? 1 : 0;
-      const desired =
-        template.role === 'primary' ? 3 : template.role === 'secondary' ? 2 : 1;
+      const desired = goalDesiredSets(
+        input.strategy.primary_objective,
+        template.role,
+      );
       const set_budget = Math.min(
         desired,
         Math.max(minimum, remaining - (minimumRequired - index - 1)),

@@ -31,6 +31,7 @@ import {
 import { ApiError, odinApi } from './api/client';
 import type {
   AthleteInput,
+  DayOfWeek,
   LongitudinalOdinProgramme,
   ProgrammeDay,
   ProgrammePreviewResponse,
@@ -1076,6 +1077,31 @@ function App() {
     setProfile((current) => ({ ...current, [key]: value }));
   };
 
+  const updateNestedProfile = <K extends keyof AthleteInput>(
+    group: K,
+    field: string,
+    value: unknown,
+  ) => {
+    setProfile((current) => ({
+      ...current,
+      [group]: { ...((current[group] as Record<string, unknown>) ?? {}), [field]: value },
+    }));
+  };
+
+  const toggleScheduleDay = (day: DayOfWeek) => {
+    setProfile((current) => {
+      const currentDays = current.schedule?.available_days ?? [];
+      const next = currentDays.includes(day)
+        ? currentDays.filter((d) => d !== day)
+        : [...currentDays, day];
+      return {
+        ...current,
+        available_days_per_week: next.length || current.available_days_per_week,
+        schedule: { ...(current.schedule ?? {}), available_days: next },
+      };
+    });
+  };
+
   const generatePreview = () => {
     if (!requireToken()) return;
     const parsed = athleteInputSchema.safeParse(profile);
@@ -1542,6 +1568,314 @@ function App() {
                   </span>
                 </div>
               </div>
+
+              <details className="advanced-section">
+                <summary>Nutrition</summary>
+                <div className="section-grid">
+                  <Field label="Calorie status">
+                    <select
+                      aria-label="Calorie status"
+                      value={profile.nutrition?.calorie_status ?? ''}
+                      onChange={(event) =>
+                        updateNestedProfile(
+                          'nutrition',
+                          'calorie_status',
+                          event.target.value || undefined,
+                        )
+                      }
+                    >
+                      <option value="">Not specified</option>
+                      <option value="deficit">Deficit</option>
+                      <option value="maintenance">Maintenance</option>
+                      <option value="surplus">Surplus</option>
+                      <option value="unknown">Unknown</option>
+                    </select>
+                  </Field>
+                  <Field label="Daily protein" hint="Grams per day">
+                    <input
+                      aria-label="Estimated protein grams per day"
+                      type="number"
+                      min={0}
+                      max={1000}
+                      value={profile.nutrition?.estimated_protein_g_per_day ?? ''}
+                      onChange={(event) =>
+                        updateNestedProfile(
+                          'nutrition',
+                          'estimated_protein_g_per_day',
+                          event.target.value ? Number(event.target.value) : undefined,
+                        )
+                      }
+                      placeholder="e.g. 140"
+                    />
+                  </Field>
+                </div>
+              </details>
+
+              <details className="advanced-section">
+                <summary>Training History</summary>
+                <div className="section-grid">
+                  <Field label="Years training">
+                    <input
+                      aria-label="Years of consistent training"
+                      type="number"
+                      min={0}
+                      max={80}
+                      step={0.5}
+                      value={profile.training_history?.years_consistent_training ?? ''}
+                      onChange={(event) =>
+                        updateNestedProfile(
+                          'training_history',
+                          'years_consistent_training',
+                          event.target.value ? Number(event.target.value) : undefined,
+                        )
+                      }
+                      placeholder="e.g. 3"
+                    />
+                  </Field>
+                  <Field label="Recent consistency" hint="Last 12 weeks">
+                    <select
+                      aria-label="Consistency last 12 weeks"
+                      value={profile.training_history?.consistency_last_12_weeks ?? ''}
+                      onChange={(event) =>
+                        updateNestedProfile(
+                          'training_history',
+                          'consistency_last_12_weeks',
+                          event.target.value || undefined,
+                        )
+                      }
+                    >
+                      <option value="">Not specified</option>
+                      <option value="low">Low</option>
+                      <option value="moderate">Moderate</option>
+                      <option value="high">High</option>
+                    </select>
+                  </Field>
+                  <Field label="Current sessions/week">
+                    <input
+                      aria-label="Current sessions per week"
+                      type="number"
+                      min={0}
+                      max={14}
+                      value={profile.training_history?.current_sessions_per_week ?? ''}
+                      onChange={(event) =>
+                        updateNestedProfile(
+                          'training_history',
+                          'current_sessions_per_week',
+                          event.target.value ? Number(event.target.value) : undefined,
+                        )
+                      }
+                      placeholder="e.g. 4"
+                    />
+                  </Field>
+                  <Field label="Exercise competency">
+                    <select
+                      aria-label="Exercise competency"
+                      value={profile.training_history?.exercise_competency ?? ''}
+                      onChange={(event) =>
+                        updateNestedProfile(
+                          'training_history',
+                          'exercise_competency',
+                          event.target.value || undefined,
+                        )
+                      }
+                    >
+                      <option value="">Not specified</option>
+                      <option value="novice">Novice</option>
+                      <option value="competent">Competent</option>
+                      <option value="advanced">Advanced</option>
+                    </select>
+                  </Field>
+                </div>
+              </details>
+
+              <details className="advanced-section">
+                <summary>Lifestyle</summary>
+                <div className="section-grid">
+                  <Field label="Sleep hours" hint="Average per night">
+                    <input
+                      aria-label="Average sleep hours"
+                      type="number"
+                      min={0}
+                      max={24}
+                      step={0.5}
+                      value={profile.lifestyle?.sleep_hours ?? ''}
+                      onChange={(event) =>
+                        updateNestedProfile(
+                          'lifestyle',
+                          'sleep_hours',
+                          event.target.value ? Number(event.target.value) : undefined,
+                        )
+                      }
+                      placeholder="e.g. 7"
+                    />
+                  </Field>
+                  <Field label="Perceived stress" hint="1 = low, 10 = high">
+                    <input
+                      aria-label="Perceived stress level"
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={profile.lifestyle?.perceived_stress ?? ''}
+                      onChange={(event) =>
+                        updateNestedProfile(
+                          'lifestyle',
+                          'perceived_stress',
+                          event.target.value ? Number(event.target.value) : undefined,
+                        )
+                      }
+                      placeholder="e.g. 4"
+                    />
+                  </Field>
+                  <Field label="Occupation type">
+                    <select
+                      aria-label="Occupation type"
+                      value={profile.lifestyle?.occupation_type ?? ''}
+                      onChange={(event) =>
+                        updateNestedProfile(
+                          'lifestyle',
+                          'occupation_type',
+                          event.target.value || undefined,
+                        )
+                      }
+                    >
+                      <option value="">Not specified</option>
+                      <option value="sedentary">Sedentary</option>
+                      <option value="mixed">Mixed</option>
+                      <option value="active">Active</option>
+                      <option value="manual">Manual</option>
+                    </select>
+                  </Field>
+                </div>
+              </details>
+
+              <details className="advanced-section">
+                <summary>Sport</summary>
+                <div className="section-grid">
+                  <Field label="Sport name">
+                    <input
+                      aria-label="Sport name"
+                      value={profile.sport?.name ?? ''}
+                      onChange={(event) =>
+                        updateNestedProfile(
+                          'sport',
+                          'name',
+                          event.target.value || undefined,
+                        )
+                      }
+                      placeholder="e.g. Football, BJJ"
+                    />
+                  </Field>
+                  <Field label="Sessions/week">
+                    <input
+                      aria-label="Sport sessions per week"
+                      type="number"
+                      min={0}
+                      max={14}
+                      value={profile.sport?.sessions_per_week ?? ''}
+                      onChange={(event) =>
+                        updateNestedProfile(
+                          'sport',
+                          'sessions_per_week',
+                          event.target.value ? Number(event.target.value) : undefined,
+                        )
+                      }
+                      placeholder="e.g. 3"
+                    />
+                  </Field>
+                  <Field label="Sport intensity">
+                    <select
+                      aria-label="Sport intensity"
+                      value={profile.sport?.intensity ?? ''}
+                      onChange={(event) =>
+                        updateNestedProfile(
+                          'sport',
+                          'intensity',
+                          event.target.value || undefined,
+                        )
+                      }
+                    >
+                      <option value="">Not specified</option>
+                      <option value="low">Low</option>
+                      <option value="moderate">Moderate</option>
+                      <option value="high">High</option>
+                    </select>
+                  </Field>
+                  <Field label="Sport priority">
+                    <select
+                      aria-label="Sport priority"
+                      value={profile.sport?.priority ?? ''}
+                      onChange={(event) =>
+                        updateNestedProfile(
+                          'sport',
+                          'priority',
+                          event.target.value || undefined,
+                        )
+                      }
+                    >
+                      <option value="">Not specified</option>
+                      <option value="supporting">Supporting</option>
+                      <option value="equal">Equal</option>
+                      <option value="primary">Primary</option>
+                    </select>
+                  </Field>
+                  <Field label="Lower body load">
+                    <select
+                      aria-label="Sport lower body load"
+                      value={profile.sport?.lower_body_load ?? ''}
+                      onChange={(event) =>
+                        updateNestedProfile(
+                          'sport',
+                          'lower_body_load',
+                          event.target.value || undefined,
+                        )
+                      }
+                    >
+                      <option value="">Not specified</option>
+                      <option value="low">Low</option>
+                      <option value="moderate">Moderate</option>
+                      <option value="high">High</option>
+                    </select>
+                  </Field>
+                </div>
+              </details>
+
+              <details className="advanced-section">
+                <summary>Schedule</summary>
+                <div className="section-grid">
+                  <div className="field span-2">
+                    <span className="field-label">Available days</span>
+                    <div className="day-toggles">
+                      {(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).map((day) => (
+                        <label key={day} className="day-toggle">
+                          <input
+                            type="checkbox"
+                            checked={profile.schedule?.available_days?.includes(day) ?? false}
+                            onChange={() => toggleScheduleDay(day)}
+                          />
+                          <span>{day.slice(0, 3).toUpperCase()}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <span className="field-hint">
+                      Selecting days auto-syncs the training days count above.
+                    </span>
+                  </div>
+                  <Field label="Preferred time">
+                    <input
+                      aria-label="Preferred workout time"
+                      value={profile.schedule?.preferred_workout_time ?? ''}
+                      onChange={(event) =>
+                        updateNestedProfile(
+                          'schedule',
+                          'preferred_workout_time',
+                          event.target.value || undefined,
+                        )
+                      }
+                      placeholder="e.g. morning, evening"
+                    />
+                  </Field>
+                </div>
+              </details>
 
               <div className="panel-actions">
                 <span>

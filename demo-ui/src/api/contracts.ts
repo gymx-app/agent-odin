@@ -17,6 +17,15 @@ export type RefinementMode =
   | 'llm_required';
 export type PlannerVersion = 'legacy_v1' | 'longitudinal_v1';
 
+export type DayOfWeek =
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday'
+  | 'sunday';
+
 export type AthleteInput = {
   name: string;
   age: number;
@@ -46,6 +55,32 @@ export type AthleteInput = {
       right_leg: number;
       trunk: number;
     };
+  };
+  training_history?: {
+    years_consistent_training?: number;
+    consistency_last_12_weeks?: 'low' | 'moderate' | 'high';
+    current_sessions_per_week?: number;
+    exercise_competency?: 'novice' | 'competent' | 'advanced';
+  };
+  nutrition?: {
+    calorie_status?: 'deficit' | 'maintenance' | 'surplus' | 'unknown';
+    estimated_protein_g_per_day?: number;
+  };
+  lifestyle?: {
+    sleep_hours?: number;
+    perceived_stress?: number;
+    occupation_type?: 'sedentary' | 'mixed' | 'active' | 'manual';
+  };
+  sport?: {
+    name?: string;
+    sessions_per_week?: number;
+    intensity?: 'low' | 'moderate' | 'high';
+    priority?: 'supporting' | 'equal' | 'primary';
+    lower_body_load?: 'low' | 'moderate' | 'high';
+  };
+  schedule?: {
+    available_days?: DayOfWeek[];
+    preferred_workout_time?: string;
   };
 };
 
