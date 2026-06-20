@@ -23,7 +23,7 @@ export const toSafeGenerationError = (error: unknown): AppError => {
       'GENERATED_PROGRAMME_INVALID',
       'Generated programme failed deterministic planning.',
       422,
-      { planner_code: error.code },
+      { planner_code: error.code, planner_details: error.details },
     );
   }
 
