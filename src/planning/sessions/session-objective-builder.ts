@@ -22,5 +22,7 @@ export const canonicalSessionTitle = (
 
 export const sessionObjective = (
   input: ResistanceSessionBuilderInput,
-): string =>
-  `${input.phase.objective} Use exact prescriptions within the session fatigue and duration budget.`;
+): string => {
+  const full = `${input.phase.objective} Use exact prescriptions within the session fatigue and duration budget.`;
+  return full.length <= 120 ? full : input.phase.objective.slice(0, 120);
+};
