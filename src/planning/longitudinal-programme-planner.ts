@@ -20,26 +20,44 @@ export type LongitudinalProgrammePlannerOptions = {
 };
 
 const initialSchedule = (profile: NormalizedAthleteProfile) => {
+  const days = profile.source.available_days_per_week;
   const conditioning =
     profile.source.goal === 'endurance'
       ? 2
       : profile.source.goal === 'fat_loss'
         ? 1
         : 0;
-  const resistance = Math.max(
-    2,
-    Math.min(
-      profile.source.available_days_per_week - Math.min(conditioning, 1),
-      profile.source.goal === 'endurance' ? 3 : 4,
-    ),
-  );
+
+  let resistance: number;
+  if (
+    days === 6 &&
+    profile.source.fitness_level !== 'beginner' &&
+    profile.recovery_capacity !== 'low'
+  ) {
+    resistance = 6;
+  } else if (days === 7) {
+    resistance = profile.source.goal === 'endurance' ? 3 : 5;
+  } else {
+    resistance = Math.max(
+      2,
+      Math.min(
+        days - Math.min(conditioning, 1),
+        profile.source.goal === 'endurance' ? 3 : days <= 5 ? 4 : days,
+      ),
+    );
+  }
+
+  const splitType =
+    resistance <= 3
+      ? ('full_body' as const)
+      : resistance === 4
+        ? ('upper_lower' as const)
+        : resistance === 6
+          ? ('push_pull_legs' as const)
+          : ('hybrid' as const);
+
   return {
-    split_type:
-      resistance <= 3
-        ? ('full_body' as const)
-        : resistance === 4
-          ? ('upper_lower' as const)
-          : ('hybrid' as const),
+    split_type: splitType,
     resistance_frequency: resistance,
     conditioning_frequency: conditioning,
     cycle_length_days: 7,
