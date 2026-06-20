@@ -147,14 +147,14 @@ const templates: Record<SessionKind, SlotTemplate[]> = {
   pull: [
     {
       pattern: 'vertical_pull',
-      substitutions: [],
+      substitutions: ['horizontal_pull'],
       muscles: ['lats', 'biceps'],
       role: 'primary',
       required: true,
     },
     {
       pattern: 'horizontal_pull',
-      substitutions: [],
+      substitutions: ['vertical_pull'],
       muscles: ['upper_back', 'lats'],
       role: 'primary',
       required: true,
