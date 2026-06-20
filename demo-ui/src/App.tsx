@@ -490,6 +490,17 @@ const V2DayCard = ({ day, calendarType }: { day: V2Day; calendarType: 'weekly' |
                   </div>
                 ) : null}
 
+                {ex.sequencing_rationale.length > 0 ? (
+                  <details className="v2-rationale">
+                    <summary><Sparkles size={12} /> Why this exercise?</summary>
+                    <ul>
+                      {ex.sequencing_rationale.map((r, i) => (
+                        <li key={i}>{r}</li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : null}
+
                 <details className="v2-dev-details">
                   <summary>IDs</summary>
                   <code>{ex.prescription_id} / {ex.exercise_id}</code>
@@ -530,6 +541,16 @@ const V2DayCard = ({ day, calendarType }: { day: V2Day; calendarType: 'weekly' |
                   </div>
                 ) : null}
                 <div className="v2-purpose">{c.purpose}</div>
+                {c.rationale.length > 0 ? (
+                  <details className="v2-rationale">
+                    <summary><Sparkles size={12} /> Why this activity?</summary>
+                    <ul>
+                      {c.rationale.map((r, i) => (
+                        <li key={i}>{r}</li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : null}
               </div>
             ))}
           </div>
@@ -573,6 +594,16 @@ const V2WeekCard = ({ week, calendarType, defaultOpen }: { week: V2Week; calenda
       </summary>
       <div className="v2-week-content">
         <p className="v2-objective">{week.objective}</p>
+        {week.progression_notes.length > 0 ? (
+          <details className="v2-rationale">
+            <summary><Sparkles size={12} /> Why this week?</summary>
+            <ul>
+              {week.progression_notes.map((note, i) => (
+                <li key={i}>{note}</li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
         <div className="v2-day-list">
           {week.days.map((day) => (
             <V2DayCard key={day.day_id} day={day} calendarType={calendarType} />
@@ -612,6 +643,19 @@ const V2PhaseCard = ({ phase, calendarType, defaultOpen }: { phase: V2Phase; cal
     </summary>
     <div className="v2-phase-content">
       <p className="v2-objective">{phase.objective}</p>
+      {phase.rationale.length > 0 ? (
+        <details className="v2-rationale v2-rationale-phase">
+          <summary><Sparkles size={12} /> Why this phase?</summary>
+          <ul>
+            {phase.rationale.map((r, i) => (
+              <li key={i}>
+                <strong>{labelize(r.code)}</strong>: {r.reason}
+                <span className="v2-rationale-value">{r.selected_value}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
       {phase.weeks.map((week, i) => (
         <V2WeekCard
           key={week.week_id}

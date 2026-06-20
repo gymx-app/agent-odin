@@ -231,6 +231,7 @@ export type V2ExercisePrescription = {
   movement_patterns: string[];
   primary_muscles: string[];
   secondary_muscles: string[];
+  sequencing_rationale: string[];
 };
 
 export type V2ConditioningPrescription = {
@@ -254,6 +255,7 @@ export type V2ConditioningPrescription = {
   placement: string;
   same_day_separation?: { category: string };
   interference_risk: string;
+  rationale: string[];
 };
 
 export type V2CooldownPrescription = {
@@ -295,6 +297,7 @@ export type V2Week = {
   planned_intensity_factor: number;
   planned_effort_factor: number;
   days: V2Day[];
+  progression_notes: string[];
   review_triggers: Array<{ code: string; message: string; trigger_type: string }>;
 };
 
@@ -311,6 +314,13 @@ export type V2Phase = {
   intensity_direction: string;
   effort_direction: string;
   weeks: V2Week[];
+  rationale: Array<{
+    code: string;
+    selected_value: string;
+    reason: string;
+    source_fields: string[];
+    confidence: string;
+  }>;
 };
 
 export type LongitudinalOdinProgramme = {

@@ -498,6 +498,16 @@ footer p { margin-left: auto; font-size: 9px; }
 .v2-conditioning-meta dd { margin: 0; font: 500 8px 'DM Mono'; }
 .v2-intervals { margin-top: 6px; font: 9px 'DM Mono'; color: #5846ae; }
 
+.v2-rationale { margin-top: 8px; border: 1px solid #e2e8df; border-radius: 8px; overflow: hidden; }
+.v2-rationale summary { display: flex; align-items: center; gap: 5px; padding: 7px 10px; font-size: 9px; font-weight: 700; color: var(--green-dark); background: var(--green-soft); cursor: pointer; list-style: none; }
+.v2-rationale summary::-webkit-details-marker { display: none; }
+.v2-rationale summary svg { color: var(--green); }
+.v2-rationale ul { margin: 0; padding: 8px 10px 8px 26px; background: white; list-style: disc; }
+.v2-rationale li { font-size: 9px; color: var(--muted); line-height: 1.6; padding: 1px 0; }
+.v2-rationale li strong { color: var(--ink); font-weight: 600; }
+.v2-rationale-value { display: inline-block; margin-left: 4px; font: 500 8px 'DM Mono'; color: var(--green-dark); background: var(--green-soft); padding: 1px 5px; border-radius: 3px; }
+.v2-rationale-phase { border-color: #b9dfca; margin-bottom: 10px; }
+
 .v2-review-triggers { margin-top: 10px; }
 .v2-review-triggers h5 { margin: 0 0 6px; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .v2-trigger { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 9px; }
