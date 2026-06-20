@@ -17,7 +17,9 @@ import { AthleteInputSchema } from '../../src/domain/athlete/athlete-input.schem
 import { seedExercises } from '../../src/exercises/approved-exercise-library.js';
 import { previewProgramme } from '../../src/application/programme-preview.service.js';
 import type { ProgrammeRefinementProvider } from '../../src/llm/programme-refinement-provider.js';
+import type { V2ProgrammeRefinementProvider } from '../../src/llm/v2-programme-refinement-provider.js';
 import { OpenAIProgrammeRefinementProvider } from '../../src/llm/openai-programme-refinement-provider.js';
+import { OpenAIV2ProgrammeRefinementProvider } from '../../src/llm/openai-v2-programme-refinement-provider.js';
 import { createOpenAIClient } from '../../src/llm/openai-client.js';
 import { PlannerVersionSchema } from '../../src/domain/programme/planner-version.js';
 import { odinError } from '../../src/shared/errors/odin-errors.js';
@@ -36,6 +38,7 @@ const previewRequestSchema = z
 export type PreviewDependencies = {
   authClient: SupabaseAuthClientLike;
   refinementProvider?: ProgrammeRefinementProvider;
+  v2RefinementProvider?: V2ProgrammeRefinementProvider;
 };
 
 const createPreviewDependencies = (
@@ -46,10 +49,13 @@ const createPreviewDependencies = (
   };
 
   if (appConfig.llmRefinementEnabled) {
+    const client = createOpenAIClient(appConfig);
     dependencies.refinementProvider = new OpenAIProgrammeRefinementProvider(
-      createOpenAIClient(appConfig),
+      client,
       appConfig,
     );
+    dependencies.v2RefinementProvider =
+      new OpenAIV2ProgrammeRefinementProvider(client, appConfig);
   }
 
   return dependencies;
@@ -89,9 +95,9 @@ export const createPreviewHandler = (
           logger: createLogger(appConfig),
           generationTimeoutMs: appConfig.generationTimeoutMs,
           configuredModel: appConfig.openaiModel,
-          refinementUnavailableReason: appConfig.llmRefinementEnabled
-            ? 'OPENAI_CONFIGURATION_MISSING'
-            : 'LLM_REFINEMENT_DISABLED',
+          ...(!appConfig.llmRefinementEnabled
+            ? { refinementUnavailableReason: 'LLM_REFINEMENT_DISABLED' as const }
+            : {}),
           ...(requestedPlannerVersion?.success
             ? { requestedPlannerVersion: requestedPlannerVersion.data }
             : {}),
@@ -102,6 +108,9 @@ export const createPreviewHandler = (
           exerciseLibraryVersion: 'approved-library-v1',
           ...(dependencies.refinementProvider
             ? { refinementProvider: dependencies.refinementProvider }
+            : {}),
+          ...(dependencies.v2RefinementProvider
+            ? { v2RefinementProvider: dependencies.v2RefinementProvider }
             : {}),
         },
       );
