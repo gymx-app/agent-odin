@@ -52,6 +52,36 @@ import {
 } from './auth/supabase';
 import { athleteInputSchema } from './profile/profile-schema';
 
+const STORAGE_KEY = 'odin_demo_form';
+
+type StoredForm = {
+  profile: AthleteInput;
+  refinementMode: RefinementMode;
+  plannerVersion: PlannerVersion;
+};
+
+const loadStoredForm = (): Partial<StoredForm> => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Partial<StoredForm>;
+    if (parsed.profile) {
+      const result = athleteInputSchema.safeParse(parsed.profile);
+      if (!result.success) return { refinementMode: parsed.refinementMode, plannerVersion: parsed.plannerVersion };
+      parsed.profile = result.data;
+    }
+    return parsed;
+  } catch {
+    return {};
+  }
+};
+
+const saveForm = (form: StoredForm) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(form));
+  } catch { /* quota exceeded — ignore */ }
+};
+
 type Notice = {
   tone: 'success' | 'error' | 'info';
   title: string;
@@ -830,18 +860,19 @@ const RawJsonViewer = ({ data }: { data: unknown }) => {
 };
 
 function App() {
+  const [storedForm] = useState(loadStoredForm);
   const [token, setToken] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
-  const [profile, setProfile] = useState<AthleteInput>(defaultProfile);
+  const [profile, setProfile] = useState<AthleteInput>(storedForm.profile ?? defaultProfile);
   const [profileLoad, setProfileLoad] =
     useState<ProfileLoadState>({ status: 'default' });
   const [refinementMode, setRefinementMode] =
-    useState<RefinementMode>('deterministic');
+    useState<RefinementMode>(storedForm.refinementMode ?? 'deterministic');
   const [plannerVersion, setPlannerVersion] =
-    useState<PlannerVersion>('ai_agent_v1');
+    useState<PlannerVersion>(storedForm.plannerVersion ?? 'ai_agent_v1');
   const [programme, setProgramme] =
     useState<ProgrammePreviewResponse | null>(null);
   const [selectedPhase, setSelectedPhase] = useState(1);
@@ -920,6 +951,10 @@ function App() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    saveForm({ profile, refinementMode, plannerVersion });
+  }, [profile, refinementMode, plannerVersion]);
 
   const loadAuthenticatedProfile = async (showNotice = true) => {
     const authClient = supabaseAuth;
