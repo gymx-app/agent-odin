@@ -15,7 +15,7 @@ export type RefinementMode =
   | 'deterministic'
   | 'llm_optional'
   | 'llm_required';
-export type PlannerVersion = 'legacy_v1' | 'longitudinal_v1';
+export type PlannerVersion = 'legacy_v1' | 'longitudinal_v1' | 'ai_agent_v1';
 
 export type DayOfWeek =
   | 'monday'
@@ -406,14 +406,23 @@ export type LongitudinalOdinProgramme = {
   [key: string]: unknown;
 };
 
+export type AiGenerationMeta = {
+  total_input_tokens: number;
+  total_output_tokens: number;
+  fallback_used: boolean;
+  fallback_reason?: string;
+};
+
 export type ProgrammePreviewResponse = {
-  source: 'deterministic' | 'llm_refined';
+  source: 'deterministic' | 'llm_refined' | 'ai_generated';
   planner_version: PlannerVersion;
   schema_version: '1.0' | '2.0';
   programme: OdinProgramme | LongitudinalOdinProgramme;
   validation: ProgrammeValidation;
   refinement: RefinementMetadata;
-  generation: Record<string, unknown>;
+  generation: Record<string, unknown> & {
+    ai_generation?: AiGenerationMeta;
+  };
 };
 
 export const isLegacyProgramme = (
@@ -436,7 +445,8 @@ export const isLongitudinalResponse = (
 ): data is ProgrammePreviewResponse & {
   programme: LongitudinalOdinProgramme;
 } =>
-  data.planner_version === 'longitudinal_v1' && data.schema_version === '2.0';
+  (data.planner_version === 'longitudinal_v1' || data.planner_version === 'ai_agent_v1') &&
+  data.schema_version === '2.0';
 
 export type SuccessEnvelope<T> = { success: true; data: T };
 export type ErrorEnvelope = {

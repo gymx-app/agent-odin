@@ -726,31 +726,48 @@ const LongitudinalProgrammeView = ({ programme }: { programme: LongitudinalOdinP
 
 // --- Generation Metadata ---
 
-const GenerationMeta = ({ data }: { data: ProgrammePreviewResponse }) => (
-  <div className="v2-gen-meta">
-    <div><dt>Planner</dt><dd>{labelize(data.planner_version)}</dd></div>
-    <div><dt>Schema</dt><dd>{data.schema_version}</dd></div>
-    <div><dt>Source</dt><dd>{labelize(data.source)}</dd></div>
-    <div><dt>Validation</dt><dd>{data.validation.passed ? 'Valid' : 'Invalid'}</dd></div>
-    <div><dt>Score</dt><dd>{Math.round(data.validation.overall_score)}</dd></div>
-    <div>
-      <dt>Refinement</dt>
-      <dd>
-        {data.refinement.status === 'applied' || data.refinement.status === 'accepted'
-          ? data.refinement.operation_count != null && data.refinement.operation_count > 0
-            ? `Applied (${data.refinement.operation_count} changes)`
-            : data.refinement.applied
-              ? 'Applied'
-              : 'No change'
-          : data.refinement.status === 'not_requested'
-            ? 'Not requested'
-            : data.refinement.status === 'fallback'
-              ? `Fallback${data.refinement.reason_code ? ` — ${data.refinement.reason_code}` : ''}`
-              : labelize(data.refinement.status)}
-      </dd>
+const GenerationMeta = ({ data }: { data: ProgrammePreviewResponse }) => {
+  const ai = data.generation.ai_generation;
+  return (
+    <div className="v2-gen-meta">
+      <div><dt>Planner</dt><dd>{labelize(data.planner_version)}</dd></div>
+      <div><dt>Schema</dt><dd>{data.schema_version}</dd></div>
+      <div><dt>Source</dt><dd>{labelize(data.source)}</dd></div>
+      <div><dt>Validation</dt><dd>{data.validation.passed ? 'Valid' : 'Invalid'}</dd></div>
+      <div><dt>Score</dt><dd>{Math.round(data.validation.overall_score)}</dd></div>
+      <div>
+        <dt>Refinement</dt>
+        <dd>
+          {data.refinement.status === 'applied' || data.refinement.status === 'accepted'
+            ? data.refinement.operation_count != null && data.refinement.operation_count > 0
+              ? `Applied (${data.refinement.operation_count} changes)`
+              : data.refinement.applied
+                ? 'Applied'
+                : 'No change'
+            : data.refinement.status === 'not_requested'
+              ? 'Not requested'
+              : data.refinement.status === 'fallback'
+                ? `Fallback${data.refinement.reason_code ? ` — ${data.refinement.reason_code}` : ''}`
+                : labelize(data.refinement.status)}
+        </dd>
+      </div>
+      {ai ? (
+        <>
+          <div>
+            <dt>AI tokens</dt>
+            <dd>{(ai.total_input_tokens + ai.total_output_tokens).toLocaleString()}</dd>
+          </div>
+          {ai.fallback_used ? (
+            <div>
+              <dt>AI fallback</dt>
+              <dd>{ai.fallback_reason ?? 'Yes'}</dd>
+            </div>
+          ) : null}
+        </>
+      ) : null}
     </div>
-  </div>
-);
+  );
+};
 
 // --- Unsupported version ---
 
@@ -824,7 +841,7 @@ function App() {
   const [refinementMode, setRefinementMode] =
     useState<RefinementMode>('deterministic');
   const [plannerVersion, setPlannerVersion] =
-    useState<PlannerVersion>('longitudinal_v1');
+    useState<PlannerVersion>('ai_agent_v1');
   const [programme, setProgramme] =
     useState<ProgrammePreviewResponse | null>(null);
   const [selectedPhase, setSelectedPhase] = useState(1);
@@ -1187,7 +1204,7 @@ function App() {
       <main id="top">
         <section className="hero">
           <div className="eyebrow">
-            <Sparkles size={14} /> Deterministic programme planning
+            <Sparkles size={14} /> AI-powered programme planning
           </div>
           <h1>
             Build with precision.
@@ -1945,6 +1962,7 @@ function App() {
                     setPlannerVersion(event.target.value as PlannerVersion)
                   }
                 >
+                  <option value="ai_agent_v1">AI Agent V1</option>
                   <option value="longitudinal_v1">Longitudinal V1</option>
                   <option value="legacy_v1">Legacy V1</option>
                 </select>
@@ -1987,7 +2005,7 @@ function App() {
                         <StatusPill tone={programme.validation.passed ? 'positive' : 'negative'}>
                           {programme.validation.passed ? 'Validated' : 'Invalid'}
                         </StatusPill>
-                        <StatusPill tone="purple">{labelize(programme.source)}</StatusPill>
+                        <StatusPill tone={programme.source === 'ai_generated' ? 'purple' : 'neutral'}>{labelize(programme.source)}</StatusPill>
                         <StatusPill>{labelize(programme.planner_version)}</StatusPill>
                         <StatusPill>Schema {programme.schema_version}</StatusPill>
                         {isLegacyProgramme(programme.programme) ? (
@@ -2075,6 +2093,28 @@ function App() {
                           <p className="empty-note"><Check size={15} /> No validation findings.</p>
                         )}
                       </div>
+
+                      {programme.generation.ai_generation ? (
+                        <div className="validation-card">
+                          <div className="card-title">
+                            <Sparkles size={18} />
+                            <strong>AI Generation</strong>
+                            <StatusPill tone={programme.generation.ai_generation.fallback_used ? 'warning' : 'positive'}>
+                              {programme.generation.ai_generation.fallback_used ? 'Fallback' : 'AI Generated'}
+                            </StatusPill>
+                          </div>
+                          <dl className="metadata-list">
+                            <div><dt>Source</dt><dd>{labelize(programme.source)}</dd></div>
+                            <div><dt>Input tokens</dt><dd>{programme.generation.ai_generation.total_input_tokens.toLocaleString()}</dd></div>
+                            <div><dt>Output tokens</dt><dd>{programme.generation.ai_generation.total_output_tokens.toLocaleString()}</dd></div>
+                            <div><dt>Total tokens</dt><dd>{(programme.generation.ai_generation.total_input_tokens + programme.generation.ai_generation.total_output_tokens).toLocaleString()}</dd></div>
+                            <div><dt>Fallback used</dt><dd>{programme.generation.ai_generation.fallback_used ? 'Yes' : 'No'}</dd></div>
+                            {programme.generation.ai_generation.fallback_reason ? (
+                              <div><dt>Fallback reason</dt><dd>{programme.generation.ai_generation.fallback_reason}</dd></div>
+                            ) : null}
+                          </dl>
+                        </div>
+                      ) : null}
 
                       <div className="validation-card">
                         <div className="card-title">
