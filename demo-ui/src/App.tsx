@@ -120,11 +120,9 @@ const mapGymXProfile = (
     source.full_name?.trim() ||
     [source.first_name, source.last_name].filter(Boolean).join(' ').trim() ||
     defaultProfile.name;
-  const age =
-    source.age ??
-    (source.date_of_birth
-      ? ageFromDateOfBirth(source.date_of_birth)
-      : defaultProfile.age);
+  const age = source.date_of_birth
+    ? ageFromDateOfBirth(source.date_of_birth)
+    : (source.age ?? defaultProfile.age);
   const sex =
     source.gender === 'male' || source.gender === 'female'
       ? source.gender
