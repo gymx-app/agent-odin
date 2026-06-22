@@ -2,10 +2,17 @@ import type { ProgrammeDay, WeekPlannerInput } from '../weeks/week.types.js';
 import { estimateMaximumSessionSets } from '../weeks/week-policies.js';
 import { budgetMovementPatterns } from './movement-volume-budgeter.js';
 import { budgetMuscleGroups } from './muscle-volume-budgeter.js';
+import {
+  VOLUME_FILL_RATES,
+  MIN_SESSION_VOLUME_FRACTION,
+} from '../evidence.js';
 
 const baseWeeklySets = (input: WeekPlannerInput): number => {
   const status = input.profile.athlete_state.training_status.value;
-  const fillRate = status === 'advanced' ? 0.92 : status === 'intermediate' ? 0.85 : 0.75;
+  const fillRate =
+    (status in VOLUME_FILL_RATES
+      ? VOLUME_FILL_RATES[status as keyof typeof VOLUME_FILL_RATES]
+      : undefined) ?? VOLUME_FILL_RATES.beginner;
   const maxPerSession = estimateMaximumSessionSets(
     input.profile.source.session_duration_min,
   );
@@ -33,7 +40,7 @@ export const allocateWeeklyVolume = (
     input.profile.source.session_duration_min,
   );
   const capacity = maximumPerSession * resistanceDays.length;
-  const minPerSession = Math.ceil(maximumPerSession * 0.6);
+  const minPerSession = Math.ceil(maximumPerSession * MIN_SESSION_VOLUME_FRACTION);
   const floor = minPerSession * resistanceDays.length;
   const desired = Math.max(floor, Math.round(baseWeeklySets(input) * volumeFactor));
   const total_working_sets = Math.min(desired, capacity);

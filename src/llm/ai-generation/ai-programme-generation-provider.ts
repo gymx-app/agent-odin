@@ -3,6 +3,7 @@ import type {
   AiPhaseGenerationResult,
   AiStrategyGenerationResult,
 } from './ai-generation.types.js';
+import type { AiReasoningResult } from './agent-reasoning.js';
 
 export type AiStrategyContext = {
   athlete: Record<string, unknown>;
@@ -27,7 +28,7 @@ export type AiPhaseContext = {
     effort_direction: string;
     progression_model: string;
   };
-  exercise_library: Record<string, unknown>[];
+  tool_instructions: string;
   prior_phase_summaries: Record<string, unknown>[];
   policies: Record<string, unknown>;
   constraints: Record<string, unknown>;
@@ -43,4 +44,9 @@ export interface AiProgrammeGenerationProvider {
     context: AiPhaseContext,
     providerCtx: AiGenerationProviderContext,
   ): Promise<AiPhaseGenerationResult>;
+
+  generateReasoning?(
+    context: AiPhaseContext,
+    providerCtx: AiGenerationProviderContext,
+  ): Promise<AiReasoningResult>;
 }

@@ -3,6 +3,7 @@ import type {
   AiStrategyOutputSchema,
   AiPhaseOutputSchema,
 } from './ai-generation.schema.js';
+import type { ToolExecutor } from './agent-tool-executor.js';
 
 export const AI_GENERATION_PROMPT_VERSION = 'odin_ai_gen_v1';
 
@@ -15,6 +16,8 @@ export type AiGenerationProviderContext = {
     validationCodes: string[];
     messages: string[];
   };
+  toolExecutor?: ToolExecutor;
+  reasoningOutput?: string;
 };
 
 export type AiGenerationResult<T> = {

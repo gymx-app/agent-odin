@@ -18,6 +18,10 @@ import type {
 } from './ai-programme-generation-provider.js';
 import { aiStrategySystemPrompt } from './ai-generation-strategy-prompt.js';
 import { aiPhaseSystemPrompt } from './ai-generation-phase-prompt.js';
+import { aiReasoningPrompt, type AiReasoningResult } from './agent-reasoning.js';
+import { AGENT_TOOLS } from './agent-tools.js';
+
+const MAX_TOOL_TURNS = 10;
 
 export class OpenAIAiProgrammeGenerationProvider
   implements AiProgrammeGenerationProvider
@@ -44,7 +48,7 @@ export class OpenAIAiProgrammeGenerationProvider
     context: AiStrategyContext,
     providerCtx: AiGenerationProviderContext,
   ): Promise<AiStrategyGenerationResult> {
-    return this.generate(
+    return this.generateStructured(
       aiStrategySystemPrompt,
       { strategy_context: context, retry_feedback: providerCtx.retryFeedback ?? null },
       AiStrategyOutputSchema,
@@ -57,16 +61,206 @@ export class OpenAIAiProgrammeGenerationProvider
     context: AiPhaseContext,
     providerCtx: AiGenerationProviderContext,
   ): Promise<AiPhaseGenerationResult> {
-    return this.generate(
-      aiPhaseSystemPrompt,
-      { phase_context: context, retry_feedback: providerCtx.retryFeedback ?? null },
-      AiPhaseOutputSchema,
-      'ai_phase_generation',
-      32000,
-    );
+    const model = this.model;
+    const userContent = { phase_context: context, retry_feedback: providerCtx.retryFeedback ?? null };
+
+    const input: OpenAI.Responses.ResponseInputItem[] = [
+      { role: 'system', content: aiPhaseSystemPrompt },
+      { role: 'user', content: JSON.stringify(userContent) },
+    ];
+
+    if (providerCtx.reasoningOutput) {
+      input.push({ role: 'assistant', content: providerCtx.reasoningOutput });
+      input.push({
+        role: 'user',
+        content: 'Now generate the phase using the tools to find exercises and check compliance. Output the complete structured phase.',
+      });
+    }
+
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    let previousResponseId: string | undefined;
+
+    try {
+      for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
+        const response = await this.client.responses.parse({
+          model,
+          ...(previousResponseId
+            ? { previous_response_id: previousResponseId }
+            : { input }),
+          tools: AGENT_TOOLS,
+          text: {
+            format: zodTextFormat(AiPhaseOutputSchema as never, 'ai_phase_generation'),
+          },
+          max_output_tokens: 32000,
+        });
+
+        previousResponseId = response.id;
+        totalInputTokens += response.usage?.input_tokens ?? 0;
+        totalOutputTokens += response.usage?.output_tokens ?? 0;
+
+        const toolCalls: Array<{ id: string; name: string; arguments: string }> = [];
+        let parsedOutput: AiPhaseGenerationResult['output'] | null = null;
+
+        for (const output of response.output) {
+          if (output.type === 'function_call') {
+            toolCalls.push({
+              id: output.call_id,
+              name: output.name,
+              arguments: output.arguments,
+            });
+          }
+
+          if (output.type === 'message') {
+            for (const item of output.content) {
+              if (item.type === 'refusal') {
+                throw refinementError(
+                  'LLM_PROVIDER_REFUSAL',
+                  'The generation provider declined the request.',
+                );
+              }
+              if (item.type === 'output_text' && item.parsed) {
+                const parsed = AiPhaseOutputSchema.safeParse(item.parsed);
+                if (parsed.success) {
+                  parsedOutput = parsed.data;
+                }
+              }
+            }
+          }
+        }
+
+        if (parsedOutput) {
+          return {
+            output: parsedOutput,
+            provider: 'openai',
+            model,
+            responseId: previousResponseId ?? null,
+            usage: {
+              inputTokens: totalInputTokens,
+              outputTokens: totalOutputTokens,
+            },
+          };
+        }
+
+        if (toolCalls.length > 0 && providerCtx.toolExecutor) {
+          const toolResults: OpenAI.Responses.ResponseInputItem[] = [];
+          for (const call of toolCalls) {
+            let args: Record<string, unknown>;
+            try {
+              args = JSON.parse(call.arguments) as Record<string, unknown>;
+            } catch {
+              args = {};
+            }
+            const result = providerCtx.toolExecutor(call.name, args);
+            toolResults.push({
+              type: 'function_call_output',
+              call_id: call.id,
+              output: JSON.stringify(result),
+            });
+          }
+          input.length = 0;
+          input.push(...toolResults);
+          continue;
+        }
+
+        if (toolCalls.length > 0 && !providerCtx.toolExecutor) {
+          throw refinementError(
+            'LLM_OUTPUT_INVALID',
+            'Model requested tool calls but no tool executor is available.',
+          );
+        }
+
+        throw refinementError(
+          'LLM_OUTPUT_INVALID',
+          'The generation provider returned no structured output or tool calls.',
+        );
+      }
+
+      throw refinementError(
+        'LLM_OUTPUT_INVALID',
+        `Phase generation exceeded maximum ${MAX_TOOL_TURNS} tool-calling turns.`,
+      );
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        typeof error.code === 'string' &&
+        error.code.startsWith('LLM_')
+      ) {
+        throw error;
+      }
+
+      if (
+        error instanceof Error &&
+        (error.name.includes('Timeout') || error.message.includes('timed out'))
+      ) {
+        throw refinementError(
+          'LLM_PROVIDER_TIMEOUT',
+          'The generation provider timed out.',
+        );
+      }
+
+      throw refinementError(
+        'LLM_PROVIDER_ERROR',
+        'The generation provider is unavailable.',
+      );
+    }
   }
 
-  private async generate<T>(
+  async generateReasoning(
+    context: AiPhaseContext,
+    providerCtx: AiGenerationProviderContext,
+  ): Promise<AiReasoningResult> {
+    const model = this.model;
+    const userContent = { phase_context: context, retry_feedback: providerCtx.retryFeedback ?? null };
+
+    try {
+      const response = await this.client.responses.create({
+        model,
+        input: [
+          { role: 'system', content: aiReasoningPrompt },
+          { role: 'user', content: JSON.stringify(userContent) },
+        ],
+        max_output_tokens: 1500,
+      });
+
+      let reasoning = '';
+      for (const output of response.output) {
+        if (output.type === 'message') {
+          for (const item of output.content) {
+            if (item.type === 'output_text') {
+              reasoning += item.text;
+            }
+          }
+        }
+      }
+
+      return {
+        reasoning,
+        usage: {
+          inputTokens: response.usage?.input_tokens ?? null,
+          outputTokens: response.usage?.output_tokens ?? null,
+        },
+      };
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        (error.name.includes('Timeout') || error.message.includes('timed out'))
+      ) {
+        throw refinementError(
+          'LLM_PROVIDER_TIMEOUT',
+          'The reasoning call timed out.',
+        );
+      }
+
+      throw refinementError(
+        'LLM_PROVIDER_ERROR',
+        'The generation provider is unavailable.',
+      );
+    }
+  }
+
+  private async generateStructured<T>(
     systemPrompt: string,
     userContent: unknown,
     schema: import('zod').ZodType<T>,

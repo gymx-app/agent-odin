@@ -3,6 +3,10 @@ import type {
   ConditioningType,
 } from './conditioning.types.js';
 import type { NormalizedAthleteProfile } from '../../domain/athlete/athlete.types.js';
+import {
+  HIIT_CYCLING,
+  BEGINNER_HIIT_EXCLUSION,
+} from '../evidence.js';
 
 export const selectConditioningType = (
   requirement: ConditioningRequirement,
@@ -25,11 +29,12 @@ export const selectConditioningType = (
   }
   if (requirement === 'performance' && !sportHasSprints) return 'intervals';
   if (requirement === 'developmental') {
+    const isBeginner = profile?.athlete_state.training_status.value === 'beginner';
     if (
       options?.goal === 'fat_loss' &&
       options.weekNumber !== undefined &&
-      profile?.athlete_state.training_status.value !== 'beginner' &&
-      options.weekNumber % 3 === 0
+      !(BEGINNER_HIIT_EXCLUSION && isBeginner) &&
+      options.weekNumber % HIIT_CYCLING.conditioning_day_interval_weeks === 0
     ) {
       return 'intervals';
     }

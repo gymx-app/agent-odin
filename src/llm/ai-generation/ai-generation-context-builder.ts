@@ -93,44 +93,18 @@ export const buildAiStrategyContext = (
   },
 });
 
-const buildExerciseLibraryForPhase = (
-  exercises: Exercise[],
-  profile: NormalizedAthleteProfile,
-) => {
-  const avoidTags = new Set(
-    profile.movement_restrictions
-      .filter((r) => r.severity === 'avoid')
-      .map((r) => r.tag),
-  );
-
-  return exercises
-    .filter((ex) => {
-      if (avoidTags.size === 0) return true;
-      return !ex.contraindication_tags.some((tag) => avoidTags.has(tag));
-    })
-    .map((ex) => ({
-      exercise_id: ex.id,
-      name: ex.name,
-      movement_patterns: ex.movement_patterns,
-      primary_muscles: ex.primary_muscles,
-      secondary_muscles: ex.secondary_muscles,
-      equipment: ex.equipment,
-      difficulty: ex.difficulty,
-    }));
-};
-
 export const buildAiPhaseContext = (
   profile: NormalizedAthleteProfile,
   strategy: AiStrategyOutput,
   phaseSkeleton: AiStrategyOutput['phase_skeletons'][number],
-  exercises: Exercise[],
+  _exercises: Exercise[],
   priorPhaseSummaries: PhaseSummary[],
 ): AiPhaseContext => ({
   athlete: buildAthleteContext(profile),
   strategy: strategy.strategy,
   calendar: strategy.calendar,
   phase_skeleton: phaseSkeleton,
-  exercise_library: buildExerciseLibraryForPhase(exercises, profile),
+  tool_instructions: 'Use the searchExercises tool to discover exercises. Do not guess exercise IDs — search first, then use the exact IDs from results.',
   prior_phase_summaries: priorPhaseSummaries,
   policies: {
     progression_policy_id: strategy.progression_policy.policy_id,

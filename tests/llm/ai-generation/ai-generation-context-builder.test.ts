@@ -140,13 +140,13 @@ describe('buildAiPhaseContext', () => {
     review_triggers: [],
   };
 
-  it('builds phase context with exercise library filtered for restrictions', () => {
+  it('builds phase context with tool instructions instead of exercise library', () => {
     const skeleton = mockStrategy.phase_skeletons[0]!;
     const ctx = buildAiPhaseContext(profile, mockStrategy, skeleton, seedExercises, []);
 
     expect(ctx.phase_skeleton.phase_number).toBe(1);
     expect(ctx.phase_skeleton.phase_type).toBe('foundation');
-    expect((ctx.exercise_library as unknown[]).length).toBeGreaterThan(0);
+    expect(ctx.tool_instructions).toContain('searchExercises');
     expect(ctx.prior_phase_summaries).toEqual([]);
     expect((ctx.policies as Record<string, unknown>).progression_policy_id).toBe('prog-policy-1');
   });

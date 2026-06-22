@@ -190,13 +190,40 @@ export const buildV2RefinementContext = (
       })),
       warmup_candidates: [],
     };
-    if (JSON.stringify(compact).length > MAX_CONTEXT_CHARACTERS) {
+    if (JSON.stringify(compact).length <= MAX_CONTEXT_CHARACTERS) {
+      return compact;
+    }
+
+    // Tier 2: Only include first week of each phase + deload weeks.
+    // The LLM refines exercise choices and structure, not per-week data.
+    const representativeWeeks = new Set<number>();
+    for (const phase of programme.phases) {
+      const firstWeek = phase.weeks[0];
+      if (firstWeek) representativeWeeks.add(firstWeek.week_number);
+      for (const week of phase.weeks) {
+        if (week.week_type === 'deload') representativeWeeks.add(week.week_number);
+      }
+    }
+    const minimal = {
+      ...compact,
+      session_summaries: compact.session_summaries.filter((session) => {
+        const weekNum = programme.phases
+          .flatMap((p) => p.weeks)
+          .find((w) => w.days.some((d) => d.day_id === session.day_id))?.week_number;
+        return weekNum !== undefined && representativeWeeks.has(weekNum);
+      }),
+      exercise_alternatives: exerciseAlternatives.slice(0, 30),
+      week_objectives: context.week_objectives.filter((w) =>
+        representativeWeeks.has(w.week_number),
+      ),
+    };
+    if (JSON.stringify(minimal).length > MAX_CONTEXT_CHARACTERS) {
       throw refinementError(
         'REFINEMENT_CONTEXT_TOO_LARGE',
         'V2 refinement context exceeds the safe size limit.',
       );
     }
-    return compact;
+    return minimal;
   }
   return context;
 };

@@ -6,6 +6,7 @@ import type {
   MovementSlotV2,
   ResistanceSessionBuilderInput,
 } from '../sessions/session.types.js';
+import { EQUIPMENT_PREFERENCE } from '../evidence.js';
 
 const difficultyRank = { beginner: 1, intermediate: 2, advanced: 3 };
 const level = { low: 2, moderate: 3, high: 5 };
@@ -27,8 +28,8 @@ const equipmentPreferenceBonus = (
   const usesLoaded = exerciseEquipment.some((e) => loadedEquipment.has(e));
   const isBodyweightOnly =
     exerciseEquipment.length === 1 && exerciseEquipment[0] === 'bodyweight';
-  if (usesLoaded) return 15;
-  if (isBodyweightOnly) return -10;
+  if (usesLoaded) return EQUIPMENT_PREFERENCE.loaded_bonus;
+  if (isBodyweightOnly) return EQUIPMENT_PREFERENCE.bodyweight_penalty;
   return 0;
 };
 

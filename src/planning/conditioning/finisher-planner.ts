@@ -6,6 +6,12 @@ import {
 } from './conditioning-policies.js';
 import { planConditioningIntensity } from './conditioning-intensity-planner.js';
 import { evaluateInterferenceRisk } from './interference-risk-evaluator.js';
+import {
+  FINISHER_DURATION,
+  FINISHER_DURATION_CITATIONS,
+  HIIT_CYCLING,
+  HIIT_CYCLING_CITATIONS,
+} from '../evidence.js';
 import type {
   ConditioningModality,
   ConditioningPrescription,
@@ -15,8 +21,8 @@ import type {
 type ResistanceDay =
   LongitudinalOdinProgramme['phases'][number]['weeks'][number]['days'][number];
 
-const MIN_FINISHER_MINUTES = 8;
-const MAX_FINISHER_MINUTES = 15;
+const MIN_FINISHER_MINUTES = FINISHER_DURATION.min_minutes;
+const MAX_FINISHER_MINUTES = FINISHER_DURATION.max_minutes;
 
 const sessionKindFromDay = (day: ResistanceDay): string =>
   day.session_metadata?.session_kind ?? '';
@@ -28,11 +34,15 @@ const finisherType = (
 ): ConditioningType | undefined => {
   if (weekType === 'deload' || weekType === 'maintenance') return undefined;
   if (goal === 'fat_loss') {
-    if (
-      options?.isLastResistanceDay &&
-      options.weekNumber !== undefined &&
-      options.weekNumber % 2 === 0
-    ) {
+    const isHiitWeek =
+      HIIT_CYCLING.finisher_even_week &&
+      options?.weekNumber !== undefined &&
+      options.weekNumber % 2 === 0;
+    const isHiitDay =
+      HIIT_CYCLING.finisher_last_resistance_day_only
+        ? options?.isLastResistanceDay
+        : true;
+    if (isHiitWeek && isHiitDay) {
       return 'intervals';
     }
     return 'moderate_continuous';
@@ -173,7 +183,10 @@ export const planResistanceSessionFinisher = (
       ...intensity.rationale_codes,
       'FINISHER_PLACED_AFTER_RESISTANCE',
       `FINISHER_AVAILABLE_${duration}_MIN`,
-      ...(isHiitFinisher ? ['HIIT_FINISHER_FAT_LOSS_CYCLE'] : []),
+      ...FINISHER_DURATION_CITATIONS,
+      ...(isHiitFinisher
+        ? ['HIIT_FINISHER_FAT_LOSS_CYCLE', ...HIIT_CYCLING_CITATIONS]
+        : []),
     ],
   };
 };
