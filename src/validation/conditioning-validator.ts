@@ -40,13 +40,15 @@ export const validateLongitudinalConditioning = (
 
   programme.phases.forEach((phase) =>
     phase.weeks.forEach((week) => {
-      const formalDays = week.days.filter((day) =>
-        day.conditioning.some(
-          (item) =>
-            !['sport_conditioning', 'movement_target'].includes(
-              item.conditioning_type,
-            ),
-        ),
+      const formalDays = week.days.filter(
+        (day) =>
+          day.day_type !== 'resistance' &&
+          day.conditioning.some(
+            (item) =>
+              !['sport_conditioning', 'movement_target'].includes(
+                item.conditioning_type,
+              ),
+          ),
       );
       if (formalDays.length !== programme.strategy.conditioning_frequency) {
         add(

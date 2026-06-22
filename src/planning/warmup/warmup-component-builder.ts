@@ -16,6 +16,123 @@ const item = (
   ...value,
 });
 
+type SessionCategory = 'push' | 'pull' | 'legs' | 'upper' | 'lower' | 'full_body';
+
+const sessionCategory = (input: WarmupPlannerInput): SessionCategory => {
+  const kind = input.session.day.session_metadata?.session_kind ?? '';
+  if (kind === 'push') return 'push';
+  if (kind === 'pull') return 'pull';
+  if (kind === 'legs' || kind === 'lower') return 'legs';
+  if (kind === 'upper') return 'upper';
+  return 'full_body';
+};
+
+const dynamicMobilityForSession = (
+  input: WarmupPlannerInput,
+  order: number,
+): WarmupItem[] => {
+  const category = sessionCategory(input);
+  const items: WarmupItem[] = [];
+
+  if (category === 'push' || category === 'upper') {
+    items.push(
+      item(input, order, 'shoulder-mob', {
+        component_type: 'dynamic_mobility',
+        activity_name: 'Shoulder Circles & Wall Slides',
+        repetitions: 8,
+        intensity: 'Controlled, full range',
+        purpose: 'Open the shoulder girdle and prepare scapular mechanics for pressing.',
+        rationale_codes: ['PUSH_SHOULDER_MOBILITY_PREPARED'],
+      }),
+    );
+  }
+  if (category === 'pull' || category === 'upper') {
+    items.push(
+      item(input, order + items.length, 'thoracic-mob', {
+        component_type: 'dynamic_mobility',
+        activity_name: 'Thoracic Rotations',
+        repetitions: 8,
+        intensity: 'Controlled, gentle end-range',
+        purpose: 'Prepare thoracic extension and rotation for pulling mechanics.',
+        rationale_codes: ['PULL_THORACIC_MOBILITY_PREPARED'],
+      }),
+    );
+  }
+  if (category === 'legs' || category === 'full_body') {
+    items.push(
+      item(input, order + items.length, 'hip-mob', {
+        component_type: 'dynamic_mobility',
+        activity_name: 'Hip Circles & Leg Swings',
+        repetitions: 10,
+        intensity: 'Controlled, progressively wider',
+        purpose: 'Open the hip capsule and prepare lower body range for squatting and hinging.',
+        rationale_codes: ['LOWER_HIP_MOBILITY_PREPARED'],
+      }),
+    );
+  }
+  if (category === 'full_body') {
+    items.push(
+      item(input, order + items.length, 'shoulder-rotation', {
+        component_type: 'dynamic_mobility',
+        activity_name: 'Shoulder Rotations',
+        repetitions: 8,
+        intensity: 'Controlled, comfortable range',
+        purpose: 'Prepare the shoulders for the upper body portion of the session.',
+        rationale_codes: ['FULL_BODY_SHOULDER_PREPARED'],
+      }),
+    );
+  }
+
+  return items;
+};
+
+const activationForSession = (
+  input: WarmupPlannerInput,
+  order: number,
+): WarmupItem[] => {
+  const category = sessionCategory(input);
+  const items: WarmupItem[] = [];
+
+  if (category === 'push' || category === 'upper') {
+    items.push(
+      item(input, order, 'scap-activation', {
+        component_type: 'activation',
+        activity_name: 'Band Pull-Aparts',
+        repetitions: 12,
+        intensity: 'Light resistance, squeeze at end range',
+        purpose: 'Activate scapular retractors to stabilise the shoulder during pressing.',
+        rationale_codes: ['PUSH_SCAPULAR_ACTIVATION_APPLIED'],
+      }),
+    );
+  }
+  if (category === 'pull') {
+    items.push(
+      item(input, order + items.length, 'rotator-activation', {
+        component_type: 'activation',
+        activity_name: 'Band Face Pulls',
+        repetitions: 12,
+        intensity: 'Light resistance, controlled',
+        purpose: 'Activate rear deltoids and external rotators before pulling.',
+        rationale_codes: ['PULL_ROTATOR_ACTIVATION_APPLIED'],
+      }),
+    );
+  }
+  if (category === 'legs' || category === 'lower' || category === 'full_body') {
+    items.push(
+      item(input, order + items.length, 'glute-activation', {
+        component_type: 'activation',
+        activity_name: 'Glute Bridges',
+        repetitions: 10,
+        intensity: 'Bodyweight, 2-second hold at top',
+        purpose: 'Activate glutes to ensure proper hip drive during squats and hinges.',
+        rationale_codes: ['LOWER_GLUTE_ACTIVATION_APPLIED'],
+      }),
+    );
+  }
+
+  return items;
+};
+
 export const buildWarmupComponents = (
   input: WarmupPlannerInput,
 ): WarmupItem[] => {
@@ -49,6 +166,14 @@ export const buildWarmupComponents = (
     }),
   ];
 
+  const mobility = dynamicMobilityForSession(input, components.length + 1);
+  components.push(...mobility);
+
+  const activation = shortSession
+    ? []
+    : activationForSession(input, components.length + 1);
+  components.push(...activation);
+
   if (hasPattern(input, 'hinge')) {
     components.push(
       item(input, components.length + 1, 'hinge-rehearsal', {
@@ -70,23 +195,6 @@ export const buildWarmupComponents = (
         intensity: 'Comfortable range',
         purpose: 'Rehearse the session squat pattern.',
         rationale_codes: ['SQUAT_PATTERN_PREPARED'],
-      }),
-    );
-  }
-  if (
-    hasPattern(input, 'horizontal_push') ||
-    hasPattern(input, 'vertical_push') ||
-    hasPattern(input, 'horizontal_pull') ||
-    hasPattern(input, 'vertical_pull')
-  ) {
-    components.push(
-      item(input, components.length + 1, 'upper-rehearsal', {
-        component_type: 'dynamic_mobility',
-        activity_name: 'Controlled Arm Circles',
-        repetitions: 8,
-        intensity: 'Comfortable range',
-        purpose: 'Prepare the shoulders for the selected upper-body patterns.',
-        rationale_codes: ['UPPER_BODY_PATTERN_PREPARED'],
       }),
     );
   }

@@ -7,6 +7,7 @@ import {
   selectConditioningType,
 } from './conditioning-progression-planner.js';
 import { planConditioningRequirement } from './conditioning-requirement-planner.js';
+import { planResistanceSessionFinisher } from './finisher-planner.js';
 import { evaluateInterferenceRisk } from './interference-risk-evaluator.js';
 import type {
   ConditioningException,
@@ -71,6 +72,14 @@ const prescriptionForDay = (
       progression_policy_id: 'conditioning-v2',
       rationale: ['SPORT_CONDITIONING_ACCOUNTED'],
     };
+  }
+  if (day.day_type === 'resistance') {
+    return planResistanceSessionFinisher(
+      input.profile,
+      input.strategy,
+      day,
+      weekType,
+    );
   }
   if (!['conditioning', 'combined', 'recovery'].includes(day.day_type)) {
     return undefined;
@@ -238,13 +247,15 @@ export const planConditioning = (
               'Calendar availability did not provide a lower-risk placement.',
           });
         }
-        const combinedDuration =
-          day.day_type === 'combined' &&
-          prescription.placement !== 'same_day_separate_session'
-            ? (day.estimated_duration_min ?? 0) + prescription.duration_min
-            : day.day_type === 'combined'
-              ? (day.estimated_duration_min ?? 0)
-              : prescription.duration_min;
+        const includesResistance =
+          day.day_type === 'resistance' ||
+          (day.day_type === 'combined' &&
+            prescription.placement !== 'same_day_separate_session');
+        const combinedDuration = includesResistance
+          ? (day.estimated_duration_min ?? 0) + prescription.duration_min
+          : day.day_type === 'combined'
+            ? (day.estimated_duration_min ?? 0)
+            : prescription.duration_min;
         return {
           ...day,
           conditioning: [prescription],

@@ -452,8 +452,14 @@ const ProgrammeDaySchema = z
         path: ['exercises'],
       });
     }
+    const hasFinisherOnly =
+      day.day_type === 'resistance' &&
+      day.conditioning.length > 0 &&
+      day.conditioning.every(
+        (item) => item.placement === 'after_resistance',
+      );
     const plannedConditioning =
-      day.conditioning.length > 0 ||
+      (!hasFinisherOnly && day.conditioning.length > 0) ||
       (requiresConditioning && day.training_budget !== undefined);
     if (requiresConditioning !== plannedConditioning) {
       ctx.addIssue({

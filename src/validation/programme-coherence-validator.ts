@@ -42,10 +42,12 @@ export const validateProgrammeCoherence = (
           { phase_id: phase.phase_id, week_number: week.week_number },
         );
       }
-      const conditioningCount = week.days.filter((day) =>
-        day.conditioning.some(
-          (item) => item.conditioning_type !== 'sport_conditioning',
-        ),
+      const conditioningCount = week.days.filter(
+        (day) =>
+          day.day_type !== 'resistance' &&
+          day.conditioning.some(
+            (item) => item.conditioning_type !== 'sport_conditioning',
+          ),
       ).length;
       if (
         conditioningCount !==
