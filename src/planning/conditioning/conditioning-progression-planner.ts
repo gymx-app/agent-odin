@@ -9,6 +9,7 @@ export const selectConditioningType = (
   weekType: string,
   sportHasSprints: boolean,
   profile?: NormalizedAthleteProfile,
+  options?: { weekNumber?: number; goal?: string },
 ): ConditioningType => {
   if (weekType === 'deload' || weekType === 'maintenance') {
     return 'active_recovery';
@@ -23,7 +24,17 @@ export const selectConditioningType = (
     return 'sprint_intervals';
   }
   if (requirement === 'performance' && !sportHasSprints) return 'intervals';
-  if (requirement === 'developmental') return 'low_intensity_steady_state';
+  if (requirement === 'developmental') {
+    if (
+      options?.goal === 'fat_loss' &&
+      options.weekNumber !== undefined &&
+      profile?.athlete_state.training_status.value !== 'beginner' &&
+      options.weekNumber % 3 === 0
+    ) {
+      return 'intervals';
+    }
+    return 'low_intensity_steady_state';
+  }
   if (requirement === 'supportive' || requirement === 'minimum_health') {
     return 'low_intensity_steady_state';
   }

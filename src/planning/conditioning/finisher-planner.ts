@@ -24,9 +24,19 @@ const sessionKindFromDay = (day: ResistanceDay): string =>
 const finisherType = (
   goal: string,
   weekType: string,
+  options?: { weekNumber?: number; isLastResistanceDay?: boolean },
 ): ConditioningType | undefined => {
   if (weekType === 'deload' || weekType === 'maintenance') return undefined;
-  if (goal === 'fat_loss') return 'moderate_continuous';
+  if (goal === 'fat_loss') {
+    if (
+      options?.isLastResistanceDay &&
+      options.weekNumber !== undefined &&
+      options.weekNumber % 2 === 0
+    ) {
+      return 'intervals';
+    }
+    return 'moderate_continuous';
+  }
   if (goal === 'endurance') return 'low_intensity_steady_state';
   return 'low_intensity_steady_state';
 };
@@ -97,8 +107,9 @@ export const planResistanceSessionFinisher = (
   strategy: LongitudinalOdinProgramme['strategy'],
   day: ResistanceDay,
   weekType: string,
+  options?: { weekNumber?: number; isLastResistanceDay?: boolean },
 ): ConditioningPrescription | undefined => {
-  const type = finisherType(profile.source.goal, weekType);
+  const type = finisherType(profile.source.goal, weekType, options);
   if (!type) return undefined;
 
   const available =
@@ -114,6 +125,19 @@ export const planResistanceSessionFinisher = (
   const duration = Math.min(MAX_FINISHER_MINUTES, available);
   const intensity = planConditioningIntensity(type, profile);
 
+  if (intensity.intervals) {
+    const secondsPerInterval =
+      intensity.intervals.work_seconds + intensity.intervals.recovery_seconds;
+    const maxIntervals = Math.max(
+      3,
+      Math.floor((duration * 60) / secondsPerInterval),
+    );
+    intensity.intervals = {
+      ...intensity.intervals,
+      interval_count: Math.min(intensity.intervals.interval_count, maxIntervals),
+    };
+  }
+
   const base = {
     conditioning_type: type,
     activity_id: modality,
@@ -127,16 +151,21 @@ export const planResistanceSessionFinisher = (
   });
   if (risk === 'unacceptable' || risk === 'high') return undefined;
 
+  const isHiitFinisher = type === 'intervals' || type === 'sprint_intervals';
   return {
     conditioning_id: `${day.day_id}-finisher`,
     display_order: (day.exercises.at(-1)?.display_order ?? 0) + 1,
     ...base,
-    activity_name: `${CONDITIONING_MODALITIES[modality].display_name} Finisher`,
-    purpose: 'Utilise remaining session time for supplemental energy expenditure.',
+    activity_name: isHiitFinisher
+      ? `${CONDITIONING_MODALITIES[modality].display_name} HIIT Finisher`
+      : `${CONDITIONING_MODALITIES[modality].display_name} Finisher`,
+    purpose: isHiitFinisher
+      ? 'High-intensity interval finisher to maximise post-session energy expenditure.'
+      : 'Utilise remaining session time for supplemental energy expenditure.',
     intensity: intensity.intensity,
     ...(intensity.intervals ? { intervals: intensity.intervals } : {}),
     impact_level: CONDITIONING_MODALITIES[modality].impact,
-    fatigue_cost: 'low',
+    fatigue_cost: isHiitFinisher ? 'moderate' : 'low',
     interference_risk: risk,
     progression_policy_id: 'conditioning-v2',
     rationale: [
@@ -144,6 +173,7 @@ export const planResistanceSessionFinisher = (
       ...intensity.rationale_codes,
       'FINISHER_PLACED_AFTER_RESISTANCE',
       `FINISHER_AVAILABLE_${duration}_MIN`,
+      ...(isHiitFinisher ? ['HIIT_FINISHER_FAT_LOSS_CYCLE'] : []),
     ],
   };
 };

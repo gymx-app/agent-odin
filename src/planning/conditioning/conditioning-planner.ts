@@ -41,6 +41,7 @@ const prescriptionForDay = (
   weekNumber: number,
   weekType: string,
   requirement: ReturnType<typeof planConditioningRequirement>,
+  lastResistanceCycleDay?: number,
 ): ConditioningPrescription | undefined => {
   if (day.day_type === 'sport') {
     const sport = input.profile.source.sport;
@@ -79,6 +80,10 @@ const prescriptionForDay = (
       input.strategy,
       day,
       weekType,
+      {
+        weekNumber,
+        isLastResistanceDay: day.cycle_day === lastResistanceCycleDay,
+      },
     );
   }
   if (!['conditioning', 'combined', 'recovery'].includes(day.day_type)) {
@@ -93,6 +98,7 @@ const prescriptionForDay = (
           weekType,
           sportHasSprints,
           input.profile,
+          { weekNumber, goal: input.profile.source.goal },
         );
   const modality = selectConditioningModality(input.profile, type);
   const availableCombinedMinutes =
@@ -228,6 +234,12 @@ export const planConditioning = (
   const phases = input.phases.map((phase) => ({
     ...phase,
     weeks: phase.weeks.map((week) => {
+      const lastResistanceCycleDay = Math.max(
+        ...week.days
+          .filter((d) => d.day_type === 'resistance')
+          .map((d) => d.cycle_day),
+        -1,
+      );
       const days = week.days.map((day) => {
         const prescription = prescriptionForDay(
           input,
@@ -235,6 +247,7 @@ export const planConditioning = (
           week.week_number,
           week.week_type,
           requirement,
+          lastResistanceCycleDay,
         );
         if (!prescription) return day;
         if (prescription.interference_risk === 'high') {
