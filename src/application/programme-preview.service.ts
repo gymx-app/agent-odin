@@ -5,6 +5,11 @@ import type { LongitudinalOdinProgramme } from '../domain/programme/programme.ty
 import type { Logger } from '../infrastructure/logging/logger.js';
 import type { ProgrammeRefinementProvider } from '../llm/programme-refinement-provider.js';
 import type { V2ProgrammeRefinementProvider } from '../llm/v2-programme-refinement-provider.js';
+import type { AiProgrammeGenerationProvider } from '../llm/ai-generation/ai-programme-generation-provider.js';
+import {
+  generateAiProgramme,
+  AiGenerationError,
+} from '../llm/ai-generation/ai-programme-generation.service.js';
 import type {
   RefinementMetadata,
   RefinementMode,
@@ -18,7 +23,9 @@ import {
   applyValidationSummary,
   validateProgramme,
 } from '../validation/programme-validator.js';
+import { programmeValidationService } from '../validation/programme-validation.service.js';
 import type { ProgrammeValidationReport } from '../validation/validation.types.js';
+import { repairProgramme } from '../repair/programme-repair.service.js';
 import { toSafeGenerationError } from './programme-generation/generation-errors.js';
 import { refineProgramme } from './programme-refinement.service.js';
 import { refineV2Programme } from './v2-programme-refinement.service.js';
@@ -30,7 +37,7 @@ import {
 import { LONGITUDINAL_VALIDATION_RULE_VERSION } from '../validation/longitudinal-validation-registry.js';
 
 export type ProgrammePreviewResult = {
-  source: 'deterministic' | 'llm_refined';
+  source: 'deterministic' | 'llm_refined' | 'ai_generated';
   planner_version: PlannerVersion;
   schema_version: '1.0' | '2.0';
   programme: OdinProgramme | LongitudinalOdinProgramme;
@@ -45,6 +52,12 @@ export type ProgrammePreviewResult = {
     repair_applied: boolean;
     planner_resolution: PlannerVersionResolution;
     stage_durations_ms: Record<string, number>;
+    ai_generation?: {
+      total_input_tokens: number;
+      total_output_tokens: number;
+      fallback_used: boolean;
+      fallback_reason?: string;
+    };
   };
 };
 
@@ -68,6 +81,8 @@ export type ProgrammePreviewContext = {
   exerciseLibraryVersion?: string;
   now?: () => number;
   longitudinalGenerator?: typeof buildLongitudinalProgramme;
+  aiGenerationProvider?: AiProgrammeGenerationProvider;
+  aiAgentPlannerEnabled?: boolean;
 };
 
 export const previewProgramme = async (
@@ -84,6 +99,7 @@ export const previewProgramme = async (
       : {}),
     defaultVersion: context.defaultPlannerVersion ?? 'legacy_v1',
     longitudinalEnabled: context.longitudinalPlannerEnabled ?? false,
+    aiAgentEnabled: context.aiAgentPlannerEnabled ?? false,
     allowedVersions: context.allowedPlannerVersions ?? [
       'legacy_v1',
       'longitudinal_v1',
@@ -129,6 +145,184 @@ export const previewProgramme = async (
       normalizeAthlete(athlete),
     );
     assertWithinDeadline('planner_resolution');
+    if (resolution.selected_version === 'ai_agent_v1') {
+      const exerciseLibraryVersion =
+        context.exerciseLibraryVersion ?? 'approved-library-v1';
+      const startDate =
+        context.startDate ?? new Date(now()).toISOString().slice(0, 10);
+
+      let aiResult: Awaited<ReturnType<typeof generateAiProgramme>> | null = null;
+      let fallbackReason: string | undefined;
+
+      if (!context.aiGenerationProvider) {
+        fallbackReason = 'AI_GENERATION_PROVIDER_MISSING';
+      } else {
+        try {
+          aiResult = await timed('ai_generation', () =>
+            generateAiProgramme({
+              profile: normalized,
+              exercises: context.exercises,
+              provider: context.aiGenerationProvider!,
+              requestId: context.requestId,
+              startDate,
+              exerciseLibraryVersion,
+              deadline,
+              now: context.now,
+              logger: context.logger ? { debug: (...args: unknown[]) => { context.logger!.debug(String(args[0] ?? 'ai_generation'), args[1] as Record<string, unknown> | undefined); } } : undefined,
+            }),
+          );
+        } catch (error) {
+          if (error instanceof AiGenerationError) {
+            fallbackReason = `${error.code}:${error.stage}`;
+            context.logger?.info('ai_generation_fallback', {
+              requestId: context.requestId,
+              reason: fallbackReason,
+              stage: error.stage,
+            });
+          } else {
+            fallbackReason = 'AI_GENERATION_UNKNOWN_ERROR';
+          }
+        }
+      }
+
+      if (aiResult) {
+        // Full validation + repair on assembled programme
+        const fullValidation = programmeValidationService.validateAndRepairVersioned({
+          programme: aiResult.programme,
+          profile: normalized,
+          exercises: context.exercises,
+        });
+
+        // Optional V2 refinement on the AI-generated programme
+        assertWithinDeadline('v2_refinement');
+        const v2RefinementResult = await timed('v2_refinement', () =>
+          refineV2Programme({
+            mode: refinementMode,
+            baseline: fullValidation.programme as LongitudinalOdinProgramme,
+            baselineValidation: fullValidation.validation,
+            profile: normalized,
+            exercises: context.exercises,
+            configuredModel: context.configuredModel ?? null,
+            unavailableReason:
+              context.refinementUnavailableReason ??
+              'OPENAI_CONFIGURATION_MISSING',
+            requestId: context.requestId,
+            ...(context.v2RefinementProvider
+              ? { provider: context.v2RefinementProvider }
+              : {}),
+          }),
+        );
+
+        return {
+          source: 'ai_generated',
+          planner_version: 'ai_agent_v1',
+          schema_version: '2.0',
+          programme: v2RefinementResult.programme,
+          validation: v2RefinementResult.validation,
+          refinement: v2RefinementResult.refinement,
+          generation: {
+            planner_version: 'ai_agent_v1',
+            schema_version: '2.0',
+            validation_rule_version: LONGITUDINAL_VALIDATION_RULE_VERSION,
+            exercise_library_version: exerciseLibraryVersion,
+            repair_attempted: fullValidation.validation.repair?.attempted ?? false,
+            repair_applied: fullValidation.validation.repair?.applied ?? false,
+            planner_resolution: resolution,
+            stage_durations_ms: {
+              ...stageDurations,
+              ...aiResult.stage_durations_ms,
+            },
+            ai_generation: {
+              total_input_tokens: aiResult.total_input_tokens,
+              total_output_tokens: aiResult.total_output_tokens,
+              fallback_used: false,
+            },
+          },
+        };
+      }
+
+      // Fallback to deterministic longitudinal pipeline
+      context.logger?.info('ai_generation_deterministic_fallback', {
+        requestId: context.requestId,
+        fallbackReason,
+      });
+      const longitudinalGenerator =
+        context.longitudinalGenerator ?? buildLongitudinalProgramme;
+      const fallbackGenerated = await timed('longitudinal_generation', () =>
+        longitudinalGenerator(normalized, context.exercises, {
+          startDate,
+          generatedAt: context.generatedAt ?? new Date(now()).toISOString(),
+          exerciseLibraryVersion,
+          stageRunner: <T>(stage: string, operation: () => T): T => {
+            assertWithinDeadline(stage);
+            const startedAt = now();
+            let success = false;
+            try {
+              const value = operation();
+              success = true;
+              return value;
+            } finally {
+              const durationMs = Math.max(0, now() - startedAt);
+              stageDurations[stage] = durationMs;
+              context.logger?.info('preview stage completed', {
+                requestId: context.requestId,
+                plannerVersion: 'ai_agent_v1',
+                stage,
+                durationMs,
+                success,
+                warningCount: 0,
+              });
+            }
+          },
+        }),
+      );
+
+      if (!fallbackGenerated.validation.passed) {
+        throw odinError(
+          'GENERATED_PROGRAMME_INVALID',
+          'Fallback longitudinal programme failed final validation.',
+          422,
+          {
+            status: fallbackGenerated.validation.status,
+            summary: fallbackGenerated.validation.summary,
+          },
+        );
+      }
+
+      return {
+        source: 'deterministic',
+        planner_version: 'ai_agent_v1',
+        schema_version: '2.0',
+        programme: fallbackGenerated.programme,
+        validation: fallbackGenerated.validation,
+        refinement: {
+          requested: false,
+          attempted: false,
+          applied: false,
+          retry_attempted: false,
+          operation_count: 0,
+          accepted_operation_types: [],
+          status: 'not_requested' as const,
+          reason_code: null,
+        },
+        generation: {
+          planner_version: 'ai_agent_v1',
+          schema_version: '2.0',
+          validation_rule_version: LONGITUDINAL_VALIDATION_RULE_VERSION,
+          exercise_library_version: exerciseLibraryVersion,
+          repair_attempted: fallbackGenerated.validation.repair?.attempted ?? false,
+          repair_applied: fallbackGenerated.validation.repair?.applied ?? false,
+          planner_resolution: resolution,
+          stage_durations_ms: stageDurations,
+          ai_generation: {
+            total_input_tokens: 0,
+            total_output_tokens: 0,
+            fallback_used: true,
+            ...(fallbackReason ? { fallback_reason: fallbackReason } : {}),
+          },
+        },
+      };
+    }
     if (resolution.selected_version === 'longitudinal_v1') {
       const longitudinalGenerator =
         context.longitudinalGenerator ?? buildLongitudinalProgramme;

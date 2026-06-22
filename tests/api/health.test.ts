@@ -23,6 +23,9 @@ const config: AppConfig = {
   generationTimeoutMs: 60000,
   defaultPlannerVersion: 'legacy_v1',
   longitudinalPlannerEnabled: false,
+  aiAgentPlannerEnabled: false,
+  openaiGenerationModel: null,
+  openaiGenerationTimeoutMs: 45000,
   allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1'],
 };
 

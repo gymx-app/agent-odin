@@ -20,6 +20,7 @@ export const resolvePlannerVersion = (input: {
   requestedVersion?: PlannerVersion;
   defaultVersion: PlannerVersion;
   longitudinalEnabled: boolean;
+  aiAgentEnabled?: boolean;
   allowedVersions: PlannerVersion[];
 }): PlannerVersionResolution => {
   const requested = input.requestedVersion ?? null;
@@ -30,6 +31,30 @@ export const resolvePlannerVersion = (input: {
       'Requested planner version is not supported.',
       400,
     );
+  }
+  if (selected === 'ai_agent_v1' && !input.aiAgentEnabled) {
+    if (requested) {
+      throw odinError(
+        'PLANNER_VERSION_DISABLED',
+        'Requested planner version is disabled.',
+        409,
+      );
+    }
+    const fallback = input.longitudinalEnabled ? 'longitudinal_v1' : 'legacy_v1';
+    if (!input.allowedVersions.includes(fallback)) {
+      throw odinError(
+        'PLANNER_VERSION_DISABLED',
+        'Configured planner version is disabled.',
+        500,
+      );
+    }
+    return {
+      selected_version: fallback,
+      requested_version: null,
+      fallback_applied: true,
+      fallback_reason: 'PLANNER_VERSION_DISABLED',
+      reason_code: 'PLANNER_VERSION_FALLBACK_APPLIED',
+    };
   }
   if (selected === 'longitudinal_v1' && !input.longitudinalEnabled) {
     if (requested) {

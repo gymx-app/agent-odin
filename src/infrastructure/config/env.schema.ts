@@ -75,7 +75,15 @@ export const envSchema = z
       .default(60000),
     ODIN_DEFAULT_PLANNER_VERSION: PlannerVersionSchema.default('legacy_v1'),
     ODIN_LONGITUDINAL_PLANNER_ENABLED: booleanStringSchema,
+    ODIN_AI_AGENT_PLANNER_ENABLED: booleanStringSchema,
     ODIN_ALLOWED_PLANNER_VERSIONS: plannerVersionsSchema,
+    OPENAI_GENERATION_MODEL: optionalSecretSchema,
+    OPENAI_GENERATION_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(5000)
+      .max(300000)
+      .default(45000),
   })
   .superRefine((env, context) => {
     if (!env.ODIN_LLM_REFINEMENT_ENABLED) {
@@ -126,7 +134,10 @@ export type AppConfig = {
   generationTimeoutMs: number;
   defaultPlannerVersion: PlannerVersion;
   longitudinalPlannerEnabled: boolean;
+  aiAgentPlannerEnabled: boolean;
   allowedPlannerVersions: PlannerVersion[];
+  openaiGenerationModel: string | null;
+  openaiGenerationTimeoutMs: number;
 };
 
 export type RawEnv = Partial<Record<keyof z.input<typeof envSchema>, string>>;
@@ -165,6 +176,9 @@ export const parseEnv = (rawEnv: RawEnv): AppConfig => {
     generationTimeoutMs: parsed.data.ODIN_GENERATION_TIMEOUT_MS,
     defaultPlannerVersion: parsed.data.ODIN_DEFAULT_PLANNER_VERSION,
     longitudinalPlannerEnabled: parsed.data.ODIN_LONGITUDINAL_PLANNER_ENABLED,
+    aiAgentPlannerEnabled: parsed.data.ODIN_AI_AGENT_PLANNER_ENABLED,
     allowedPlannerVersions: parsed.data.ODIN_ALLOWED_PLANNER_VERSIONS,
+    openaiGenerationModel: parsed.data.OPENAI_GENERATION_MODEL ?? null,
+    openaiGenerationTimeoutMs: parsed.data.OPENAI_GENERATION_TIMEOUT_MS,
   };
 };

@@ -18,8 +18,10 @@ import { seedExercises } from '../../src/exercises/approved-exercise-library.js'
 import { previewProgramme } from '../../src/application/programme-preview.service.js';
 import type { ProgrammeRefinementProvider } from '../../src/llm/programme-refinement-provider.js';
 import type { V2ProgrammeRefinementProvider } from '../../src/llm/v2-programme-refinement-provider.js';
+import type { AiProgrammeGenerationProvider } from '../../src/llm/ai-generation/ai-programme-generation-provider.js';
 import { OpenAIProgrammeRefinementProvider } from '../../src/llm/openai-programme-refinement-provider.js';
 import { OpenAIV2ProgrammeRefinementProvider } from '../../src/llm/openai-v2-programme-refinement-provider.js';
+import { OpenAIAiProgrammeGenerationProvider } from '../../src/llm/ai-generation/openai-ai-programme-generation-provider.js';
 import { createOpenAIClient } from '../../src/llm/openai-client.js';
 import { PlannerVersionSchema } from '../../src/domain/programme/planner-version.js';
 import { odinError } from '../../src/shared/errors/odin-errors.js';
@@ -39,6 +41,7 @@ export type PreviewDependencies = {
   authClient: SupabaseAuthClientLike;
   refinementProvider?: ProgrammeRefinementProvider;
   v2RefinementProvider?: V2ProgrammeRefinementProvider;
+  aiGenerationProvider?: AiProgrammeGenerationProvider;
 };
 
 const createPreviewDependencies = (
@@ -48,14 +51,20 @@ const createPreviewDependencies = (
     authClient: createSupabaseAuthClient(appConfig),
   };
 
-  if (appConfig.llmRefinementEnabled) {
+  if (appConfig.llmRefinementEnabled || appConfig.aiAgentPlannerEnabled) {
     const client = createOpenAIClient(appConfig);
-    dependencies.refinementProvider = new OpenAIProgrammeRefinementProvider(
-      client,
-      appConfig,
-    );
-    dependencies.v2RefinementProvider =
-      new OpenAIV2ProgrammeRefinementProvider(client, appConfig);
+    if (appConfig.llmRefinementEnabled) {
+      dependencies.refinementProvider = new OpenAIProgrammeRefinementProvider(
+        client,
+        appConfig,
+      );
+      dependencies.v2RefinementProvider =
+        new OpenAIV2ProgrammeRefinementProvider(client, appConfig);
+    }
+    if (appConfig.aiAgentPlannerEnabled) {
+      dependencies.aiGenerationProvider =
+        new OpenAIAiProgrammeGenerationProvider(client, appConfig);
+    }
   }
 
   return dependencies;
@@ -103,6 +112,7 @@ export const createPreviewHandler = (
             : {}),
           defaultPlannerVersion: appConfig.defaultPlannerVersion,
           longitudinalPlannerEnabled: appConfig.longitudinalPlannerEnabled,
+          aiAgentPlannerEnabled: appConfig.aiAgentPlannerEnabled,
           allowedPlannerVersions: appConfig.allowedPlannerVersions,
           ...(body.start_date ? { startDate: body.start_date } : {}),
           exerciseLibraryVersion: 'approved-library-v1',
@@ -111,6 +121,9 @@ export const createPreviewHandler = (
             : {}),
           ...(dependencies.v2RefinementProvider
             ? { v2RefinementProvider: dependencies.v2RefinementProvider }
+            : {}),
+          ...(dependencies.aiGenerationProvider
+            ? { aiGenerationProvider: dependencies.aiGenerationProvider }
             : {}),
         },
       );

@@ -672,7 +672,7 @@ const ProgrammeWeekSchema = z.object({
   }),
 });
 
-const ProgrammePhaseSchema = z
+export const ProgrammePhaseSchema = z
   .object({
     phase_id: identifier,
     phase_number: z.number().int().positive(),
@@ -722,7 +722,7 @@ const ProgrammePhaseSchema = z
     }
   });
 
-const CalendarSchema = z
+export const CalendarSchema = z
   .object({
     cycle_type: z.enum(['weekly', 'rolling']),
     cycle_length_days: z.number().int().positive(),
