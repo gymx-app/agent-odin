@@ -33,7 +33,9 @@ export const allocateWeeklyVolume = (
     input.profile.source.session_duration_min,
   );
   const capacity = maximumPerSession * resistanceDays.length;
-  const desired = Math.round(baseWeeklySets(input) * volumeFactor);
+  const minPerSession = Math.ceil(maximumPerSession * 0.6);
+  const floor = minPerSession * resistanceDays.length;
+  const desired = Math.max(floor, Math.round(baseWeeklySets(input) * volumeFactor));
   const total_working_sets = Math.min(desired, capacity);
   const session_set_budgets = new Map<number, number>();
   let remaining = total_working_sets;

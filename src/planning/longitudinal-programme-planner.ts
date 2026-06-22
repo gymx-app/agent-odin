@@ -29,14 +29,14 @@ const initialSchedule = (profile: NormalizedAthleteProfile) => {
         : 0;
 
   let resistance: number;
-  if (
+  if (days === 7) {
+    resistance = profile.source.goal === 'endurance' ? 3 : 5;
+  } else if (
     days === 6 &&
     profile.source.fitness_level !== 'beginner' &&
     profile.recovery_capacity !== 'low'
   ) {
-    resistance = 6;
-  } else if (days === 7) {
-    resistance = profile.source.goal === 'endurance' ? 3 : 5;
+    resistance = 6 - conditioning;
   } else {
     resistance = Math.max(
       2,
