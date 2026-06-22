@@ -103,6 +103,7 @@ export const previewProgramme = async (
     allowedVersions: context.allowedPlannerVersions ?? [
       'legacy_v1',
       'longitudinal_v1',
+      'ai_agent_v1',
     ],
   });
   const assertWithinDeadline = (stage: string): void => {
