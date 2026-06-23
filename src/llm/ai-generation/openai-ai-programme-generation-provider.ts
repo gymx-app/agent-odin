@@ -200,9 +200,10 @@ export class OpenAIAiProgrammeGenerationProvider
         );
       }
 
+      const detail = error instanceof Error ? error.message : String(error);
       throw refinementError(
         'LLM_PROVIDER_ERROR',
-        'The generation provider is unavailable.',
+        `The generation provider is unavailable: ${detail}`,
       );
     }
   }
@@ -253,9 +254,10 @@ export class OpenAIAiProgrammeGenerationProvider
         );
       }
 
+      const detail = error instanceof Error ? error.message : String(error);
       throw refinementError(
         'LLM_PROVIDER_ERROR',
-        'The generation provider is unavailable.',
+        `The generation provider is unavailable: ${detail}`,
       );
     }
   }
@@ -341,9 +343,10 @@ export class OpenAIAiProgrammeGenerationProvider
         );
       }
 
+      const detail = error instanceof Error ? error.message : String(error);
       throw refinementError(
         'LLM_PROVIDER_ERROR',
-        'The generation provider is unavailable.',
+        `The generation provider is unavailable: ${detail}`,
       );
     }
   }
