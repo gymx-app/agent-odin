@@ -23,7 +23,7 @@ const booleanStringSchema = z
 
 const plannerVersionsSchema = z
   .string()
-  .default('legacy_v1,longitudinal_v1')
+  .default('legacy_v1,longitudinal_v1,ai_agent_v1')
   .transform((value, context) => {
     const versions = value
       .split(',')

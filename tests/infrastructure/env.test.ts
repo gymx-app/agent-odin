@@ -22,7 +22,7 @@ describe('environment configuration', () => {
       aiAgentPlannerEnabled: false,
       openaiGenerationModel: null,
       openaiGenerationTimeoutMs: 45000,
-      allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1'],
+      allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1', 'ai_agent_v1'],
     });
   });
 
