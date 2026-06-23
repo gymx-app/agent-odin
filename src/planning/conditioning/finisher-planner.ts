@@ -74,11 +74,18 @@ const selectFinisherModality = (
 ): {
   modality: ConditioningModality;
   rationale_codes: string[];
+  modifiable: boolean;
+  restriction_tags: string[];
 } => {
   const conflicts = demandConflicts(sessionKind);
   const avoid = new Set(
     profile.movement_restrictions
       .filter((restriction) => restriction.severity === 'avoid')
+      .map((restriction) => restriction.tag),
+  );
+  const modify = new Set(
+    profile.movement_restrictions
+      .filter((restriction) => restriction.severity === 'modify')
       .map((restriction) => restriction.tag),
   );
   const lowImpactRequired =
@@ -100,15 +107,22 @@ const selectFinisherModality = (
     if (candidate.restriction_tags.some((tag) => avoid.has(tag))) continue;
     if (conflicts.lower && candidate.lower_body_demand === 'high') continue;
     if (conflicts.grip && candidate.grip_demand !== 'low') continue;
+    const modificationTags = candidate.restriction_tags.filter((tag) =>
+      modify.has(tag),
+    );
     return {
       modality,
       rationale_codes: ['FINISHER_MODALITY_SELECTED'],
+      modifiable: modificationTags.length > 0,
+      restriction_tags: modificationTags,
     };
   }
 
   return {
     modality: 'walking',
     rationale_codes: ['FINISHER_MODALITY_FALLBACK_WALKING'],
+    modifiable: false,
+    restriction_tags: [],
   };
 };
 
@@ -128,10 +142,8 @@ export const planResistanceSessionFinisher = (
   if (available < MIN_FINISHER_MINUTES) return undefined;
 
   const sessionKind = sessionKindFromDay(day);
-  const { modality, rationale_codes } = selectFinisherModality(
-    profile,
-    sessionKind,
-  );
+  const { modality, rationale_codes, modifiable, restriction_tags } =
+    selectFinisherModality(profile, sessionKind);
   const duration = Math.min(MAX_FINISHER_MINUTES, available);
   const intensity = planConditioningIntensity(type, profile);
 
@@ -188,5 +200,14 @@ export const planResistanceSessionFinisher = (
         ? ['HIIT_FINISHER_FAT_LOSS_CYCLE', ...HIIT_CYCLING_CITATIONS]
         : []),
     ],
+    ...(modifiable
+      ? {
+          modification_metadata: {
+            required: true,
+            instructions: ['Use a symptom-free range and conservative setup.'],
+            restriction_tags,
+          },
+        }
+      : {}),
   };
 };
