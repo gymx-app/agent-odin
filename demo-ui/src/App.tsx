@@ -972,6 +972,8 @@ function App() {
   const [health, setHealth] = useState<{
     status: 'checking' | 'online' | 'offline';
     version?: string;
+    openaiConnected?: boolean;
+    aiAgentEnabled?: boolean;
   }>({ status: 'checking' });
 
   const workflowStep: WorkflowStep = !token.trim()
@@ -1003,7 +1005,12 @@ function App() {
     setNotice(null);
     try {
       const data = await odinApi.health();
-      setHealth({ status: 'online', version: data.version });
+      setHealth({
+        status: 'online',
+        version: data.version,
+        openaiConnected: data.openai_connected,
+        aiAgentEnabled: data.ai_agent_enabled,
+      });
       setNotice({
         tone: 'success',
         title: 'API connected',
@@ -1020,7 +1027,12 @@ function App() {
   useEffect(() => {
     odinApi
       .health()
-      .then((data) => setHealth({ status: 'online', version: data.version }))
+      .then((data) => setHealth({
+        status: 'online',
+        version: data.version,
+        openaiConnected: data.openai_connected,
+        aiAgentEnabled: data.ai_agent_enabled,
+      }))
       .catch(() => setHealth({ status: 'offline' }));
   }, []);
 
@@ -2074,6 +2086,17 @@ function App() {
                   </label>
                 ))}
               </div>
+
+              {health.status === 'online' && (
+                <div className={`openai-status ${health.openaiConnected ? 'connected' : 'disconnected'}`}>
+                  <span className="openai-status-dot" />
+                  <span>
+                    {health.openaiConnected
+                      ? 'OpenAI connected — AI generation available'
+                      : 'OpenAI not configured — AI modes will fall back to deterministic'}
+                  </span>
+                </div>
+              )}
 
               <div className="preview-actions">
                 <span>

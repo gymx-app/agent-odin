@@ -77,9 +77,13 @@ const request = async <T>(
 
 export const odinApi = {
   health: () =>
-    request<{ service: 'agent-odin'; version: string; status: 'ok' }>(
-      '/api/health',
-    ),
+    request<{
+      service: 'agent-odin';
+      version: string;
+      status: 'ok';
+      ai_agent_enabled?: boolean;
+      openai_connected?: boolean;
+    }>('/api/health'),
 
   preview: (
     token: string,

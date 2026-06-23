@@ -44,6 +44,8 @@ describe('GET /api/health', () => {
         status: 'ok',
         default_planner_version: 'legacy_v1',
         longitudinal_planner_enabled: false,
+        ai_agent_enabled: false,
+        openai_connected: false,
         supported_planner_versions: ['legacy_v1', 'longitudinal_v1'],
       },
     });
