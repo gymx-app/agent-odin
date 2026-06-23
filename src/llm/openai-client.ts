@@ -3,14 +3,10 @@ import type { AppConfig } from '../infrastructure/config/env.schema.js';
 import { refinementError } from './refinement-errors.js';
 
 export const createOpenAIClient = (config: AppConfig): OpenAI => {
-  if (
-    !config.llmRefinementEnabled ||
-    !config.openaiApiKey ||
-    !config.openaiModel
-  ) {
+  if (!config.openaiApiKey) {
     throw refinementError(
       'OPENAI_CONFIGURATION_MISSING',
-      'OpenAI refinement configuration is missing.',
+      'OPENAI_API_KEY is required for OpenAI features.',
     );
   }
 
