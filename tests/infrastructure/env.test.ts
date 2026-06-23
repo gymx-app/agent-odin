@@ -99,6 +99,7 @@ describe('environment configuration', () => {
         llmRefinementEnabled: true,
         generationTimeoutMs: 60000,
         openaiModel: 'configured-model',
+        openaiGenerationModel: 'configured-model',
         openaiTimeoutMs: 20000,
         openaiMaxRetries: 1,
       }),
@@ -154,5 +155,28 @@ describe('environment configuration', () => {
         ODIN_ALLOWED_PLANNER_VERSIONS: 'legacy_v1',
       }),
     ).toThrow('Default planner version must be allowed.');
+  });
+
+  it('falls back openaiGenerationModel to OPENAI_MODEL when OPENAI_GENERATION_MODEL is unset', () => {
+    expect(
+      parseEnv({
+        NODE_ENV: 'test',
+        OPENAI_MODEL: 'gpt-4o-mini',
+      }),
+    ).toMatchObject({
+      openaiModel: 'gpt-4o-mini',
+      openaiGenerationModel: 'gpt-4o-mini',
+    });
+
+    expect(
+      parseEnv({
+        NODE_ENV: 'test',
+        OPENAI_MODEL: 'gpt-4o-mini',
+        OPENAI_GENERATION_MODEL: 'gpt-4o',
+      }),
+    ).toMatchObject({
+      openaiModel: 'gpt-4o-mini',
+      openaiGenerationModel: 'gpt-4o',
+    });
   });
 });

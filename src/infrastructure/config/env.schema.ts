@@ -182,7 +182,7 @@ export const parseEnv = (rawEnv: RawEnv): AppConfig => {
     longitudinalPlannerEnabled: parsed.data.ODIN_LONGITUDINAL_PLANNER_ENABLED,
     aiAgentPlannerEnabled: parsed.data.ODIN_AI_AGENT_PLANNER_ENABLED,
     allowedPlannerVersions: parsed.data.ODIN_ALLOWED_PLANNER_VERSIONS,
-    openaiGenerationModel: parsed.data.OPENAI_GENERATION_MODEL ?? null,
+    openaiGenerationModel: parsed.data.OPENAI_GENERATION_MODEL ?? parsed.data.OPENAI_MODEL ?? null,
     openaiGenerationTimeoutMs: parsed.data.OPENAI_GENERATION_TIMEOUT_MS,
   };
 };
