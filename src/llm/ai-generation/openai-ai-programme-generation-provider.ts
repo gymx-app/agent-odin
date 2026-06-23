@@ -20,8 +20,12 @@ import { aiStrategySystemPrompt } from './ai-generation-strategy-prompt.js';
 import { aiPhaseSystemPrompt } from './ai-generation-phase-prompt.js';
 import { aiReasoningPrompt, type AiReasoningResult } from './agent-reasoning.js';
 import { AGENT_TOOLS } from './agent-tools.js';
+import { toOpenAISchema } from './openai-schema-compat.js';
 
 const MAX_TOOL_TURNS = 10;
+
+const OpenAIStrategySchema = toOpenAISchema(AiStrategyOutputSchema);
+const OpenAIPhaseSchema = toOpenAISchema(AiPhaseOutputSchema);
 
 export class OpenAIAiProgrammeGenerationProvider
   implements AiProgrammeGenerationProvider
@@ -54,6 +58,7 @@ export class OpenAIAiProgrammeGenerationProvider
       AiStrategyOutputSchema,
       'ai_strategy_generation',
       8000,
+      OpenAIStrategySchema,
     );
   }
 
@@ -90,7 +95,7 @@ export class OpenAIAiProgrammeGenerationProvider
             : { input }),
           tools: AGENT_TOOLS,
           text: {
-            format: zodTextFormat(AiPhaseOutputSchema as never, 'ai_phase_generation'),
+            format: zodTextFormat(OpenAIPhaseSchema as never, 'ai_phase_generation'),
           },
           max_output_tokens: 32000,
         });
@@ -268,6 +273,7 @@ export class OpenAIAiProgrammeGenerationProvider
     schema: import('zod').ZodType<T>,
     schemaName: string,
     maxOutputTokens: number,
+    openaiSchema?: import('zod').ZodTypeAny,
   ): Promise<AiGenerationResult<T>> {
     const model = this.model;
 
@@ -279,7 +285,7 @@ export class OpenAIAiProgrammeGenerationProvider
           { role: 'user', content: JSON.stringify(userContent) },
         ],
         text: {
-          format: zodTextFormat(schema as never, schemaName),
+          format: zodTextFormat((openaiSchema ?? schema) as never, schemaName),
         },
         max_output_tokens: maxOutputTokens,
       });
