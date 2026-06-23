@@ -28,7 +28,7 @@ import {
   Database,
   UserRound,
 } from 'lucide-react';
-import { ApiError, odinApi } from './api/client';
+import { ApiError, odinApi, apiPlatform } from './api/client';
 import type {
   AthleteInput,
   DayOfWeek,
@@ -1341,6 +1341,7 @@ function App() {
           )}
           API {health.status}
           {health.version ? ` · v${health.version}` : ''}
+          {health.status === 'online' ? ` · ${apiPlatform === 'supabase' ? 'Edge Function' : apiPlatform === 'vercel' ? 'Vercel' : 'Local'}` : ''}
         </button>
       </header>
 

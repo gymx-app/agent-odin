@@ -10,6 +10,9 @@ import type {
 const configuredBase = import.meta.env.VITE_ODIN_API_BASE_URL?.trim() ?? '';
 const apiBase = configuredBase.replace(/\/$/, '');
 const isEdgeFunction = apiBase.includes('supabase.co');
+export const apiPlatform: 'supabase' | 'vercel' | 'local' = isEdgeFunction
+  ? 'supabase'
+  : apiBase ? 'vercel' : 'local';
 
 export class ApiError extends Error {
   constructor(
