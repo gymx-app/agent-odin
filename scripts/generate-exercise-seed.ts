@@ -6,6 +6,7 @@ const escapeSql = (value: string): string => value.replaceAll("'", "''");
 console.log('-- Generated from fixtures/exercises/seed-exercises.ts');
 console.log('-- Do not edit manually; run npm run supabase:seed:exercises.');
 console.log('begin;');
+console.log('delete from public.exercise_library;');
 
 seedExercises.forEach((exercise) => {
   const parsed = ExerciseSchema.parse(exercise);

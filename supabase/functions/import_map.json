@@ -1,0 +1,10 @@
+{
+  "imports": {
+    "zod": "npm:zod@3.25.76",
+    "zod-to-json-schema": "npm:zod-to-json-schema@3.25.2",
+    "openai": "npm:openai@6.44.0",
+    "openai/helpers/zod": "npm:openai@6.44.0/helpers/zod",
+    "@anthropic-ai/sdk": "npm:@anthropic-ai/sdk@0.105.0",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.108.2"
+  }
+}

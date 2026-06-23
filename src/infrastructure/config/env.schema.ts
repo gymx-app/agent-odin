@@ -88,6 +88,18 @@ export const envSchema = z
       .min(5000)
       .max(300000)
       .default(45000),
+    AI_GENERATION_PROVIDER: z
+      .enum(['openai', 'anthropic'])
+      .optional()
+      .default('openai'),
+    ANTHROPIC_API_KEY: optionalSecretSchema,
+    ANTHROPIC_MODEL: optionalSecretSchema,
+    ANTHROPIC_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(5000)
+      .max(300000)
+      .default(45000),
   })
   .superRefine((env, context) => {
     if (!env.ODIN_LLM_REFINEMENT_ENABLED) {
@@ -142,6 +154,10 @@ export type AppConfig = {
   allowedPlannerVersions: PlannerVersion[];
   openaiGenerationModel: string | null;
   openaiGenerationTimeoutMs: number;
+  aiGenerationProvider: 'openai' | 'anthropic';
+  anthropicApiKey: string | null;
+  anthropicModel: string | null;
+  anthropicTimeoutMs: number;
 };
 
 export type RawEnv = Partial<Record<keyof z.input<typeof envSchema>, string>>;
@@ -184,5 +200,9 @@ export const parseEnv = (rawEnv: RawEnv): AppConfig => {
     allowedPlannerVersions: parsed.data.ODIN_ALLOWED_PLANNER_VERSIONS,
     openaiGenerationModel: parsed.data.OPENAI_GENERATION_MODEL ?? parsed.data.OPENAI_MODEL ?? null,
     openaiGenerationTimeoutMs: parsed.data.OPENAI_GENERATION_TIMEOUT_MS,
+    aiGenerationProvider: parsed.data.AI_GENERATION_PROVIDER,
+    anthropicApiKey: parsed.data.ANTHROPIC_API_KEY ?? null,
+    anthropicModel: parsed.data.ANTHROPIC_MODEL ?? null,
+    anthropicTimeoutMs: parsed.data.ANTHROPIC_TIMEOUT_MS,
   };
 };

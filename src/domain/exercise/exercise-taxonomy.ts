@@ -18,6 +18,8 @@ export const MovementPatternSchema = z.enum([
   'core_anti_rotation',
   'core_flexion',
   'core_extension',
+  'hip_adduction',
+  'hip_abduction',
   'liss',
   'mobility',
 ]);
@@ -40,6 +42,7 @@ export const MuscleGroupSchema = z.enum([
   'spinal_erectors',
   'abdominals',
   'obliques',
+  'neck',
 ]);
 
 export const ExerciseEquipmentSchema = z.enum([
@@ -58,6 +61,11 @@ export const ExerciseEquipmentSchema = z.enum([
   'bike',
   'rower',
   'elliptical',
+  'trap_bar',
+  'suspension',
+  'sled',
+  'tire',
+  'ez_barbell',
 ]);
 
 export const MovementDemandTagSchema = z.enum([

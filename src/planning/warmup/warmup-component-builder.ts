@@ -38,7 +38,8 @@ const dynamicMobilityForSession = (
     items.push(
       item(input, order, 'shoulder-mob', {
         component_type: 'dynamic_mobility',
-        activity_name: 'Shoulder Circles & Wall Slides',
+        activity_name: 'Wall Slides',
+        exercise_id: 'wall_slide',
         repetitions: 8,
         intensity: 'Controlled, full range',
         purpose: 'Open the shoulder girdle and prepare scapular mechanics for pressing.',
@@ -50,7 +51,8 @@ const dynamicMobilityForSession = (
     items.push(
       item(input, order + items.length, 'thoracic-mob', {
         component_type: 'dynamic_mobility',
-        activity_name: 'Thoracic Rotations',
+        activity_name: 'Thoracic Spine Rotation',
+        exercise_id: 'thoracic_spine_rotation',
         repetitions: 8,
         intensity: 'Controlled, gentle end-range',
         purpose: 'Prepare thoracic extension and rotation for pulling mechanics.',
@@ -62,7 +64,8 @@ const dynamicMobilityForSession = (
     items.push(
       item(input, order + items.length, 'hip-mob', {
         component_type: 'dynamic_mobility',
-        activity_name: 'Hip Circles & Leg Swings',
+        activity_name: 'Leg Swings',
+        exercise_id: 'leg_swing',
         repetitions: 10,
         intensity: 'Controlled, progressively wider',
         purpose: 'Open the hip capsule and prepare lower body range for squatting and hinging.',
@@ -74,7 +77,8 @@ const dynamicMobilityForSession = (
     items.push(
       item(input, order + items.length, 'shoulder-rotation', {
         component_type: 'dynamic_mobility',
-        activity_name: 'Shoulder Rotations',
+        activity_name: 'Shoulder Dislocate',
+        exercise_id: 'shoulder_dislocate',
         repetitions: 8,
         intensity: 'Controlled, comfortable range',
         purpose: 'Prepare the shoulders for the upper body portion of the session.',
@@ -97,7 +101,8 @@ const activationForSession = (
     items.push(
       item(input, order, 'scap-activation', {
         component_type: 'activation',
-        activity_name: 'Band Pull-Aparts',
+        activity_name: 'Band Pull-Apart',
+        exercise_id: 'band_pull_apart',
         repetitions: 12,
         intensity: 'Light resistance, squeeze at end range',
         purpose: 'Activate scapular retractors to stabilise the shoulder during pressing.',
@@ -109,7 +114,8 @@ const activationForSession = (
     items.push(
       item(input, order + items.length, 'rotator-activation', {
         component_type: 'activation',
-        activity_name: 'Band Face Pulls',
+        activity_name: 'Banded Face Pull',
+        exercise_id: 'banded_face_pull',
         repetitions: 12,
         intensity: 'Light resistance, controlled',
         purpose: 'Activate rear deltoids and external rotators before pulling.',
@@ -121,7 +127,8 @@ const activationForSession = (
     items.push(
       item(input, order + items.length, 'glute-activation', {
         component_type: 'activation',
-        activity_name: 'Glute Bridges',
+        activity_name: 'Glute Bridge',
+        exercise_id: 'bodyweight_glute_bridge',
         repetitions: 10,
         intensity: 'Bodyweight, 2-second hold at top',
         purpose: 'Activate glutes to ensure proper hip drive during squats and hinges.',
@@ -149,10 +156,16 @@ export const buildWarmupComponents = (
   const clinicianRestrictions = input.profile.movement_restrictions.filter(
     (restriction) => restriction.clinician_restriction,
   );
+  const pulseExercise = lower
+    ? { name: 'Stationary Bike', id: 'stationary_bike' }
+    : upper
+      ? { name: 'Rower LISS', id: 'rower_liss' }
+      : { name: 'Treadmill Walk', id: 'treadmill_walk' };
   const components: WarmupItem[] = [
     item(input, 1, 'pulse', {
       component_type: 'pulse_raiser',
-      activity_name: lower ? 'Easy Cycle' : upper ? 'Easy Row' : 'Easy March',
+      activity_name: pulseExercise.name,
+      exercise_id: pulseExercise.id,
       duration_seconds: shortSession ? 60 : power ? 180 : 120,
       intensity: 'Easy conversational effort',
       purpose: 'Raise body temperature without creating fatigue.',
@@ -178,7 +191,8 @@ export const buildWarmupComponents = (
     components.push(
       item(input, components.length + 1, 'hinge-rehearsal', {
         component_type: 'movement_rehearsal',
-        activity_name: 'Hip Hinge Rehearsal',
+        activity_name: 'Glute Bridge',
+        exercise_id: 'bodyweight_glute_bridge',
         repetitions: 8,
         intensity: 'Controlled',
         purpose: 'Rehearse the session hinge pattern.',
@@ -190,7 +204,8 @@ export const buildWarmupComponents = (
     components.push(
       item(input, components.length + 1, 'squat-rehearsal', {
         component_type: 'movement_rehearsal',
-        activity_name: 'Squat Pattern Rehearsal',
+        activity_name: 'Bodyweight Squat',
+        exercise_id: 'bodyweight_squat',
         repetitions: 8,
         intensity: 'Comfortable range',
         purpose: 'Rehearse the session squat pattern.',

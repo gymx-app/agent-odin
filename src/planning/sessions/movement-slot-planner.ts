@@ -298,9 +298,12 @@ export const planMovementSlotsV2 = (
         input.strategy.primary_objective,
         template.role,
       );
+      const requiredAfter = available
+        .slice(index + 1)
+        .filter((s) => s.required).length;
       const set_budget = Math.min(
         desired,
-        Math.max(minimum, remaining - (minimumRequired - index - 1)),
+        Math.max(minimum, remaining - requiredAfter),
       );
       remaining -= set_budget;
       return {

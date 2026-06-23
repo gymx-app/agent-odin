@@ -9,6 +9,7 @@ import type {
 
 const configuredBase = import.meta.env.VITE_ODIN_API_BASE_URL?.trim() ?? '';
 const apiBase = configuredBase.replace(/\/$/, '');
+const isEdgeFunction = apiBase.includes('supabase.co');
 
 export class ApiError extends Error {
   constructor(
@@ -75,6 +76,11 @@ const request = async <T>(
   return payload.data;
 };
 
+const paths = {
+  health: isEdgeFunction ? '/functions/v1/health' : '/api/health',
+  preview: isEdgeFunction ? '/functions/v1/preview' : '/api/odin/preview',
+};
+
 export const odinApi = {
   health: () =>
     request<{
@@ -83,7 +89,9 @@ export const odinApi = {
       status: 'ok';
       ai_agent_enabled?: boolean;
       openai_connected?: boolean;
-    }>('/api/health'),
+      ai_generation_provider?: 'openai' | 'anthropic';
+      ai_provider_connected?: boolean;
+    }>(paths.health),
 
   preview: (
     token: string,
@@ -91,7 +99,7 @@ export const odinApi = {
     refinementMode: RefinementMode,
     plannerVersion: PlannerVersion,
   ) =>
-    request<ProgrammePreviewResponse>('/api/odin/preview', {
+    request<ProgrammePreviewResponse>(paths.preview, {
       method: 'POST',
       token,
       body: {

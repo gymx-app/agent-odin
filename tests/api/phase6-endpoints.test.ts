@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createGenerateHandler } from '../../api/odin/generate.js';
 import { createPreviewHandler } from '../../api/odin/preview.js';
-import { createProfileHandler } from '../../api/profile.js';
-import { createGetProgrammeHandler } from '../../api/programmes/[id].js';
 import type { AppConfig } from '../../src/infrastructure/config/env.schema.js';
 import type { SupabaseAuthClientLike } from '../../src/infrastructure/supabase/supabase.types.js';
 import {
@@ -33,6 +30,10 @@ const config: AppConfig = {
   aiAgentPlannerEnabled: false,
   openaiGenerationModel: null,
   openaiGenerationTimeoutMs: 45000,
+  aiGenerationProvider: 'openai' as const,
+  anthropicApiKey: null,
+  anthropicModel: null,
+  anthropicTimeoutMs: 45000,
   allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1'],
 };
 
@@ -246,31 +247,4 @@ describe('public API boundaries', () => {
     });
   });
 
-  it.each([
-    ['PUT', '/api/profile', createProfileHandler(config)],
-    ['POST', '/api/odin/generate', createGenerateHandler(config)],
-    [
-      'GET',
-      '/api/programmes/11111111-1111-4111-8111-111111111111',
-      createGetProgrammeHandler(config),
-    ],
-  ])('retires the persistent %s %s endpoint', async (method, url, handler) => {
-    const response = createTestResponse();
-
-    await handler(
-      createTestRequest({
-        method,
-        url,
-      }),
-      response,
-    );
-
-    expect(response.statusCode).toBe(410);
-    expect(response.json()).toMatchObject({
-      success: false,
-      error: {
-        code: 'ENDPOINT_RETIRED',
-      },
-    });
-  });
 });

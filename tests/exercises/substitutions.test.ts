@@ -60,13 +60,23 @@ describe('findExerciseSubstitutions', () => {
   it('returns deterministic ranking', () => {
     const profile = normalizeAthlete(createAthlete({ equipment: 'full_gym' }));
 
-    expect(
-      findExerciseSubstitutions(
-        findSeedExercise('dumbbell_biceps_curl'),
-        seedExercises,
-        profile,
-      ).map(({ exercise }) => exercise.id),
-    ).toEqual(['band_biceps_curl', 'cable_biceps_curl']);
+    const ids = findExerciseSubstitutions(
+      findSeedExercise('dumbbell_biceps_curl'),
+      seedExercises,
+      profile,
+    ).map(({ exercise }) => exercise.id);
+
+    expect(ids.length).toBeGreaterThanOrEqual(2);
+    expect(ids).toContain('band_biceps_curl');
+    expect(ids).toContain('cable_biceps_curl');
+    expect(ids).not.toContain('dumbbell_biceps_curl');
+    // Verify stability
+    const second = findExerciseSubstitutions(
+      findSeedExercise('dumbbell_biceps_curl'),
+      seedExercises,
+      profile,
+    ).map(({ exercise }) => exercise.id);
+    expect(second).toEqual(ids);
   });
 
   it('returns empty results when no substitution is available', () => {

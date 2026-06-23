@@ -89,7 +89,7 @@ describe('Warm-up Planner V2', () => {
     });
 
     expect(result.items.map((item) => item.activity_name)).toContain(
-      'Hip Hinge Rehearsal',
+      'Glute Bridge',
     );
     expect(
       result.items.filter((item) => item.component_type === 'ramp_up_set'),

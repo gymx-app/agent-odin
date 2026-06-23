@@ -1,5 +1,6 @@
-import type OpenAI from 'openai';
-import { zodTextFormat } from 'openai/helpers/zod';
+import Anthropic from '@anthropic-ai/sdk';
+import type { ZodType } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { AppConfig } from '../../infrastructure/config/env.schema.js';
 import { refinementError } from '../refinement-errors.js';
 import {
@@ -18,35 +19,49 @@ import type {
 } from './ai-programme-generation-provider.js';
 import { aiStrategySystemPrompt } from './ai-generation-strategy-prompt.js';
 import { aiPhaseSystemPrompt } from './ai-generation-phase-prompt.js';
-import { aiReasoningPrompt, type AiReasoningResult } from './agent-reasoning.js';
-import type { FunctionTool } from 'openai/resources/responses/responses';
+import {
+  aiReasoningPrompt,
+  type AiReasoningResult,
+} from './agent-reasoning.js';
 import { AGENT_TOOLS } from './agent-tools.js';
-import { toOpenAISchema } from './openai-schema-compat.js';
 
 const MAX_TOOL_TURNS = 10;
 
-const OpenAIStrategySchema = toOpenAISchema(AiStrategyOutputSchema);
-const OpenAIPhaseSchema = toOpenAISchema(AiPhaseOutputSchema);
+const strategyJsonSchema = zodToJsonSchema(AiStrategyOutputSchema, {
+  target: 'jsonSchema7',
+  $refStrategy: 'none',
+});
 
-export class OpenAIAiProgrammeGenerationProvider
+const phaseJsonSchema = zodToJsonSchema(AiPhaseOutputSchema, {
+  target: 'jsonSchema7',
+  $refStrategy: 'none',
+});
+
+const anthropicTools: Anthropic.Messages.Tool[] = AGENT_TOOLS.map((tool) => ({
+  name: tool.name,
+  description: tool.description,
+  input_schema: {
+    type: 'object' as const,
+    ...(tool.parameters as Record<string, unknown>),
+  },
+}));
+
+export class AnthropicAiProgrammeGenerationProvider
   implements AiProgrammeGenerationProvider
 {
   constructor(
-    private readonly client: OpenAI,
-    private readonly config: Pick<
-      AppConfig,
-      'openaiGenerationModel' | 'openaiGenerationTimeoutMs'
-    >,
+    private readonly client: Anthropic,
+    private readonly config: Pick<AppConfig, 'anthropicModel'>,
   ) {}
 
   private get model(): string {
-    if (!this.config.openaiGenerationModel) {
+    if (!this.config.anthropicModel) {
       throw refinementError(
-        'OPENAI_CONFIGURATION_MISSING',
-        'OpenAI generation model configuration is missing.',
+        'ANTHROPIC_CONFIGURATION_MISSING',
+        'Anthropic model configuration is missing.',
       );
     }
-    return this.config.openaiGenerationModel;
+    return this.config.anthropicModel;
   }
 
   async generateStrategy(
@@ -55,11 +70,13 @@ export class OpenAIAiProgrammeGenerationProvider
   ): Promise<AiStrategyGenerationResult> {
     return this.generateStructured(
       aiStrategySystemPrompt,
-      { strategy_context: context, retry_feedback: providerCtx.retryFeedback ?? null },
+      {
+        strategy_context: context,
+        retry_feedback: providerCtx.retryFeedback ?? null,
+      },
       AiStrategyOutputSchema,
-      'ai_strategy_generation',
+      strategyJsonSchema,
       8000,
-      OpenAIStrategySchema,
     );
   }
 
@@ -68,104 +85,97 @@ export class OpenAIAiProgrammeGenerationProvider
     providerCtx: AiGenerationProviderContext,
   ): Promise<AiPhaseGenerationResult> {
     const model = this.model;
-    const userContent = { phase_context: context, retry_feedback: providerCtx.retryFeedback ?? null };
+    const userContent = {
+      phase_context: context,
+      retry_feedback: providerCtx.retryFeedback ?? null,
+    };
 
-    const input: OpenAI.Responses.ResponseInputItem[] = [
-      { role: 'system', content: aiPhaseSystemPrompt },
+    const messages: Anthropic.Messages.MessageParam[] = [
       { role: 'user', content: JSON.stringify(userContent) },
     ];
 
     if (providerCtx.reasoningOutput) {
-      input.push({ role: 'assistant', content: providerCtx.reasoningOutput });
-      input.push({
+      messages.push({
+        role: 'assistant',
+        content: providerCtx.reasoningOutput,
+      });
+      messages.push({
         role: 'user',
-        content: 'Now generate the phase using the tools to find exercises and check compliance. Output the complete structured phase.',
+        content:
+          'Now generate the phase using the tools to find exercises and check compliance. Output the complete structured phase as JSON.',
       });
     }
 
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
-    let previousResponseId: string | undefined;
 
     try {
       for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
-        const response = await this.client.responses.parse({
+        const response = await this.client.messages.create({
           model,
-          ...(previousResponseId
-            ? { previous_response_id: previousResponseId }
-            : { input }),
-          tools: AGENT_TOOLS as FunctionTool[],
-          text: {
-            format: zodTextFormat(OpenAIPhaseSchema as never, 'ai_phase_generation'),
-          },
-          max_output_tokens: 32000,
+          system: aiPhaseSystemPrompt,
+          messages,
+          tools: anthropicTools,
+          max_tokens: 32000,
         });
 
-        previousResponseId = response.id;
         totalInputTokens += response.usage?.input_tokens ?? 0;
         totalOutputTokens += response.usage?.output_tokens ?? 0;
 
-        const toolCalls: Array<{ id: string; name: string; arguments: string }> = [];
-        let parsedOutput: AiPhaseGenerationResult['output'] | null = null;
+        const toolCalls: Array<{
+          id: string;
+          name: string;
+          input: Record<string, unknown>;
+        }> = [];
+        let textOutput = '';
 
-        for (const output of response.output) {
-          if (output.type === 'function_call') {
+        for (const block of response.content) {
+          if (block.type === 'tool_use') {
             toolCalls.push({
-              id: output.call_id,
-              name: output.name,
-              arguments: output.arguments,
+              id: block.id,
+              name: block.name,
+              input: block.input as Record<string, unknown>,
             });
           }
-
-          if (output.type === 'message') {
-            for (const item of output.content) {
-              if (item.type === 'refusal') {
-                throw refinementError(
-                  'LLM_PROVIDER_REFUSAL',
-                  'The generation provider declined the request.',
-                );
-              }
-              if (item.type === 'output_text' && item.parsed) {
-                const parsed = AiPhaseOutputSchema.safeParse(item.parsed);
-                if (parsed.success) {
-                  parsedOutput = parsed.data;
-                }
-              }
-            }
+          if (block.type === 'text') {
+            textOutput += block.text;
           }
         }
 
-        if (parsedOutput) {
-          return {
-            output: parsedOutput,
-            provider: 'openai',
-            model,
-            responseId: previousResponseId ?? null,
-            usage: {
-              inputTokens: totalInputTokens,
-              outputTokens: totalOutputTokens,
-            },
-          };
+        if (
+          response.stop_reason === 'end_turn' &&
+          textOutput &&
+          toolCalls.length === 0
+        ) {
+          const parsed = this.parseJsonOutput(textOutput, AiPhaseOutputSchema);
+          if (parsed) {
+            return {
+              output: parsed,
+              provider: 'anthropic',
+              model,
+              responseId: response.id ?? null,
+              usage: {
+                inputTokens: totalInputTokens,
+                outputTokens: totalOutputTokens,
+              },
+            };
+          }
         }
 
         if (toolCalls.length > 0 && providerCtx.toolExecutor) {
-          const toolResults: OpenAI.Responses.ResponseInputItem[] = [];
-          for (const call of toolCalls) {
-            let args: Record<string, unknown>;
-            try {
-              args = JSON.parse(call.arguments) as Record<string, unknown>;
-            } catch {
-              args = {};
-            }
-            const result = providerCtx.toolExecutor(call.name, args);
-            toolResults.push({
-              type: 'function_call_output',
-              call_id: call.id,
-              output: JSON.stringify(result),
+          messages.push({ role: 'assistant', content: response.content });
+
+          const toolResults: Anthropic.Messages.ToolResultBlockParam[] =
+            toolCalls.map((call) => {
+              const result = providerCtx.toolExecutor!(call.name, call.input);
+              return {
+                type: 'tool_result' as const,
+                tool_use_id: call.id,
+                content: JSON.stringify(result),
+              };
             });
-          }
-          input.length = 0;
-          input.push(...toolResults);
+
+          messages.push({ role: 'user', content: toolResults });
           continue;
         }
 
@@ -219,26 +229,25 @@ export class OpenAIAiProgrammeGenerationProvider
     providerCtx: AiGenerationProviderContext,
   ): Promise<AiReasoningResult> {
     const model = this.model;
-    const userContent = { phase_context: context, retry_feedback: providerCtx.retryFeedback ?? null };
+    const userContent = {
+      phase_context: context,
+      retry_feedback: providerCtx.retryFeedback ?? null,
+    };
 
     try {
-      const response = await this.client.responses.create({
+      const response = await this.client.messages.create({
         model,
-        input: [
-          { role: 'system', content: aiReasoningPrompt },
+        system: aiReasoningPrompt,
+        messages: [
           { role: 'user', content: JSON.stringify(userContent) },
         ],
-        max_output_tokens: 1500,
+        max_tokens: 1500,
       });
 
       let reasoning = '';
-      for (const output of response.output) {
-        if (output.type === 'message') {
-          for (const item of output.content) {
-            if (item.type === 'output_text') {
-              reasoning += item.text;
-            }
-          }
+      for (const block of response.content) {
+        if (block.type === 'text') {
+          reasoning += block.text;
         }
       }
 
@@ -271,50 +280,31 @@ export class OpenAIAiProgrammeGenerationProvider
   private async generateStructured<T>(
     systemPrompt: string,
     userContent: unknown,
-    schema: import('zod').ZodType<T>,
-    schemaName: string,
+    schema: ZodType<T>,
+    jsonSchema: Record<string, unknown>,
     maxOutputTokens: number,
-    openaiSchema?: import('zod').ZodTypeAny,
-  ): Promise<AiGenerationResult<T>> {
+  ): Promise<AnthropicGenerationResult<T>> {
     const model = this.model;
+    const structuredPrompt =
+      `${systemPrompt}\n\n# OUTPUT FORMAT\nRespond with a single JSON object matching this schema:\n${JSON.stringify(jsonSchema, null, 2)}\n\nRespond ONLY with valid JSON. No markdown fences, no explanations.`;
 
     try {
-      const response = await this.client.responses.parse({
+      const response = await this.client.messages.create({
         model,
-        input: [
-          { role: 'system', content: systemPrompt },
+        system: structuredPrompt,
+        messages: [
           { role: 'user', content: JSON.stringify(userContent) },
         ],
-        text: {
-          format: zodTextFormat((openaiSchema ?? schema) as never, schemaName),
-        },
-        max_output_tokens: maxOutputTokens,
+        max_tokens: maxOutputTokens,
       });
 
-      for (const output of response.output) {
-        if (output.type !== 'message') continue;
-
-        for (const item of output.content) {
-          if (item.type === 'refusal') {
-            throw refinementError(
-              'LLM_PROVIDER_REFUSAL',
-              'The generation provider declined the request.',
-            );
-          }
-
-          if (item.type === 'output_text' && item.parsed) {
-            const parsed = schema.safeParse(item.parsed);
-
-            if (!parsed.success) {
-              throw refinementError(
-                'LLM_OUTPUT_INVALID',
-                'The generation provider returned invalid structured output.',
-              );
-            }
-
+      for (const block of response.content) {
+        if (block.type === 'text') {
+          const parsed = this.parseJsonOutput(block.text, schema);
+          if (parsed) {
             return {
-              output: parsed.data,
-              provider: 'openai',
+              output: parsed,
+              provider: 'anthropic',
               model,
               responseId: response.id ?? null,
               usage: {
@@ -357,11 +347,30 @@ export class OpenAIAiProgrammeGenerationProvider
       );
     }
   }
+
+  private parseJsonOutput<T>(text: string, schema: ZodType<T>): T | null {
+    let jsonText = text.trim();
+    if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+    }
+
+    try {
+      const raw = JSON.parse(jsonText);
+      const parsed = schema.safeParse(raw);
+      if (parsed.success) {
+        return parsed.data;
+      }
+    } catch {
+      // not valid JSON
+    }
+
+    return null;
+  }
 }
 
-type AiGenerationResult<T> = {
+type AnthropicGenerationResult<T> = {
   output: T;
-  provider: 'openai';
+  provider: 'anthropic';
   model: string;
   responseId: string | null;
   usage: {

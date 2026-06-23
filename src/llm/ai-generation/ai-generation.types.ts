@@ -22,7 +22,7 @@ export type AiGenerationProviderContext = {
 
 export type AiGenerationResult<T> = {
   output: T;
-  provider: 'openai';
+  provider: 'openai' | 'anthropic';
   model: string;
   responseId: string | null;
   usage: {

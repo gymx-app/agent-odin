@@ -2,6 +2,7 @@ import type { NormalizedAthleteProfile } from '../../domain/athlete/athlete.type
 import type { LongitudinalOdinProgramme } from '../../domain/programme/programme.types.js';
 import {
   CONDITIONING_MODALITIES,
+  MODALITY_EXERCISE_MAP,
   type ModalityProfile,
 } from './conditioning-policies.js';
 import { planConditioningIntensity } from './conditioning-intensity-planner.js';
@@ -178,6 +179,7 @@ export const planResistanceSessionFinisher = (
     conditioning_id: `${day.day_id}-finisher`,
     display_order: (day.exercises.at(-1)?.display_order ?? 0) + 1,
     ...base,
+    exercise_id: MODALITY_EXERCISE_MAP[modality],
     activity_name: isHiitFinisher
       ? `${CONDITIONING_MODALITIES[modality].display_name} HIIT Finisher`
       : `${CONDITIONING_MODALITIES[modality].display_name} Finisher`,

@@ -53,6 +53,8 @@ export const MOVEMENT_MUSCLE_MAP: Record<MovementPattern, MuscleGroup[]> = {
   core_anti_rotation: ['obliques'],
   core_flexion: ['abdominals'],
   core_extension: ['spinal_erectors'],
+  hip_adduction: ['adductors'],
+  hip_abduction: ['glutes'],
   liss: [],
   mobility: [],
 };

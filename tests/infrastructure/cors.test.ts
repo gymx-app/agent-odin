@@ -22,6 +22,10 @@ const createConfig = (overrides: Partial<AppConfig> = {}): AppConfig => ({
   aiAgentPlannerEnabled: false,
   openaiGenerationModel: null,
   openaiGenerationTimeoutMs: 45000,
+  aiGenerationProvider: 'openai' as const,
+  anthropicApiKey: null,
+  anthropicModel: null,
+  anthropicTimeoutMs: 45000,
   allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1'],
   ...overrides,
 });

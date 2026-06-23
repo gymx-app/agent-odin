@@ -1,6 +1,12 @@
-import type { FunctionTool } from 'openai/resources/responses/responses';
+export type AgentToolDefinition = {
+  type: 'function';
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  strict?: boolean;
+};
 
-export const SEARCH_EXERCISES_TOOL: FunctionTool = {
+export const SEARCH_EXERCISES_TOOL: AgentToolDefinition = {
   type: 'function',
   name: 'searchExercises',
   description:
@@ -41,7 +47,7 @@ export const SEARCH_EXERCISES_TOOL: FunctionTool = {
   strict: false,
 };
 
-export const CHECK_VOLUME_COMPLIANCE_TOOL: FunctionTool = {
+export const CHECK_VOLUME_COMPLIANCE_TOOL: AgentToolDefinition = {
   type: 'function',
   name: 'checkVolumeCompliance',
   description:
@@ -70,7 +76,7 @@ export const CHECK_VOLUME_COMPLIANCE_TOOL: FunctionTool = {
   strict: true,
 };
 
-export const GET_EVIDENCE_RULE_TOOL: FunctionTool = {
+export const GET_EVIDENCE_RULE_TOOL: AgentToolDefinition = {
   type: 'function',
   name: 'getEvidenceRule',
   description:
@@ -104,7 +110,7 @@ export const GET_EVIDENCE_RULE_TOOL: FunctionTool = {
   strict: true,
 };
 
-export const AGENT_TOOLS: FunctionTool[] = [
+export const AGENT_TOOLS: AgentToolDefinition[] = [
   SEARCH_EXERCISES_TOOL,
   CHECK_VOLUME_COMPLIANCE_TOOL,
   GET_EVIDENCE_RULE_TOOL,

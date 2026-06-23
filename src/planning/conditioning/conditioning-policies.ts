@@ -142,6 +142,19 @@ export const CONDITIONING_MODALITIES: Record<
   },
 };
 
+export const MODALITY_EXERCISE_MAP: Partial<Record<ConditioningModality, string>> = {
+  walking: 'treadmill_walk',
+  incline_walking: 'treadmill_incline_walk',
+  stationary_bike: 'stationary_bike',
+  elliptical: 'elliptical_liss',
+  rowing: 'rower_liss',
+  stair_machine: 'stair_machine_cardio',
+  running: 'treadmill_run',
+  sled: 'sled_push',
+  swimming: 'swimming_liss',
+  assault_bike: 'assault_bike_cardio',
+};
+
 export const MODALITY_PREFERENCE_ORDER: ConditioningModality[] = [
   'walking',
   'stationary_bike',

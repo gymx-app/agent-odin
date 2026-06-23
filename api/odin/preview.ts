@@ -1,3 +1,4 @@
+import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { z } from 'zod';
 import { config } from '../../src/infrastructure/config/env.js';
@@ -23,6 +24,7 @@ import type { AiProgrammeGenerationProvider } from '../../src/llm/ai-generation/
 import { OpenAIProgrammeRefinementProvider } from '../../src/llm/openai-programme-refinement-provider.js';
 import { OpenAIV2ProgrammeRefinementProvider } from '../../src/llm/openai-v2-programme-refinement-provider.js';
 import { OpenAIAiProgrammeGenerationProvider } from '../../src/llm/ai-generation/openai-ai-programme-generation-provider.js';
+import { AnthropicAiProgrammeGenerationProvider } from '../../src/llm/ai-generation/anthropic-ai-programme-generation-provider.js';
 import { createOpenAIClient } from '../../src/llm/openai-client.js';
 import { PlannerVersionSchema } from '../../src/domain/programme/planner-version.js';
 import { odinError } from '../../src/shared/errors/odin-errors.js';
@@ -63,13 +65,23 @@ const createPreviewDependencies = (
         new OpenAIV2ProgrammeRefinementProvider(client, appConfig);
     }
     if (appConfig.aiAgentPlannerEnabled) {
-      const generationClient = new OpenAI({
-        apiKey: appConfig.openaiApiKey!,
-        timeout: appConfig.openaiGenerationTimeoutMs,
-        maxRetries: 0,
-      });
-      dependencies.aiGenerationProvider =
-        new OpenAIAiProgrammeGenerationProvider(generationClient, appConfig);
+      if (appConfig.aiGenerationProvider === 'anthropic' && appConfig.anthropicApiKey) {
+        const anthropicClient = new Anthropic({
+          apiKey: appConfig.anthropicApiKey,
+          timeout: appConfig.anthropicTimeoutMs,
+          maxRetries: 0,
+        });
+        dependencies.aiGenerationProvider =
+          new AnthropicAiProgrammeGenerationProvider(anthropicClient, appConfig);
+      } else if (appConfig.openaiApiKey) {
+        const generationClient = new OpenAI({
+          apiKey: appConfig.openaiApiKey,
+          timeout: appConfig.openaiGenerationTimeoutMs,
+          maxRetries: 0,
+        });
+        dependencies.aiGenerationProvider =
+          new OpenAIAiProgrammeGenerationProvider(generationClient, appConfig);
+      }
     }
   }
 

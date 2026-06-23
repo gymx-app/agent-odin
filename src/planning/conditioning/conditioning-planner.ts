@@ -1,4 +1,4 @@
-import { CONDITIONING_MODALITIES } from './conditioning-policies.js';
+import { CONDITIONING_MODALITIES, MODALITY_EXERCISE_MAP } from './conditioning-policies.js';
 import { planConditioningIntensity } from './conditioning-intensity-planner.js';
 import { selectConditioningModality } from './conditioning-modality-selector.js';
 import { planConditioningPlacement } from './conditioning-placement-planner.js';
@@ -141,6 +141,7 @@ const prescriptionForDay = (
     conditioning_id: `${day.day_id}-conditioning`,
     display_order: 1,
     ...base,
+    exercise_id: MODALITY_EXERCISE_MAP[modality.modality],
     activity_name: CONDITIONING_MODALITIES[modality.modality].display_name,
     purpose:
       requirement === 'developmental'

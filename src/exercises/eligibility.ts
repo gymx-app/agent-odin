@@ -74,7 +74,14 @@ export const evaluateExerciseEligibility = (
     };
   }
 
-  if (conflicts.some((conflict) => conflict.restriction_severity === 'avoid')) {
+  if (
+    conflicts.some(
+      (conflict) =>
+        conflict.restriction_severity === 'avoid' ||
+        (conflict.restriction_severity === 'modify' &&
+          conflict.movement_demand_score >= 4),
+    )
+  ) {
     return {
       status: 'excluded',
       eligible: false,

@@ -12,15 +12,15 @@ import { canonicalizeJson } from '../../src/shared/canonical-json.js';
 const deterministicPreviewHashes = new Map([
   [
     beginnerFatLossAthlete.name,
-    '26fc1e3925d8233742417c5a28aed3b681451308a5192899dddc4ee7147c2a1c',
+    '84fd980f36fc14ddf78c409d169f1709b288306e5cc2a6fbacf16293eb0d7f8e',
   ],
   [
     intermediateHypertrophyKneeAthlete.name,
-    '616b9b6856ca9bf5e719d4e2a150f81c10a96dfcc1b0893caeadff9f24da8381',
+    '9a8a732e0465704a39b769192466da0e97fd1d3aee25b769d5e424f4e46fb604',
   ],
   [
     advancedStrengthInBodyAthlete.name,
-    'f3765fdc34e75e7b15111a6c3eb149295125b00c7d0906f2902cd002c325da3b',
+    '0f02e5d1d422abb7d29505bfafa5265dd11f61d0224fb325ec4237d5b00c4f72',
   ],
 ]);
 

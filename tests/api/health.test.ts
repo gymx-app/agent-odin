@@ -26,6 +26,10 @@ const config: AppConfig = {
   aiAgentPlannerEnabled: false,
   openaiGenerationModel: null,
   openaiGenerationTimeoutMs: 45000,
+  aiGenerationProvider: 'openai' as const,
+  anthropicApiKey: null,
+  anthropicModel: null,
+  anthropicTimeoutMs: 45000,
   allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1'],
 };
 
@@ -46,6 +50,8 @@ describe('GET /api/health', () => {
         longitudinal_planner_enabled: false,
         ai_agent_enabled: false,
         openai_connected: false,
+        ai_generation_provider: 'openai',
+        ai_provider_connected: false,
         supported_planner_versions: ['legacy_v1', 'longitudinal_v1'],
       },
     });

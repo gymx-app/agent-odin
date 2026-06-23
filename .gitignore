@@ -6,3 +6,4 @@ coverage/
 !.env.example
 .vercel
 .env*
+supabase/functions/_bundles/

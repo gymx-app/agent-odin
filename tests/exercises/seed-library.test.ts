@@ -44,8 +44,8 @@ describe('seed exercise library', () => {
   });
 
   it('has the expected curated scope', () => {
-    expect(seedExercises.length).toBeGreaterThanOrEqual(50);
-    expect(seedExercises.length).toBeLessThanOrEqual(70);
+    expect(seedExercises.length).toBeGreaterThanOrEqual(200);
+    expect(seedExercises.length).toBeLessThanOrEqual(400);
   });
 
   it('passes library validation without errors', () => {
