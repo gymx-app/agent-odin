@@ -54,6 +54,93 @@ import { athleteInputSchema } from './profile/profile-schema';
 
 const STORAGE_KEY = 'odin_demo_form';
 
+type GenerationMode =
+  | 'ai_agent'
+  | 'longitudinal_deterministic'
+  | 'longitudinal_ai_refined'
+  | 'longitudinal_ai_required'
+  | 'legacy_deterministic'
+  | 'legacy_ai_refined'
+  | 'legacy_ai_required';
+
+const GENERATION_MODES: readonly {
+  value: GenerationMode;
+  title: string;
+  description: string;
+}[] = [
+  {
+    value: 'ai_agent',
+    title: 'AI Agent',
+    description: 'AI generates the full programme with tool use, reasoning, and replanning.',
+  },
+  {
+    value: 'longitudinal_deterministic',
+    title: 'Longitudinal — Deterministic',
+    description: 'Evidence-based periodised planner. No AI refinement.',
+  },
+  {
+    value: 'longitudinal_ai_refined',
+    title: 'Longitudinal — AI Refined',
+    description: 'Deterministic planner + optional AI polish. Falls back safely.',
+  },
+  {
+    value: 'legacy_deterministic',
+    title: 'Legacy — Deterministic',
+    description: 'Original single-phase planner. No AI refinement.',
+  },
+  {
+    value: 'legacy_ai_refined',
+    title: 'Legacy — AI Refined',
+    description: 'Original planner + optional AI polish. Falls back safely.',
+  },
+  {
+    value: 'legacy_ai_required',
+    title: 'Legacy — AI Required',
+    description: 'Original planner + mandatory AI. Fails if unavailable. Dev only.',
+  },
+  {
+    value: 'longitudinal_ai_required',
+    title: 'Longitudinal — AI Required',
+    description: 'Periodised planner + mandatory AI. Fails if unavailable. Dev only.',
+  },
+];
+
+const generationModeToParams = (
+  mode: GenerationMode,
+): { plannerVersion: PlannerVersion; refinementMode: RefinementMode } => {
+  switch (mode) {
+    case 'ai_agent':
+      return { plannerVersion: 'ai_agent_v1', refinementMode: 'deterministic' };
+    case 'longitudinal_deterministic':
+      return { plannerVersion: 'longitudinal_v1', refinementMode: 'deterministic' };
+    case 'longitudinal_ai_refined':
+      return { plannerVersion: 'longitudinal_v1', refinementMode: 'llm_optional' };
+    case 'longitudinal_ai_required':
+      return { plannerVersion: 'longitudinal_v1', refinementMode: 'llm_required' };
+    case 'legacy_deterministic':
+      return { plannerVersion: 'legacy_v1', refinementMode: 'deterministic' };
+    case 'legacy_ai_refined':
+      return { plannerVersion: 'legacy_v1', refinementMode: 'llm_optional' };
+    case 'legacy_ai_required':
+      return { plannerVersion: 'legacy_v1', refinementMode: 'llm_required' };
+  }
+};
+
+const paramsToGenerationMode = (
+  plannerVersion: PlannerVersion,
+  refinementMode: RefinementMode,
+): GenerationMode => {
+  if (plannerVersion === 'ai_agent_v1') return 'ai_agent';
+  if (plannerVersion === 'longitudinal_v1') {
+    if (refinementMode === 'llm_required') return 'longitudinal_ai_required';
+    if (refinementMode === 'llm_optional') return 'longitudinal_ai_refined';
+    return 'longitudinal_deterministic';
+  }
+  if (refinementMode === 'llm_required') return 'legacy_ai_required';
+  if (refinementMode === 'llm_optional') return 'legacy_ai_refined';
+  return 'legacy_deterministic';
+};
+
 type StoredForm = {
   profile: AthleteInput;
   refinementMode: RefinementMode;
@@ -869,10 +956,13 @@ function App() {
   const [profile, setProfile] = useState<AthleteInput>(storedForm.profile ?? defaultProfile);
   const [profileLoad, setProfileLoad] =
     useState<ProfileLoadState>({ status: 'default' });
-  const [refinementMode, setRefinementMode] =
-    useState<RefinementMode>(storedForm.refinementMode ?? 'deterministic');
-  const [plannerVersion, setPlannerVersion] =
-    useState<PlannerVersion>(storedForm.plannerVersion ?? 'ai_agent_v1');
+  const [generationMode, setGenerationMode] = useState<GenerationMode>(
+    paramsToGenerationMode(
+      storedForm.plannerVersion ?? 'ai_agent_v1',
+      storedForm.refinementMode ?? 'deterministic',
+    ),
+  );
+  const { plannerVersion, refinementMode } = generationModeToParams(generationMode);
   const [programme, setProgramme] =
     useState<ProgrammePreviewResponse | null>(null);
   const [selectedPhase, setSelectedPhase] = useState(1);
@@ -954,7 +1044,7 @@ function App() {
 
   useEffect(() => {
     saveForm({ profile, refinementMode, plannerVersion });
-  }, [profile, refinementMode, plannerVersion]);
+  }, [profile, refinementMode, plannerVersion, generationMode]);
 
   const loadAuthenticatedProfile = async (showNotice = true) => {
     const authClient = supabaseAuth;
@@ -1966,21 +2056,17 @@ function App() {
               </div>
 
               <div className="mode-grid">
-                {([
-                  ['deterministic', 'Deterministic', 'Planner and validator only.'],
-                  ['llm_optional', 'AI Refined', 'Falls back safely if unavailable.'],
-                  ['llm_required', 'AI Required', 'Fails if refinement is unavailable. Developer only.'],
-                ] as const).map(([value, title, description]) => (
+                {GENERATION_MODES.map(({ value, title, description }) => (
                   <label
                     key={value}
-                    className={`mode-card ${refinementMode === value ? 'selected' : ''}`}
+                    className={`mode-card ${generationMode === value ? 'selected' : ''}`}
                   >
                     <input
                       type="radio"
-                      name="refinement"
+                      name="generation-mode"
                       value={value}
-                      checked={refinementMode === value}
-                      onChange={() => setRefinementMode(value)}
+                      checked={generationMode === value}
+                      onChange={() => setGenerationMode(value)}
                     />
                     <span className="radio-mark" />
                     <strong>{title}</strong>
@@ -1988,20 +2074,6 @@ function App() {
                   </label>
                 ))}
               </div>
-
-              <label className="field" style={{ marginTop: 19 }}>
-                <span className="field-label">Planner version</span>
-                <select
-                  value={plannerVersion}
-                  onChange={(event) =>
-                    setPlannerVersion(event.target.value as PlannerVersion)
-                  }
-                >
-                  <option value="ai_agent_v1">AI Agent V1</option>
-                  <option value="longitudinal_v1">Longitudinal V1</option>
-                  <option value="legacy_v1">Legacy V1</option>
-                </select>
-              </label>
 
               <div className="preview-actions">
                 <span>

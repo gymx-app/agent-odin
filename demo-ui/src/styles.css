@@ -221,7 +221,9 @@ main { max-width: 1400px; margin: 0 auto; padding: 0 24px 80px; }
 .button-secondary { color: var(--ink); background: white; border-color: var(--line); }
 .button-ghost { color: var(--green-dark); background: transparent; }
 
-.mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; }
+.mode-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 11px; }
+.mode-grid .mode-card:first-child { grid-column: 1 / -1; border-color: #b3d8f7; background: #f0f7fd; }
+.mode-grid .mode-card:first-child.selected { border-color: #82c5a0; background: #f4fbf7; }
 .mode-card { position: relative; border: 1px solid var(--line); border-radius: 12px; padding: 15px 14px 14px 42px; background: white; cursor: pointer; transition: border .15s, background .15s; }
 .mode-card input { position: absolute; opacity: 0; }
 .mode-card .radio-mark { position: absolute; left: 15px; top: 17px; width: 16px; height: 16px; border: 1px solid #b8beb9; border-radius: 50%; }
