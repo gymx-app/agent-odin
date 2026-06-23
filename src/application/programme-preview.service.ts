@@ -181,7 +181,13 @@ export const previewProgramme = async (
               stage: error.stage,
             });
           } else {
-            fallbackReason = 'AI_GENERATION_UNKNOWN_ERROR';
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            fallbackReason = `AI_GENERATION_UNKNOWN_ERROR:${errorMessage}`;
+            context.logger?.info('ai_generation_unknown_error', {
+              requestId: context.requestId,
+              error: errorMessage,
+              errorName: error instanceof Error ? error.name : 'unknown',
+            });
           }
         }
       }
