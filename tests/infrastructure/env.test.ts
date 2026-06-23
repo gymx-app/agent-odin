@@ -19,7 +19,7 @@ describe('environment configuration', () => {
       generationTimeoutMs: 60000,
       defaultPlannerVersion: 'legacy_v1',
       longitudinalPlannerEnabled: false,
-      aiAgentPlannerEnabled: false,
+      aiAgentPlannerEnabled: true,
       openaiGenerationModel: null,
       openaiGenerationTimeoutMs: 45000,
       allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1', 'ai_agent_v1'],
@@ -142,7 +142,7 @@ describe('environment configuration', () => {
     ).toMatchObject({
       defaultPlannerVersion: 'longitudinal_v1',
       longitudinalPlannerEnabled: true,
-      aiAgentPlannerEnabled: false,
+      aiAgentPlannerEnabled: true,
       openaiGenerationModel: null,
       openaiGenerationTimeoutMs: 45000,
       allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1'],

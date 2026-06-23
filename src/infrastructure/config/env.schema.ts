@@ -75,7 +75,11 @@ export const envSchema = z
       .default(60000),
     ODIN_DEFAULT_PLANNER_VERSION: PlannerVersionSchema.default('legacy_v1'),
     ODIN_LONGITUDINAL_PLANNER_ENABLED: booleanStringSchema,
-    ODIN_AI_AGENT_PLANNER_ENABLED: booleanStringSchema,
+    ODIN_AI_AGENT_PLANNER_ENABLED: z
+      .enum(['true', 'false'])
+      .optional()
+      .default('true')
+      .transform((value) => value === 'true'),
     ODIN_ALLOWED_PLANNER_VERSIONS: plannerVersionsSchema,
     OPENAI_GENERATION_MODEL: optionalSecretSchema,
     OPENAI_GENERATION_TIMEOUT_MS: z.coerce
