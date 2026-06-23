@@ -1,3 +1,4 @@
+import OpenAI from 'openai';
 import { z } from 'zod';
 import { config } from '../../src/infrastructure/config/env.js';
 import type { AppConfig } from '../../src/infrastructure/config/env.schema.js';
@@ -62,8 +63,13 @@ const createPreviewDependencies = (
         new OpenAIV2ProgrammeRefinementProvider(client, appConfig);
     }
     if (appConfig.aiAgentPlannerEnabled) {
+      const generationClient = new OpenAI({
+        apiKey: appConfig.openaiApiKey!,
+        timeout: appConfig.openaiGenerationTimeoutMs,
+        maxRetries: 0,
+      });
       dependencies.aiGenerationProvider =
-        new OpenAIAiProgrammeGenerationProvider(client, appConfig);
+        new OpenAIAiProgrammeGenerationProvider(generationClient, appConfig);
     }
   }
 
