@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   Sparkles,
   Database,
+  Settings,
   UserRound,
 } from 'lucide-react';
 import { ApiError, odinApi, apiPlatform } from './api/client';
@@ -184,7 +185,7 @@ type BusyAction =
   | null;
 
 type WorkflowStep = 'connect' | 'preview' | 'review';
-type ResultTab = 'programme' | 'validation' | 'json';
+type ResultTab = 'programme' | 'validation' | 'json' | 'logs';
 
 type ProfileLoadState =
   | { status: 'default' }
@@ -908,18 +909,113 @@ const ResultTabs = ({
   onChange: (tab: ResultTab) => void;
 }) => (
   <div className="result-tabs">
-    {(['programme', 'validation', 'json'] as const).map((tab) => (
+    {(['programme', 'validation', 'json', 'logs'] as const).map((tab) => (
       <button
         key={tab}
         type="button"
         className={active === tab ? 'active' : ''}
         onClick={() => onChange(tab)}
       >
-        {tab === 'programme' ? 'Programme' : tab === 'validation' ? 'Validation' : 'Raw JSON'}
+        {{ programme: 'Programme', validation: 'Validation', json: 'Raw JSON', logs: 'Process Logs' }[tab]}
       </button>
     ))}
   </div>
 );
+
+// --- Process Logs ---
+
+const ProcessLogs = ({ data }: { data: ProgrammePreviewResponse }) => {
+  const gen = data.generation;
+  const stages = gen.stage_durations_ms ?? {};
+  const resolution = gen.planner_resolution;
+  const ai = gen.ai_generation;
+  const totalMs = Object.values(stages).reduce((sum, ms) => sum + ms, 0);
+
+  return (
+    <div className="validation-grid">
+      <div className="validation-card">
+        <div className="card-title">
+          <Clock3 size={18} />
+          <strong>Stage Durations</strong>
+          <StatusPill tone="default">{totalMs.toLocaleString()} ms total</StatusPill>
+        </div>
+        <table className="log-table">
+          <thead>
+            <tr><th>Stage</th><th>Duration</th><th>%</th></tr>
+          </thead>
+          <tbody>
+            {Object.entries(stages)
+              .sort(([, a], [, b]) => b - a)
+              .map(([stage, ms]) => (
+                <tr key={stage}>
+                  <td><code>{stage}</code></td>
+                  <td>{ms.toLocaleString()} ms</td>
+                  <td>
+                    <span className="bar-cell">
+                      <i style={{ width: `${Math.round((ms / totalMs) * 100)}%` }} />
+                      {totalMs > 0 ? Math.round((ms / totalMs) * 100) : 0}%
+                    </span>
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="validation-card">
+        <div className="card-title">
+          <Settings size={18} />
+          <strong>Planner Resolution</strong>
+        </div>
+        <dl className="metadata-list">
+          <div><dt>Selected version</dt><dd><code>{resolution?.selected_version ?? '—'}</code></dd></div>
+          <div><dt>Requested version</dt><dd><code>{resolution?.requested_version ?? 'none'}</code></dd></div>
+          <div><dt>Fallback applied</dt><dd>{resolution?.fallback_applied ? 'Yes' : 'No'}</dd></div>
+          {resolution?.fallback_reason ? (
+            <div><dt>Fallback reason</dt><dd>{resolution.fallback_reason}</dd></div>
+          ) : null}
+          <div><dt>Reason code</dt><dd><code>{resolution?.reason_code ?? '—'}</code></dd></div>
+        </dl>
+      </div>
+
+      <div className="validation-card">
+        <div className="card-title">
+          <Sparkles size={18} />
+          <strong>Generation Config</strong>
+        </div>
+        <dl className="metadata-list">
+          <div><dt>Planner version</dt><dd><code>{gen.planner_version}</code></dd></div>
+          <div><dt>Schema version</dt><dd>{gen.schema_version}</dd></div>
+          <div><dt>Validation rules</dt><dd><code>{gen.validation_rule_version}</code></dd></div>
+          <div><dt>Exercise library</dt><dd><code>{gen.exercise_library_version}</code></dd></div>
+          <div><dt>Repair attempted</dt><dd>{gen.repair_attempted ? 'Yes' : 'No'}</dd></div>
+          <div><dt>Repair applied</dt><dd>{gen.repair_applied ? 'Yes' : 'No'}</dd></div>
+        </dl>
+      </div>
+
+      {ai ? (
+        <div className="validation-card">
+          <div className="card-title">
+            <Bot size={18} />
+            <strong>AI Generation Detail</strong>
+            <StatusPill tone={ai.fallback_used ? 'warning' : 'positive'}>
+              {ai.fallback_used ? 'Fallback' : 'AI Generated'}
+            </StatusPill>
+          </div>
+          <dl className="metadata-list">
+            <div><dt>Input tokens</dt><dd>{ai.total_input_tokens.toLocaleString()}</dd></div>
+            <div><dt>Output tokens</dt><dd>{ai.total_output_tokens.toLocaleString()}</dd></div>
+            <div><dt>Total tokens</dt><dd>{(ai.total_input_tokens + ai.total_output_tokens).toLocaleString()}</dd></div>
+            <div><dt>Fallback used</dt><dd>{ai.fallback_used ? 'Yes' : 'No'}</dd></div>
+            {ai.fallback_reason ? (
+              <div><dt>Fallback reason</dt><dd className="error-text">{ai.fallback_reason}</dd></div>
+            ) : null}
+          </dl>
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
 // --- Raw JSON viewer ---
 
@@ -2285,6 +2381,8 @@ function App() {
                         </dl>
                       </div>
                     </div>
+                  ) : resultTab === 'logs' ? (
+                    <ProcessLogs data={programme} />
                   ) : (
                     <RawJsonViewer data={programme} />
                   )}

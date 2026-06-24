@@ -420,8 +420,23 @@ export type ProgrammePreviewResponse = {
   programme: OdinProgramme | LongitudinalOdinProgramme;
   validation: ProgrammeValidation;
   refinement: RefinementMetadata;
-  generation: Record<string, unknown> & {
+  generation: {
+    planner_version: PlannerVersion;
+    schema_version: '1.0' | '2.0';
+    validation_rule_version: string;
+    exercise_library_version: string;
+    repair_attempted: boolean;
+    repair_applied: boolean;
+    planner_resolution?: {
+      selected_version: string;
+      requested_version: string | null;
+      fallback_applied: boolean;
+      fallback_reason: string | null;
+      reason_code: string;
+    };
+    stage_durations_ms?: Record<string, number>;
     ai_generation?: AiGenerationMeta;
+    [key: string]: unknown;
   };
 };
 

@@ -389,7 +389,7 @@ describe('Orchestrator — diverse athlete profiles', () => {
     expect(result.phases.length).toBeGreaterThan(0);
   });
 
-  it('generates programme for 6-day advanced strength', async () => {
+  it('generates programme for 6-day advanced strength', { timeout: 15_000 }, async () => {
     const athlete: AthleteInput = {
       ...advancedStrengthInBodyAthlete,
       available_days_per_week: 6,

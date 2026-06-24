@@ -7,6 +7,11 @@ import {
 import { firstHeaderValue } from './headers.js';
 import { REQUEST_BODY_LIMITS } from './request-limits.js';
 
+const byteLength = (str: string): number =>
+  typeof Buffer !== 'undefined'
+    ? Buffer.byteLength(str, 'utf8')
+    : new TextEncoder().encode(str).byteLength;
+
 const payloadTooLarge = (): PayloadTooLargeError => new PayloadTooLargeError();
 
 const parseContentLength = (
@@ -86,7 +91,7 @@ export const readJsonBody = async <Schema extends z.ZodTypeAny>(
 
     if (
       serialized === undefined ||
-      Buffer.byteLength(serialized, 'utf8') > maximumBytes
+      byteLength(serialized) > maximumBytes
     ) {
       throw payloadTooLarge();
     }

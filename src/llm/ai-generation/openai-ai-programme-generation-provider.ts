@@ -91,9 +91,10 @@ export class OpenAIAiProgrammeGenerationProvider
       for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
         const response = await this.client.responses.parse({
           model,
+          input,
           ...(previousResponseId
             ? { previous_response_id: previousResponseId }
-            : { input }),
+            : {}),
           tools: AGENT_TOOLS as FunctionTool[],
           text: {
             format: zodTextFormat(OpenAIPhaseSchema as never, 'ai_phase_generation'),
@@ -129,6 +130,11 @@ export class OpenAIAiProgrammeGenerationProvider
                 const parsed = AiPhaseOutputSchema.safeParse(item.parsed);
                 if (parsed.success) {
                   parsedOutput = parsed.data;
+                } else {
+                  throw refinementError(
+                    'LLM_OUTPUT_INVALID',
+                    `Phase output failed validation: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`,
+                  );
                 }
               }
             }
@@ -176,9 +182,10 @@ export class OpenAIAiProgrammeGenerationProvider
           );
         }
 
+        const outputTypes = response.output.map((o) => o.type).join(', ');
         throw refinementError(
           'LLM_OUTPUT_INVALID',
-          'The generation provider returned no structured output or tool calls.',
+          `The generation provider returned no structured output or tool calls. Response contained: [${outputTypes}]`,
         );
       }
 
@@ -303,12 +310,13 @@ export class OpenAIAiProgrammeGenerationProvider
           }
 
           if (item.type === 'output_text' && item.parsed) {
-            const parsed = schema.safeParse(item.parsed);
+            const validationSchema = openaiSchema ?? schema;
+            const parsed = validationSchema.safeParse(item.parsed);
 
             if (!parsed.success) {
               throw refinementError(
                 'LLM_OUTPUT_INVALID',
-                'The generation provider returned invalid structured output.',
+                `The generation provider returned invalid structured output: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`,
               );
             }
 

@@ -1,3 +1,6 @@
+// @ts-ignore: Deno globalThis
+globalThis.process = globalThis.process ?? { env: Deno.env.toObject() };
+
 import { createPreviewHandler } from '../_bundles/preview-handler.js';
 
 let handler: ReturnType<typeof createPreviewHandler> | null = null;
@@ -53,6 +56,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error('EDGE_FUNCTION_ERROR', { message, stack });
     return new Response(
       JSON.stringify({ success: false, error: { code: 'EDGE_FUNCTION_ERROR', message } }),
       { status: 500, headers: { 'Content-Type': 'application/json' } },

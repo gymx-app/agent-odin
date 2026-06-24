@@ -152,6 +152,10 @@ export const createEndpointHandler = <Data>({
         responseStatus: appError.httpStatus,
         durationMs: Date.now() - startedAt,
         errorCode: appError.code,
+        errorMessage: appError.message,
+        ...(appError.httpStatus >= 500 && error instanceof Error
+          ? { errorStack: error.stack }
+          : {}),
       });
     }
   };

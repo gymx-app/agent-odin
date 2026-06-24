@@ -564,6 +564,15 @@ footer p { margin-left: auto; font-size: 9px; }
   .v2-day-header { grid-template-columns: 36px minmax(0, 1fr) auto; }
 }
 
+/* Process Logs */
+.log-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.log-table th { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--muted); font-weight: 500; }
+.log-table td { padding: 6px 10px; border-bottom: 1px solid var(--border-subtle, rgba(128,128,128,.1)); }
+.log-table code { font-size: 0.8rem; background: var(--surface-elevated, rgba(128,128,128,.08)); padding: 2px 6px; border-radius: 4px; }
+.bar-cell { display: flex; align-items: center; gap: 6px; }
+.bar-cell i { display: inline-block; height: 6px; border-radius: 3px; background: var(--accent, #6366f1); min-width: 2px; }
+.error-text { color: var(--negative, #ef4444); word-break: break-word; }
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after {

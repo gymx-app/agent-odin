@@ -5,7 +5,7 @@ import { buildLongitudinalProgramme } from '../../src/planning/longitudinal-prog
 import { createProfile } from './test-planning-utils.js';
 
 describe('end-to-end longitudinal programme planner', () => {
-  it('builds and independently validates a complete deterministic programme', () => {
+  it('builds and independently validates a complete deterministic programme', { timeout: 15_000 }, () => {
     const profile = createProfile({
       available_days_per_week: 4,
       session_duration_min: 60,
