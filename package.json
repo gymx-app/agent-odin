@@ -13,8 +13,8 @@
     "test:watch": "vitest",
     "build": "tsc -p tsconfig.build.json",
     "dev:api": "npx supabase functions serve",
-    "bundle:functions": "esbuild api/health.ts --bundle --format=esm --platform=node --target=esnext --outfile=supabase/functions/_bundles/health-handler.js && esbuild api/odin/preview.ts --bundle --format=esm --platform=node --target=esnext --outfile=supabase/functions/_bundles/preview-handler.js && esbuild api/odin/generate-programme.ts --bundle --format=esm --platform=node --target=esnext --outfile=supabase/functions/_bundles/generate-programme-handler.js",
-    "deploy:functions": "npm run bundle:functions && npx supabase functions deploy health preview generate-programme",
+    "bundle:functions": "esbuild api/health.ts --bundle --format=esm --platform=node --target=esnext --outfile=supabase/functions/_bundles/health-handler.js && esbuild api/odin/generate-programme.ts --bundle --format=esm --platform=node --target=esnext --outfile=supabase/functions/_bundles/generate-programme-handler.js",
+    "deploy:functions": "npm run bundle:functions && npx supabase functions deploy health generate-programme",
     "supabase:seed:exercises": "tsx scripts/generate-exercise-seed.ts > supabase/seed.sql"
   },
   "dependencies": {

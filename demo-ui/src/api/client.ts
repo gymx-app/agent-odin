@@ -2,8 +2,6 @@ import type {
   AthleteInput,
   ErrorEnvelope,
   ProgrammePreviewResponse,
-  PlannerVersion,
-  RefinementMode,
   SuccessEnvelope,
 } from './contracts';
 
@@ -81,7 +79,6 @@ const request = async <T>(
 
 const paths = {
   health: isEdgeFunction ? '/functions/v1/health' : '/api/health',
-  preview: isEdgeFunction ? '/functions/v1/preview' : '/api/odin/preview',
   generateProgramme: isEdgeFunction ? '/functions/v1/generate-programme' : '/api/odin/generate-programme',
 };
 
@@ -103,22 +100,6 @@ export const odinApi = {
       ai_generation_provider?: 'openai' | 'anthropic';
       ai_provider_connected?: boolean;
     }>(paths.health),
-
-  preview: (
-    token: string,
-    athlete: AthleteInput,
-    refinementMode: RefinementMode,
-    plannerVersion: PlannerVersion,
-  ) =>
-    request<ProgrammePreviewResponse>(paths.preview, {
-      method: 'POST',
-      token,
-      body: {
-        athlete,
-        refinement_mode: refinementMode,
-        planner_version: plannerVersion,
-      },
-    }),
 
   generateProgramme: async (
     token: string,

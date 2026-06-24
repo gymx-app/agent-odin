@@ -36,8 +36,6 @@ import type {
   LongitudinalOdinProgramme,
   ProgrammeDay,
   ProgrammePreviewResponse,
-  PlannerVersion,
-  RefinementMode,
   V2Day,
   V2Phase,
   V2Week,
@@ -55,97 +53,8 @@ import { athleteInputSchema } from './profile/profile-schema';
 
 const STORAGE_KEY = 'odin_demo_form';
 
-type GenerationMode =
-  | 'ai_agent'
-  | 'longitudinal_deterministic'
-  | 'longitudinal_ai_refined'
-  | 'longitudinal_ai_required'
-  | 'legacy_deterministic'
-  | 'legacy_ai_refined'
-  | 'legacy_ai_required';
-
-const GENERATION_MODES: readonly {
-  value: GenerationMode;
-  title: string;
-  description: string;
-}[] = [
-  {
-    value: 'ai_agent',
-    title: 'AI Agent',
-    description: 'AI generates the full programme with tool use, reasoning, and replanning.',
-  },
-  {
-    value: 'longitudinal_deterministic',
-    title: 'Longitudinal — Deterministic',
-    description: 'Evidence-based periodised planner. No AI refinement.',
-  },
-  {
-    value: 'longitudinal_ai_refined',
-    title: 'Longitudinal — AI Refined',
-    description: 'Deterministic planner + optional AI polish. Falls back safely.',
-  },
-  {
-    value: 'legacy_deterministic',
-    title: 'Legacy — Deterministic',
-    description: 'Original single-phase planner. No AI refinement.',
-  },
-  {
-    value: 'legacy_ai_refined',
-    title: 'Legacy — AI Refined',
-    description: 'Original planner + optional AI polish. Falls back safely.',
-  },
-  {
-    value: 'legacy_ai_required',
-    title: 'Legacy — AI Required',
-    description: 'Original planner + mandatory AI. Fails if unavailable. Dev only.',
-  },
-  {
-    value: 'longitudinal_ai_required',
-    title: 'Longitudinal — AI Required',
-    description: 'Periodised planner + mandatory AI. Fails if unavailable. Dev only.',
-  },
-];
-
-const generationModeToParams = (
-  mode: GenerationMode,
-): { plannerVersion: PlannerVersion; refinementMode: RefinementMode } => {
-  switch (mode) {
-    case 'ai_agent':
-      return { plannerVersion: 'ai_agent_v1', refinementMode: 'deterministic' };
-    case 'longitudinal_deterministic':
-      return { plannerVersion: 'longitudinal_v1', refinementMode: 'deterministic' };
-    case 'longitudinal_ai_refined':
-      return { plannerVersion: 'longitudinal_v1', refinementMode: 'llm_optional' };
-    case 'longitudinal_ai_required':
-      return { plannerVersion: 'longitudinal_v1', refinementMode: 'llm_required' };
-    case 'legacy_deterministic':
-      return { plannerVersion: 'legacy_v1', refinementMode: 'deterministic' };
-    case 'legacy_ai_refined':
-      return { plannerVersion: 'legacy_v1', refinementMode: 'llm_optional' };
-    case 'legacy_ai_required':
-      return { plannerVersion: 'legacy_v1', refinementMode: 'llm_required' };
-  }
-};
-
-const paramsToGenerationMode = (
-  plannerVersion: PlannerVersion,
-  refinementMode: RefinementMode,
-): GenerationMode => {
-  if (plannerVersion === 'ai_agent_v1') return 'ai_agent';
-  if (plannerVersion === 'longitudinal_v1') {
-    if (refinementMode === 'llm_required') return 'longitudinal_ai_required';
-    if (refinementMode === 'llm_optional') return 'longitudinal_ai_refined';
-    return 'longitudinal_deterministic';
-  }
-  if (refinementMode === 'llm_required') return 'legacy_ai_required';
-  if (refinementMode === 'llm_optional') return 'legacy_ai_refined';
-  return 'legacy_deterministic';
-};
-
 type StoredForm = {
   profile: AthleteInput;
-  refinementMode: RefinementMode;
-  plannerVersion: PlannerVersion;
 };
 
 const loadStoredForm = (): Partial<StoredForm> => {
@@ -155,7 +64,7 @@ const loadStoredForm = (): Partial<StoredForm> => {
     const parsed = JSON.parse(raw) as Partial<StoredForm>;
     if (parsed.profile) {
       const result = athleteInputSchema.safeParse(parsed.profile);
-      if (!result.success) return { refinementMode: parsed.refinementMode, plannerVersion: parsed.plannerVersion };
+      if (!result.success) return {};
       parsed.profile = result.data;
     }
     return parsed;
@@ -1052,13 +961,6 @@ function App() {
   const [profile, setProfile] = useState<AthleteInput>(storedForm.profile ?? defaultProfile);
   const [profileLoad, setProfileLoad] =
     useState<ProfileLoadState>({ status: 'default' });
-  const [generationMode, setGenerationMode] = useState<GenerationMode>(
-    paramsToGenerationMode(
-      storedForm.plannerVersion ?? 'ai_agent_v1',
-      storedForm.refinementMode ?? 'deterministic',
-    ),
-  );
-  const { plannerVersion, refinementMode } = generationModeToParams(generationMode);
   const [programme, setProgramme] =
     useState<ProgrammePreviewResponse | null>(null);
   const [selectedPhase, setSelectedPhase] = useState(1);
@@ -1160,8 +1062,8 @@ function App() {
 
   // Save full form state to localStorage on every change
   useEffect(() => {
-    saveForm({ profile, refinementMode, plannerVersion });
-  }, [profile, refinementMode, plannerVersion, generationMode]);
+    saveForm({ profile });
+  }, [profile]);
 
   const loadAuthenticatedProfile = async (showNotice = true) => {
     const authClient = supabaseAuth;
@@ -1378,23 +1280,14 @@ function App() {
       });
       return;
     }
-    const useSteppedApi = apiPlatform === 'supabase' && plannerVersion === 'ai_agent_v1';
     void run(
       'preview',
       () => {
-        if (useSteppedApi) {
-          setProgressDetail('Initializing AI agent...');
-          return odinApi.generateProgramme(
-            token.trim(),
-            parsed.data,
-            (progress) => setProgressDetail(progress.detail),
-          );
-        }
-        return odinApi.preview(
+        setProgressDetail('Initializing AI agent...');
+        return odinApi.generateProgramme(
           token.trim(),
           parsed.data,
-          refinementMode,
-          plannerVersion,
+          (progress) => setProgressDetail(progress.detail),
         );
       },
       (data) => {
@@ -2193,37 +2086,6 @@ function App() {
                 <StatusPill tone="purple"><Bot size={13} /> Odin</StatusPill>
               </div>
 
-              <div className="mode-grid">
-                {GENERATION_MODES.map(({ value, title, description }) => (
-                  <label
-                    key={value}
-                    className={`mode-card ${generationMode === value ? 'selected' : ''}`}
-                  >
-                    <input
-                      type="radio"
-                      name="generation-mode"
-                      value={value}
-                      checked={generationMode === value}
-                      onChange={() => setGenerationMode(value)}
-                    />
-                    <span className="radio-mark" />
-                    <strong>{title}</strong>
-                    <small>{description}</small>
-                  </label>
-                ))}
-              </div>
-
-              {health.status === 'online' && (
-                <div className={`openai-status ${health.aiProviderConnected ? 'connected' : 'disconnected'}`}>
-                  <span className="openai-status-dot" />
-                  <span>
-                    {health.aiProviderConnected
-                      ? `${health.aiGenerationProvider === 'anthropic' ? 'Anthropic Claude' : 'OpenAI'} connected — AI generation available`
-                      : `AI provider not configured — AI modes will fall back to deterministic`}
-                  </span>
-                </div>
-              )}
-
               <div className="preview-actions">
                 <span>
                   <ShieldCheck size={16} />
@@ -2452,7 +2314,7 @@ function App() {
                 </li>
                 <li className={workflowStep === 'preview' ? 'active' : programme ? 'done' : ''}>
                   <span>{programme ? <Check size={13} /> : '3'}</span>
-                  <div><strong>Generate preview</strong><small>POST /api/odin/preview</small></div>
+                  <div><strong>Generate programme</strong><small>POST /api/odin/generate-programme</small></div>
                 </li>
                 <li className={programme ? 'done' : workflowStep === 'review' ? 'active' : ''}>
                   <span>{programme ? <Check size={13} /> : '4'}</span>
@@ -2468,7 +2330,7 @@ function App() {
               </div>
               <ul className="endpoint-list">
                 <li><code>GET</code><span>/api/health</span></li>
-                <li><code>POST</code><span>/api/odin/preview</span></li>
+                <li><code>POST</code><span>/api/odin/generate-programme</span></li>
               </ul>
             </div>
 
