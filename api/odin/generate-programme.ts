@@ -121,7 +121,7 @@ const getProvider = (appConfig: AppConfig): AiProgrammeGenerationProvider => {
   throw odinError('AI_GENERATION_PROVIDER_MISSING', 'No AI generation provider configured.', 500);
 };
 
-export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
+export const createGenerateProgrammeHandler = (appConfig: AppConfig = config) => {
   const authClient = createSupabaseAuthClient(appConfig);
 
   return createEndpointHandler({
@@ -425,9 +425,9 @@ export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
   });
 };
 
-export default async function previewStep(
+export default async function generateProgramme(
   request: HttpRequest,
   response: HttpResponse,
 ): Promise<void> {
-  await createPreviewStepHandler(config)(request, response);
+  await createGenerateProgrammeHandler(config)(request, response);
 }

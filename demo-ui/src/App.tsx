@@ -1384,7 +1384,7 @@ function App() {
       () => {
         if (useSteppedApi) {
           setProgressDetail('Initializing AI agent...');
-          return odinApi.previewStepped(
+          return odinApi.generateProgramme(
             token.trim(),
             parsed.data,
             (progress) => setProgressDetail(progress.detail),

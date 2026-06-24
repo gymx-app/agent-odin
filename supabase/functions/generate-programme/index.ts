@@ -1,13 +1,13 @@
 // @ts-ignore: Deno globalThis
 globalThis.process = globalThis.process ?? { env: Deno.env.toObject() };
 
-import { createPreviewStepHandler } from '../_bundles/preview-step-handler.js';
+import { createGenerateProgrammeHandler } from '../_bundles/generate-programme-handler.js';
 
-let handler: ReturnType<typeof createPreviewStepHandler> | null = null;
+let handler: ReturnType<typeof createGenerateProgrammeHandler> | null = null;
 
 const getHandler = () => {
   if (!handler) {
-    handler = createPreviewStepHandler();
+    handler = createGenerateProgrammeHandler();
   }
   return handler;
 };

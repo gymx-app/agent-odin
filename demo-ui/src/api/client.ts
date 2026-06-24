@@ -82,7 +82,7 @@ const request = async <T>(
 const paths = {
   health: isEdgeFunction ? '/functions/v1/health' : '/api/health',
   preview: isEdgeFunction ? '/functions/v1/preview' : '/api/odin/preview',
-  previewStep: isEdgeFunction ? '/functions/v1/preview-step' : '/api/odin/preview-step',
+  generateProgramme: isEdgeFunction ? '/functions/v1/generate-programme' : '/api/odin/generate-programme',
 };
 
 export type StepProgress = {
@@ -120,7 +120,7 @@ export const odinApi = {
       },
     }),
 
-  previewStepped: async (
+  generateProgramme: async (
     token: string,
     athlete: AthleteInput,
     onProgress?: (progress: StepProgress) => void,
@@ -131,7 +131,7 @@ export const odinApi = {
       step: 'strategy';
       strategy: unknown;
       usage: { inputTokens: number; outputTokens: number };
-    }>(paths.previewStep, {
+    }>(paths.generateProgramme, {
       method: 'POST',
       token,
       body: { step: 'strategy', athlete },
@@ -142,7 +142,7 @@ export const odinApi = {
 
     // Step 2: Deterministic build (strategy → full programme)
     onProgress?.({ step: 'build', detail: 'Building programme structure...' });
-    const buildResult = await request<ProgrammePreviewResponse>(paths.previewStep, {
+    const buildResult = await request<ProgrammePreviewResponse>(paths.generateProgramme, {
       method: 'POST',
       token,
       body: {
