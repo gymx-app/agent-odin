@@ -128,7 +128,7 @@ export class OpenAIAiProgrammeGenerationProvider
           text: {
             format: zodTextFormat(OpenAIPhaseSchema as never, 'ai_phase_generation'),
           },
-          max_output_tokens: 16000,
+          max_output_tokens: 20000,
         }));
 
         totalInputTokens += response.usage?.input_tokens ?? 0;
