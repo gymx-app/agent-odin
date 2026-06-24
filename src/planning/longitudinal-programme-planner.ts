@@ -2,6 +2,7 @@ import { LongitudinalOdinProgrammeSchema } from '../domain/programme/programme.s
 import type { NormalizedAthleteProfile } from '../domain/athlete/athlete.types.js';
 import type { Exercise } from '../domain/exercise/exercise.types.js';
 import type { LongitudinalOdinProgramme } from '../domain/programme/programme.types.js';
+import type { AiStrategyOutput } from '../llm/ai-generation/ai-generation.types.js';
 import { programmeValidationService } from '../validation/programme-validation.service.js';
 import { LONGITUDINAL_VALIDATION_RULE_VERSION } from '../validation/longitudinal-validation-registry.js';
 import { planTrainingCalendar } from './calendar/calendar-planner.js';
@@ -10,6 +11,7 @@ import { planProgrammePhases } from './phases/phase-planner.js';
 import { PlannerError } from './planner-errors.js';
 import { buildProgrammeResistanceSessions } from './sessions/session-builder.js';
 import { selectProgrammeStrategyV2 } from './strategy/strategy-selector.js';
+import type { TrainingStrategyV2 } from './strategy/strategy.types.js';
 import { planProgrammeWeeks } from './weeks/week-progression-planner.js';
 
 export type LongitudinalProgrammePlannerOptions = {
@@ -258,5 +260,214 @@ export const buildLongitudinalProgramme = (
       validation_summary: validationSummary(result.validation),
     }),
   );
+  return { programme, validation: result.validation };
+};
+
+const mapAiStrategyToTrainingStrategy = (
+  ai: AiStrategyOutput['strategy'],
+): TrainingStrategyV2 => ({
+  primary_objective: ai.primary_objective,
+  periodization_model: ai.periodization_model,
+  progression_model: ai.progression_model,
+  split_type: ai.split_type,
+  resistance_frequency: ai.resistance_frequency,
+  conditioning_frequency: ai.conditioning_frequency,
+  cycle_length_days: ai.cycle_length_days,
+  volume_strategy: ai.volume_strategy,
+  intensity_strategy: ai.intensity_strategy,
+  fatigue_strategy: ai.fatigue_strategy,
+  conditioning_strategy: ai.conditioning_strategy,
+  rationale: ai.rationale,
+});
+
+export const buildProgrammeFromAiStrategy = (
+  profile: NormalizedAthleteProfile,
+  exercises: Exercise[],
+  aiStrategy: AiStrategyOutput,
+  options: LongitudinalProgrammePlannerOptions = {},
+): {
+  programme: LongitudinalOdinProgramme;
+  validation: ReturnType<typeof programmeValidationService.validateVersioned>;
+} => {
+  const startDate = options.startDate ?? new Date().toISOString().slice(0, 10);
+  const generatedAt = options.generatedAt ?? new Date().toISOString();
+  const run =
+    options.stageRunner ??
+    (<T>(_stage: string, operation: () => T): T => operation());
+
+  const strategy = run('strategy', () =>
+    mapAiStrategyToTrainingStrategy(aiStrategy.strategy),
+  );
+
+  const calendar = run('calendar', () =>
+    planTrainingCalendar({
+      profile,
+      strategy,
+      cycleAnchorDate: startDate,
+    }).calendar,
+  );
+
+  const phases = aiStrategy.phase_skeletons.map((sk) => ({
+    phase_id: sk.phase_id,
+    phase_number: sk.phase_number,
+    name: sk.name,
+    phase_type: sk.phase_type,
+    objective: sk.objective,
+    start_week: sk.start_week,
+    end_week: sk.end_week,
+    weeks_count: sk.weeks_count,
+    volume_direction: sk.volume_direction,
+    intensity_direction: sk.intensity_direction,
+    effort_direction: sk.effort_direction,
+    progression_model: sk.progression_model,
+    rationale: [
+      {
+        code: `AI_PHASE_${sk.phase_type.toUpperCase()}`,
+        selected_value: sk.name,
+        reason: sk.objective,
+        source_fields: ['ai_strategy'],
+        confidence: 'high' as const,
+      },
+    ],
+  }));
+
+  const planned_deload_weeks =
+    aiStrategy.fatigue_management_policy.planned_deload_weeks;
+
+  const weekPlan = run('weeks', () =>
+    planProgrammeWeeks({
+      profile,
+      strategy,
+      calendar,
+      phases,
+      planned_deload_weeks,
+    }),
+  );
+
+  const resistancePhases = run('sessions', () =>
+    buildProgrammeResistanceSessions({
+      profile,
+      strategy,
+      phases: weekPlan.phases,
+      exercises,
+    }),
+  );
+
+  const conditioning = run('conditioning', () =>
+    planConditioning({
+      profile,
+      strategy,
+      calendar,
+      phases: resistancePhases,
+    }),
+  );
+
+  const progressionModel =
+    weekPlan.weeks[0]?.planning_metadata.progression_policy.model ??
+    strategy.progression_model;
+
+  const candidate = run<LongitudinalOdinProgramme>('composition', () => ({
+    schema_version: '2.0',
+    planner_version: 'ai_agent_v1',
+    programme: {
+      name: aiStrategy.programme.name,
+      goal_type: aiStrategy.programme.goal_type,
+      goal_description: aiStrategy.programme.goal_description,
+      start_date: startDate,
+      target_weeks: aiStrategy.programme.target_weeks,
+      start_weight_kg: profile.source.current_weight_kg,
+      target_weight_kg: profile.source.target_weight_kg,
+      status: 'preview',
+    },
+    athlete_summary: {
+      training_status: aiStrategy.athlete_summary.training_status,
+      recovery_capacity: aiStrategy.athlete_summary.recovery_capacity,
+      energy_availability: aiStrategy.athlete_summary.energy_availability,
+      movement_limitation_level:
+        aiStrategy.athlete_summary.movement_limitation_level,
+      sport_interference_risk:
+        aiStrategy.athlete_summary.sport_interference_risk,
+      programme_confidence: aiStrategy.athlete_summary.programme_confidence,
+    },
+    strategy,
+    calendar,
+    phases: conditioning.phases,
+    progression_policy: {
+      policy_id: 'default-progression',
+      default_model: progressionModel,
+      success_condition: aiStrategy.progression_policy.success_condition,
+      hold_condition: aiStrategy.progression_policy.hold_condition,
+      regression_condition: aiStrategy.progression_policy.regression_condition,
+      exercise_overrides: [],
+      rationale: aiStrategy.progression_policy.rationale,
+    },
+    fatigue_management_policy: {
+      strategy: aiStrategy.fatigue_management_policy.strategy,
+      planned_deload_weeks,
+      deload_adjustments: aiStrategy.fatigue_management_policy.deload_adjustments,
+      readiness_triggers: aiStrategy.fatigue_management_policy.readiness_triggers,
+      rationale: aiStrategy.fatigue_management_policy.rationale,
+    },
+    substitution_policy: aiStrategy.substitution_policy,
+    conditioning_policy: conditioning.conditioning_policy,
+    assumptions: aiStrategy.assumptions,
+    review_triggers: aiStrategy.review_triggers,
+    validation_summary: {
+      passed: false,
+      status: 'invalid',
+      overall_score: 0,
+      category_scores: {},
+      warnings: [],
+      validation_rule_version: LONGITUDINAL_VALIDATION_RULE_VERSION,
+    },
+    generation_metadata: {
+      generated_at: generatedAt,
+      planner_version: 'ai_agent_v1',
+      schema_version: '2.0',
+      exercise_library_version:
+        options.exerciseLibraryVersion ?? 'approved-library-v1',
+      validation_rule_version: LONGITUDINAL_VALIDATION_RULE_VERSION,
+      deterministic: false,
+    },
+  }));
+
+  const parsed = run('validation', () =>
+    LongitudinalOdinProgrammeSchema.safeParse(candidate),
+  );
+  if (!parsed.success) {
+    throw new PlannerError(
+      'PROGRAMME_SCHEMA_VALIDATION_FAILED',
+      'AI-strategy-driven programme failed schema validation.',
+      parsed.error.issues,
+    );
+  }
+
+  const result = run('repair', () =>
+    programmeValidationService.validateAndRepairVersioned({
+      programme: parsed.data,
+      profile,
+      exercises,
+    }),
+  );
+
+  if (result.programme.schema_version !== '2.0' || !result.validation.passed) {
+    throw new PlannerError(
+      'PROGRAMME_REPAIR_FAILED',
+      'AI-strategy-driven programme remained invalid after bounded repair.',
+      {
+        status: result.validation.status,
+        summary: result.validation.summary,
+        finding_codes: result.validation.findings.map((item) => item.code),
+      },
+    );
+  }
+
+  const programme = run('final_validation', () =>
+    LongitudinalOdinProgrammeSchema.parse({
+      ...result.programme,
+      validation_summary: validationSummary(result.validation),
+    }),
+  );
+
   return { programme, validation: result.validation };
 };

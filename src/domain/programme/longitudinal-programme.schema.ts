@@ -813,7 +813,7 @@ export const CalendarSchema = z
 export const LongitudinalOdinProgrammeSchema = z
   .object({
     schema_version: z.literal('2.0'),
-    planner_version: z.literal('longitudinal_v1'),
+    planner_version: z.enum(['longitudinal_v1', 'ai_agent_v1']),
     programme: z.object({
       name: conciseName,
       goal_type: AthleteGoalSchema,
@@ -989,7 +989,7 @@ export const LongitudinalOdinProgrammeSchema = z
     }),
     generation_metadata: z.object({
       generated_at: isoDateString,
-      planner_version: z.literal('longitudinal_v1'),
+      planner_version: z.enum(['longitudinal_v1', 'ai_agent_v1']),
       schema_version: z.literal('2.0'),
       exercise_library_version: z.string().min(1),
       validation_rule_version: z.string().min(1),

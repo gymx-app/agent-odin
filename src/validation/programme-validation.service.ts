@@ -221,7 +221,7 @@ export class ProgrammeValidationService {
       return this.validate({ ...input, programme });
     }
 
-    if (input.programme.planner_version !== 'longitudinal_v1') {
+    if (input.programme.planner_version !== 'longitudinal_v1' && input.programme.planner_version !== 'ai_agent_v1') {
       const findings = [
         finding(
           validationCodes.UNSUPPORTED_PLANNER_VERSION,

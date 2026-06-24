@@ -10,6 +10,7 @@ import {
 import type {
   AiStrategyGenerationResult,
   AiPhaseGenerationResult,
+  AiWeekOutput,
   AiWeekGenerationResult,
   AiWeekGenerationContext,
   AiGenerationProviderContext,
@@ -28,6 +29,20 @@ import { toOpenAISchema } from './openai-schema-compat.js';
 
 const MAX_TOOL_TURNS = 10;
 const MAX_RATE_LIMIT_RETRIES = 3;
+
+const stripNullsDeep = (obj: unknown): unknown => {
+  if (obj === null) return undefined;
+  if (Array.isArray(obj)) return obj.map(stripNullsDeep);
+  if (typeof obj === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+      const stripped = stripNullsDeep(v);
+      if (stripped !== undefined) result[k] = stripped;
+    }
+    return result;
+  }
+  return obj;
+};
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -56,6 +71,7 @@ const withRateLimitRetry = async <T>(fn: () => Promise<T>): Promise<T> => {
 
 const OpenAIStrategySchema = toOpenAISchema(AiStrategyOutputSchema);
 const OpenAIPhaseSchema = toOpenAISchema(AiPhaseOutputSchema);
+const OpenAIWeekSchema = toOpenAISchema(AiWeekOutputSchema);
 
 export class OpenAIAiProgrammeGenerationProvider
   implements AiProgrammeGenerationProvider
@@ -426,7 +442,7 @@ export class OpenAIAiProgrammeGenerationProvider
         model,
         input,
         ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
-        text: { format: { type: 'json_object' } },
+        text: { format: zodTextFormat(OpenAIWeekSchema as never, 'week') },
         max_output_tokens: 8000,
       }));
 
@@ -448,14 +464,14 @@ export class OpenAIAiProgrammeGenerationProvider
         throw refinementError('LLM_OUTPUT_INVALID', 'Week output was not valid JSON.');
       }
 
-      const parsed = AiWeekOutputSchema.safeParse(raw);
+      const parsed = OpenAIWeekSchema.safeParse(raw);
       if (!parsed.success) {
         const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
         throw refinementError('LLM_OUTPUT_INVALID', `Week validation failed: ${issues}`);
       }
 
       return {
-        output: parsed.data,
+        output: parsed.data as AiWeekOutput,
         provider: 'openai',
         model,
         responseId: response.id ?? null,

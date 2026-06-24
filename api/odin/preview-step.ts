@@ -25,6 +25,7 @@ import { assembleProgramme } from '../../src/llm/ai-generation/ai-programme-asse
 import { programmeValidationService } from '../../src/validation/programme-validation.service.js';
 import { LONGITUDINAL_VALIDATION_RULE_VERSION } from '../../src/validation/longitudinal-validation-registry.js';
 import { AiStrategyOutputSchema } from '../../src/llm/ai-generation/ai-generation.schema.js';
+import { buildProgrammeFromAiStrategy } from '../../src/planning/longitudinal-programme-planner.js';
 import type { AiProgrammeGenerationProvider } from '../../src/llm/ai-generation/ai-programme-generation-provider.js';
 import type { HttpRequest, HttpResponse } from '../../src/infrastructure/http/types.js';
 
@@ -86,6 +87,11 @@ const stepRequestSchema = z.discriminatedUnion('step', [
     athlete: AthleteInputSchema,
     strategy: z.any(),
     phases: z.array(z.any()).min(1),
+  }),
+  z.object({
+    step: z.literal('build'),
+    athlete: AthleteInputSchema,
+    strategy: z.any(),
   }),
 ]);
 
@@ -302,7 +308,7 @@ export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
           weekGenCtx.previousResponseId = body.previous_response_id;
         } else {
           const fullStrategy = AiStrategyOutputSchema.parse(stripped);
-          const fullSkeleton = fullStrategy.phase_skeletons[body.phase_index];
+          const fullSkeleton = fullStrategy.phase_skeletons[body.phase_index]!;
           const phaseCtx = buildAiPhaseContext(
             normalized,
             fullStrategy,
@@ -329,6 +335,41 @@ export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
           usage: {
             inputTokens: weekResult.usage.inputTokens ?? 0,
             outputTokens: weekResult.usage.outputTokens ?? 0,
+          },
+        });
+      }
+
+      if (body.step === 'build') {
+        const strategy = AiStrategyOutputSchema.parse(stripNulls(body.strategy));
+        const { programme, validation } = buildProgrammeFromAiStrategy(
+          normalized,
+          seedExercises,
+          strategy,
+          { startDate: new Date().toISOString().slice(0, 10) },
+        );
+
+        return successResponse({
+          step: 'build',
+          source: 'ai_generated' as const,
+          planner_version: 'ai_agent_v1' as const,
+          schema_version: '2.0' as const,
+          programme,
+          validation,
+          refinement: {
+            requested: false,
+            attempted: false,
+            applied: false,
+            retry_attempted: false,
+            status: 'not_requested',
+            reason_code: null,
+          },
+          generation: {
+            planner_version: 'ai_agent_v1' as const,
+            schema_version: '2.0' as const,
+            validation_rule_version: LONGITUDINAL_VALIDATION_RULE_VERSION,
+            exercise_library_version: 'approved-library-v1',
+            repair_attempted: validation.repair?.attempted ?? false,
+            repair_applied: validation.repair?.applied ?? false,
           },
         });
       }

@@ -60045,7 +60045,7 @@ var CalendarSchema = external_exports.object({
 });
 var LongitudinalOdinProgrammeSchema = external_exports.object({
   schema_version: external_exports.literal("2.0"),
-  planner_version: external_exports.literal("longitudinal_v1"),
+  planner_version: external_exports.enum(["longitudinal_v1", "ai_agent_v1"]),
   programme: external_exports.object({
     name: conciseName,
     goal_type: AthleteGoalSchema,
@@ -60221,7 +60221,7 @@ var LongitudinalOdinProgrammeSchema = external_exports.object({
   }),
   generation_metadata: external_exports.object({
     generated_at: isoDateString,
-    planner_version: external_exports.literal("longitudinal_v1"),
+    planner_version: external_exports.enum(["longitudinal_v1", "ai_agent_v1"]),
     schema_version: external_exports.literal("2.0"),
     exercise_library_version: external_exports.string().min(1),
     validation_rule_version: external_exports.string().min(1),
@@ -63075,7 +63075,7 @@ var ProgrammeValidationService = class {
       const programme = LegacyOdinProgrammeSchema.parse(versioned);
       return this.validate({ ...input, programme });
     }
-    if (input.programme.planner_version !== "longitudinal_v1") {
+    if (input.programme.planner_version !== "longitudinal_v1" && input.programme.planner_version !== "ai_agent_v1") {
       const findings2 = [
         finding(
           validationCodes.UNSUPPORTED_PLANNER_VERSION,
@@ -73070,6 +73070,7 @@ var withRateLimitRetry = async (fn) => {
 };
 var OpenAIStrategySchema = toOpenAISchema(AiStrategyOutputSchema);
 var OpenAIPhaseSchema = toOpenAISchema(AiPhaseOutputSchema);
+var OpenAIWeekSchema = toOpenAISchema(AiWeekOutputSchema);
 var OpenAIAiProgrammeGenerationProvider = class {
   constructor(client, config3) {
     this.client = client;
@@ -73353,25 +73354,31 @@ var OpenAIAiProgrammeGenerationProvider = class {
   }
   async generateWeek(weekCtx, providerCtx) {
     const model = this.model;
-    const input = [
-      { role: "system", content: aiPhaseSystemPrompt },
-      { role: "user", content: JSON.stringify({ phase_context: weekCtx.phaseContext, week_generation_instructions: weekCtx.weekPrompt }) }
-    ];
-    if (weekCtx.reasoning) {
-      input.push({ role: "assistant", content: weekCtx.reasoning });
+    const weekUserMessage = weekCtx.weekPrompt + "\nOutput ONLY valid JSON for this single week object. No markdown fences.";
+    let input;
+    let previousResponseId;
+    if (weekCtx.previousResponseId) {
+      previousResponseId = weekCtx.previousResponseId;
+      input = [{ role: "user", content: weekUserMessage }];
+    } else {
+      input = [
+        { role: "system", content: aiPhaseSystemPrompt },
+        { role: "user", content: JSON.stringify({ phase_context: weekCtx.phaseContext, week_generation_instructions: weekCtx.weekPrompt }) }
+      ];
+      if (weekCtx.reasoning) {
+        input.push({ role: "assistant", content: weekCtx.reasoning });
+      }
+      if (weekCtx.toolConversation && weekCtx.toolConversation.length > 0) {
+        input.push(...weekCtx.toolConversation);
+      }
+      input.push({ role: "user", content: weekUserMessage });
     }
-    if (weekCtx.toolConversation && weekCtx.toolConversation.length > 0) {
-      input.push(...weekCtx.toolConversation);
-    }
-    input.push({
-      role: "user",
-      content: weekCtx.weekPrompt + "\nOutput ONLY valid JSON for this single week object. No markdown fences."
-    });
     try {
       const response = await withRateLimitRetry(() => this.client.responses.create({
         model,
         input,
-        text: { format: { type: "json_object" } },
+        ...previousResponseId ? { previous_response_id: previousResponseId } : {},
+        text: { format: zodTextFormat(OpenAIWeekSchema, "week") },
         max_output_tokens: 8e3
       }));
       let weekJson = "";
@@ -73390,7 +73397,7 @@ var OpenAIAiProgrammeGenerationProvider = class {
       } catch {
         throw refinementError("LLM_OUTPUT_INVALID", "Week output was not valid JSON.");
       }
-      const parsed = AiWeekOutputSchema.safeParse(raw);
+      const parsed = OpenAIWeekSchema.safeParse(raw);
       if (!parsed.success) {
         const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
         throw refinementError("LLM_OUTPUT_INVALID", `Week validation failed: ${issues}`);
