@@ -1240,6 +1240,13 @@ function App() {
       return;
     }
 
+    // localStorage has saved form data — use it, skip DB fetch
+    if (storedForm.profile) {
+      setProfileLoad({ status: 'default' });
+      return;
+    }
+
+    // First-time login with no localStorage — seed from Supabase DB
     void loadAuthenticatedProfile(true);
   }, [token]);
 
