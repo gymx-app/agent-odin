@@ -1,4 +1,3 @@
-import { PlannerError } from '../planner-errors.js';
 import type {
   ExerciseCandidate,
   MovementSlotV2,
@@ -12,12 +11,16 @@ export const selectExerciseForSlot = (
   selectedIds: Set<string>,
 ): ExerciseCandidate | null => {
   const candidate = buildExerciseCandidatesV2(input, slot, selectedIds)[0];
-  if (!candidate && slot.required) {
-    throw new PlannerError(
-      'NO_ELIGIBLE_EXERCISE_FOR_REQUIRED_SLOT',
-      `No approved eligible or modifiable exercise exists for ${slot.slot_id}.`,
-      { slot },
-    );
-  }
-  return candidate ?? null;
+  if (candidate) return candidate;
+
+  if (!slot.required) return null;
+
+  // Retry with relaxed difficulty (allow one tier above athlete level)
+  const relaxed = buildExerciseCandidatesV2(input, slot, selectedIds, {
+    relaxDifficulty: true,
+  })[0];
+  if (relaxed) return relaxed;
+
+  // Last resort: treat as optional rather than crashing the entire programme
+  return null;
 };

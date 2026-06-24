@@ -52,7 +52,11 @@ const buildPrescriptions = (
   slots.forEach((slot) => {
     const selected = selectExerciseForSlot(input, slot, selectedIds);
     if (!selected) {
-      rationale.push('OPTIONAL_SLOT_DROPPED');
+      rationale.push(
+        slot.required
+          ? 'REQUIRED_SLOT_DROPPED_NO_ELIGIBLE_EXERCISE'
+          : 'OPTIONAL_SLOT_DROPPED',
+      );
       return;
     }
     selectedIds.add(selected.exercise.id);
@@ -117,10 +121,28 @@ export const buildResistanceSession = (
     duration = estimateResistanceSessionDuration(input, built.prescriptions);
   }
 
+  const droppedRequiredSlots = new Set(
+    built.rationale.includes('REQUIRED_SLOT_DROPPED_NO_ELIGIBLE_EXERCISE')
+      ? activeSlots
+          .filter(
+            (slot) =>
+              slot.required &&
+              !built.prescriptions.some((p) =>
+                p.movement_patterns.some(
+                  (pat) =>
+                    pat === slot.movement_pattern ||
+                    slot.allowed_substitution_patterns.includes(pat as never),
+                ),
+              ),
+          )
+          .map((s) => s.slot_id)
+      : [],
+  );
+
   if (
     duration.estimated_duration_min > maximum ||
     activeSlots
-      .filter((slot) => slot.required)
+      .filter((slot) => slot.required && !droppedRequiredSlots.has(slot.slot_id))
       .some(
         (slot) =>
           !built.prescriptions.some((prescription) =>

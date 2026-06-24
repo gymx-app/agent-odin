@@ -67,22 +67,30 @@ const goalBonus = (primaryObjective: string, exercise: Exercise): number => {
   }
 };
 
+export type CandidateSearchOptions = {
+  relaxDifficulty?: boolean;
+};
+
 export const buildExerciseCandidatesV2 = (
   input: ResistanceSessionBuilderInput,
   slot: MovementSlotV2,
   selectedIds: Set<string>,
+  options?: CandidateSearchOptions,
 ): ExerciseCandidate[] => {
   const patterns = [
     slot.movement_pattern,
     ...slot.allowed_substitution_patterns,
   ];
   const priorId = input.prior_programme_context?.by_slot_id[slot.slot_id];
-  const maxDifficulty =
+  const baseDifficulty =
     input.profile.athlete_state.training_status.value === 'advanced'
       ? 3
       : input.profile.athlete_state.training_status.value === 'intermediate'
         ? 2
         : 1;
+  const maxDifficulty = options?.relaxDifficulty
+    ? Math.min(baseDifficulty + 1, 3)
+    : baseDifficulty;
 
   return input.exercises
     .flatMap((exercise) => {
