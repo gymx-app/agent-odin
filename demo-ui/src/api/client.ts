@@ -147,62 +147,34 @@ export const odinApi = {
     const summaries: unknown[] = [];
 
     for (let i = 0; i < totalPhases; i++) {
-      // Sub-step A: Reasoning (tool-use / exercise search)
+      // Sub-step A: Reasoning + tool calls (exercise search, volume compliance)
       onProgress?.({
-        step: 'phase_reasoning',
-        detail: `Phase ${i + 1}/${totalPhases} — reasoning...`,
+        step: 'phase_prep',
+        detail: `Phase ${i + 1}/${totalPhases} — reasoning & searching exercises...`,
         phaseIndex: i,
         totalPhases,
       });
 
-      const reasoningResult = await request<{
-        step: 'phase_reasoning';
+      const prepResult = await request<{
+        step: 'phase_prep';
         phase_index: number;
         reasoning: string | null;
-        usage: { inputTokens: number; outputTokens: number };
-      }>(paths.previewStep, {
-        method: 'POST',
-        token,
-        body: {
-          step: 'phase_reasoning',
-          athlete,
-          strategy: strategyResult.strategy,
-          phase_index: i,
-          prior_phase_summaries: summaries,
-        },
-      });
-
-      totalInputTokens += reasoningResult.usage.inputTokens ?? 0;
-      totalOutputTokens += reasoningResult.usage.outputTokens ?? 0;
-
-      // Sub-step B: Tool calls (exercise search, volume compliance)
-      onProgress?.({
-        step: 'phase_tools',
-        detail: `Phase ${i + 1}/${totalPhases} — searching exercises...`,
-        phaseIndex: i,
-        totalPhases,
-      });
-
-      const toolsResult = await request<{
-        step: 'phase_tools';
-        phase_index: number;
         tool_conversation: unknown[];
         usage: { inputTokens: number; outputTokens: number };
       }>(paths.previewStep, {
         method: 'POST',
         token,
         body: {
-          step: 'phase_tools',
+          step: 'phase_prep',
           athlete,
           strategy: strategyResult.strategy,
           phase_index: i,
           prior_phase_summaries: summaries,
-          reasoning: reasoningResult.reasoning,
         },
       });
 
-      totalInputTokens += toolsResult.usage.inputTokens ?? 0;
-      totalOutputTokens += toolsResult.usage.outputTokens ?? 0;
+      totalInputTokens += prepResult.usage.inputTokens ?? 0;
+      totalOutputTokens += prepResult.usage.outputTokens ?? 0;
 
       // Sub-step C: Generate weeks one at a time
       const phaseSkeleton = strategy.phase_skeletons[i] as {
@@ -247,8 +219,8 @@ export const odinApi = {
             phase_index: i,
             week_index: w,
             prior_phase_summaries: summaries,
-            reasoning: reasoningResult.reasoning,
-            tool_conversation: toolsResult.tool_conversation,
+            reasoning: prepResult.reasoning,
+            tool_conversation: prepResult.tool_conversation,
             prior_weeks: weekSummaries,
           },
         });

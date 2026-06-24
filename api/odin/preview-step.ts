@@ -48,6 +48,13 @@ const stepRequestSchema = z.discriminatedUnion('step', [
     athlete: AthleteInputSchema,
   }),
   z.object({
+    step: z.literal('phase_prep'),
+    athlete: AthleteInputSchema,
+    strategy: z.any(),
+    phase_index: z.number().int().nonnegative(),
+    prior_phase_summaries: z.array(z.any()).default([]),
+  }),
+  z.object({
     step: z.literal('phase_reasoning'),
     athlete: AthleteInputSchema,
     strategy: z.any(),
@@ -130,6 +137,56 @@ export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
           step: 'strategy',
           strategy: result.output,
           usage: result.usage,
+        });
+      }
+
+      if (body.step === 'phase_prep') {
+        const strategy = AiStrategyOutputSchema.parse(stripNulls(body.strategy));
+        const skeleton = strategy.phase_skeletons[body.phase_index];
+        if (!skeleton) {
+          throw odinError('INVALID_PHASE_INDEX', `Phase index ${body.phase_index} out of range.`, 400);
+        }
+
+        const phaseCtx = buildAiPhaseContext(
+          normalized,
+          strategy,
+          skeleton,
+          seedExercises,
+          body.prior_phase_summaries,
+        );
+
+        let reasoning: string | null = null;
+        let reasoningInputTokens = 0;
+        let reasoningOutputTokens = 0;
+
+        if (provider.generateReasoning) {
+          const reasoningResult = await provider.generateReasoning(phaseCtx, {
+            requestId: context.requestId,
+            toolExecutor,
+          });
+          reasoning = reasoningResult.reasoning;
+          reasoningInputTokens = reasoningResult.usage.inputTokens ?? 0;
+          reasoningOutputTokens = reasoningResult.usage.outputTokens ?? 0;
+        }
+
+        const toolResult = await provider.generatePhase(phaseCtx, {
+          requestId: context.requestId,
+          toolExecutor,
+          toolsOnly: true,
+          ...(reasoning ? { reasoningOutput: reasoning } : {}),
+        });
+
+        const toolConversation = (toolResult as { toolConversation?: unknown[] }).toolConversation ?? [];
+
+        return successResponse({
+          step: 'phase_prep',
+          phase_index: body.phase_index,
+          reasoning,
+          tool_conversation: toolConversation,
+          usage: {
+            inputTokens: reasoningInputTokens + (toolResult.usage.inputTokens ?? 0),
+            outputTokens: reasoningOutputTokens + (toolResult.usage.outputTokens ?? 0),
+          },
         });
       }
 
