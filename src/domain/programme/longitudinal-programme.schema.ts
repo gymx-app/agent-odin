@@ -550,7 +550,7 @@ const ProgrammeDaySchema = z
     });
   });
 
-const ProgrammeWeekSchema = z.object({
+export const ProgrammeWeekSchema = z.object({
   week_id: identifier,
   week_number: z.number().int().positive(),
   week_type: z.enum([

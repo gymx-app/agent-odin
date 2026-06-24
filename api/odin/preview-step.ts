@@ -28,7 +28,7 @@ import { validatePhaseInIsolation } from '../../src/llm/ai-generation/validate-p
 import { programmeValidationService } from '../../src/validation/programme-validation.service.js';
 import { refineV2Programme } from '../../src/application/v2-programme-refinement.service.js';
 import { LONGITUDINAL_VALIDATION_RULE_VERSION } from '../../src/validation/longitudinal-validation-registry.js';
-import { AiStrategyOutputSchema, AiPhaseOutputSchema } from '../../src/llm/ai-generation/ai-generation.schema.js';
+import { AiStrategyOutputSchema, AiPhaseOutputSchema, AiWeekOutputSchema } from '../../src/llm/ai-generation/ai-generation.schema.js';
 import type { AiProgrammeGenerationProvider } from '../../src/llm/ai-generation/ai-programme-generation-provider.js';
 import type { HttpRequest, HttpResponse } from '../../src/infrastructure/http/types.js';
 import type { LongitudinalOdinProgramme } from '../../src/domain/programme/programme.types.js';
@@ -68,13 +68,15 @@ const stepRequestSchema = z.discriminatedUnion('step', [
     reasoning: z.string().optional(),
   }),
   z.object({
-    step: z.literal('phase_generate'),
+    step: z.literal('phase_week'),
     athlete: AthleteInputSchema,
     strategy: z.any(),
     phase_index: z.number().int().nonnegative(),
+    week_index: z.number().int().nonnegative(),
     prior_phase_summaries: z.array(z.any()).default([]),
     reasoning: z.string().optional(),
     tool_conversation: z.array(z.any()).default([]),
+    prior_weeks: z.array(z.any()).default([]),
   }),
   z.object({
     step: z.literal('assemble'),
@@ -211,7 +213,7 @@ export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
         });
       }
 
-      if (body.step === 'phase_generate') {
+      if (body.step === 'phase_week') {
         const strategy = AiStrategyOutputSchema.parse(stripNulls(body.strategy));
         const skeleton = strategy.phase_skeletons[body.phase_index];
         if (!skeleton) {
@@ -226,23 +228,87 @@ export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
           body.prior_phase_summaries,
         );
 
-        const result = await provider.generatePhase(phaseCtx, {
-          requestId: context.requestId,
-          ...(body.reasoning ? { reasoningOutput: body.reasoning } : {}),
-          toolConversation: body.tool_conversation,
+        const weekNumber = skeleton.start_week + body.week_index;
+        const isDeload = strategy.fatigue_management_policy.planned_deload_weeks.includes(weekNumber);
+
+        const weekPrompt = [
+          `Generate ONLY week ${weekNumber} (week_index ${body.week_index + 1} of ${skeleton.weeks_count} in this phase).`,
+          `week_number must be ${weekNumber}. week_id should be "W${weekNumber}".`,
+          isDeload ? 'This is a DELOAD week — apply deload adjustments from fatigue_management_policy.' : '',
+          body.prior_weeks.length > 0
+            ? `Prior weeks already generated: ${JSON.stringify(body.prior_weeks.map((w: { week_number: number; week_type: string }) => ({ week_number: w.week_number, week_type: w.week_type })))}`
+            : '',
+          'Output a single JSON object representing this one week. Follow the ProgrammeWeekSchema exactly.',
+        ].filter(Boolean).join('\n');
+
+        const userContent = {
+          phase_context: phaseCtx,
+          week_generation_instructions: weekPrompt,
+        };
+
+        const { aiPhaseSystemPrompt: systemPrompt } = await import('../../src/llm/ai-generation/ai-generation-phase-prompt.js');
+
+        const openai = new OpenAI({
+          apiKey: appConfig.openaiApiKey,
+          timeout: appConfig.openaiGenerationTimeoutMs,
+          maxRetries: 0,
         });
 
-        const phase = result.output;
-        const summary = summarisePhase({ ...skeleton, weeks: phase.weeks });
+        const input: OpenAI.Responses.ResponseInputItem[] = [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: JSON.stringify(userContent) },
+        ];
+
+        if (body.reasoning) {
+          input.push({ role: 'assistant', content: body.reasoning });
+        }
+        if (body.tool_conversation.length > 0) {
+          input.push(...(body.tool_conversation as OpenAI.Responses.ResponseInputItem[]));
+        }
+        input.push({
+          role: 'user',
+          content: weekPrompt + '\nOutput ONLY valid JSON for this single week object. No markdown fences.',
+        });
+
+        const response = await openai.responses.create({
+          model: appConfig.openaiGenerationModel ?? appConfig.openaiModel ?? 'gpt-4o',
+          input,
+          text: { format: { type: 'json_object' } },
+          max_output_tokens: 8000,
+        });
+
+        let weekJson = '';
+        for (const output of response.output) {
+          if (output.type === 'message') {
+            for (const item of output.content) {
+              if (item.type === 'output_text') {
+                weekJson += item.text;
+              }
+            }
+          }
+        }
+
+        let raw: unknown;
+        try {
+          raw = JSON.parse(weekJson);
+        } catch {
+          throw odinError('AI_GENERATION_INVALID_OUTPUT', 'Week output was not valid JSON.', 422);
+        }
+
+        const parsed = AiWeekOutputSchema.safeParse(raw);
+        if (!parsed.success) {
+          const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+          throw odinError('AI_GENERATION_INVALID_OUTPUT', `Week validation failed: ${issues}`, 422);
+        }
 
         return successResponse({
-          step: 'phase_generate',
+          step: 'phase_week',
           phase_index: body.phase_index,
-          phase,
-          summary,
+          week_index: body.week_index,
+          week: parsed.data,
           usage: {
-            inputTokens: result.usage.inputTokens ?? 0,
-            outputTokens: result.usage.outputTokens ?? 0,
+            inputTokens: response.usage?.input_tokens ?? 0,
+            outputTokens: response.usage?.output_tokens ?? 0,
           },
         });
       }

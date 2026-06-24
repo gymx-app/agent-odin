@@ -204,35 +204,66 @@ export const odinApi = {
       totalInputTokens += toolsResult.usage.inputTokens ?? 0;
       totalOutputTokens += toolsResult.usage.outputTokens ?? 0;
 
-      // Sub-step C: Generate phase structure (single LLM call, no tools)
-      onProgress?.({
-        step: 'phase_generate',
-        detail: `Phase ${i + 1}/${totalPhases} — generating...`,
-        phaseIndex: i,
-        totalPhases,
-      });
+      // Sub-step C: Generate weeks one at a time
+      const phaseSkeleton = strategy.phase_skeletons[i] as {
+        phase_id: string;
+        phase_number: number;
+        name: string;
+        phase_type: string;
+        objective: string;
+        start_week: number;
+        end_week: number;
+        weeks_count: number;
+        volume_direction: string;
+        intensity_direction: string;
+        effort_direction: string;
+        progression_model: string;
+      };
+      const weeksCount = phaseSkeleton.weeks_count;
+      const weeks: unknown[] = [];
 
-      const phaseResult = await request<{
-        step: 'phase_generate';
-        phase: unknown;
-        summary: unknown;
-        usage: { inputTokens: number; outputTokens: number };
-      }>(paths.previewStep, {
-        method: 'POST',
-        token,
-        body: {
-          step: 'phase_generate',
-          athlete,
-          strategy: strategyResult.strategy,
-          phase_index: i,
-          prior_phase_summaries: summaries,
-          reasoning: reasoningResult.reasoning,
-          tool_conversation: toolsResult.tool_conversation,
-        },
-      });
+      for (let w = 0; w < weeksCount; w++) {
+        onProgress?.({
+          step: 'phase_week',
+          detail: `Phase ${i + 1}/${totalPhases} — week ${w + 1}/${weeksCount}...`,
+          phaseIndex: i,
+          totalPhases,
+        });
 
-      phases.push(phaseResult.phase);
-      summaries.push(phaseResult.summary);
+        const weekResult = await request<{
+          step: 'phase_week';
+          phase_index: number;
+          week_index: number;
+          week: unknown;
+          usage: { inputTokens: number; outputTokens: number };
+        }>(paths.previewStep, {
+          method: 'POST',
+          token,
+          body: {
+            step: 'phase_week',
+            athlete,
+            strategy: strategyResult.strategy,
+            phase_index: i,
+            week_index: w,
+            prior_phase_summaries: summaries,
+            reasoning: reasoningResult.reasoning,
+            tool_conversation: toolsResult.tool_conversation,
+            prior_weeks: weeks,
+          },
+        });
+
+        weeks.push(weekResult.week);
+        totalInputTokens += weekResult.usage.inputTokens ?? 0;
+        totalOutputTokens += weekResult.usage.outputTokens ?? 0;
+      }
+
+      const phase = {
+        ...phaseSkeleton,
+        weeks,
+        rationale: [],
+      };
+      phases.push(phase);
+      summaries.push({ phase_id: phaseSkeleton.phase_id, phase_type: phaseSkeleton.phase_type, objective: phaseSkeleton.objective, exercises_used: [], volume_per_muscle_group: {}, progression_model: phaseSkeleton.progression_model });
       totalInputTokens += phaseResult.usage.inputTokens ?? 0;
       totalOutputTokens += phaseResult.usage.outputTokens ?? 0;
     }

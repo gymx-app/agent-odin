@@ -6,6 +6,7 @@ import {
 import {
   CalendarSchema,
   ProgrammePhaseSchema,
+  ProgrammeWeekSchema,
 } from '../../domain/programme/longitudinal-programme.schema.js';
 
 const identifier = z.string().min(1).max(100);
@@ -235,3 +236,4 @@ export const AiStrategyOutputSchema = z.object({
 });
 
 export const AiPhaseOutputSchema = ProgrammePhaseSchema;
+export const AiWeekOutputSchema = ProgrammeWeekSchema;
