@@ -54,6 +54,7 @@ import {
 import { athleteInputSchema } from './profile/profile-schema';
 
 const STORAGE_KEY = 'odin_demo_form';
+const profileStorageKey = (email: string) => `odin_profile_${email}`;
 
 type GenerationMode =
   | 'ai_agent'
@@ -1160,6 +1161,29 @@ function App() {
     saveForm({ profile, refinementMode, plannerVersion });
   }, [profile, refinementMode, plannerVersion, generationMode]);
 
+  useEffect(() => {
+    if (!sessionEmail) return;
+    try {
+      const raw = localStorage.getItem(profileStorageKey(sessionEmail));
+      if (!raw) return;
+      const parsed = athleteInputSchema.safeParse(JSON.parse(raw));
+      if (parsed.success) {
+        setProfile(parsed.data);
+        setNotice({ tone: 'info', title: 'Profile loaded', message: `Saved profile for ${sessionEmail} restored.` });
+      }
+    } catch { /* ignore */ }
+  }, [sessionEmail]);
+
+  const saveProfileToStorage = () => {
+    if (!sessionEmail) return;
+    try {
+      localStorage.setItem(profileStorageKey(sessionEmail), JSON.stringify(profile));
+      setNotice({ tone: 'success', title: 'Profile saved', message: `Profile saved locally for ${sessionEmail}.` });
+    } catch {
+      setNotice({ tone: 'error', title: 'Save failed', message: 'Could not save profile to local storage.' });
+    }
+  };
+
   const loadAuthenticatedProfile = async (showNotice = true) => {
     const authClient = supabaseAuth;
 
@@ -2144,6 +2168,13 @@ function App() {
                     : 'User ID comes from the verified token'}
                 </span>
                 <div className="profile-actions">
+                  <Button
+                    variant="secondary"
+                    onClick={saveProfileToStorage}
+                    disabled={!sessionEmail}
+                  >
+                    <Database size={16} /> Save profile
+                  </Button>
                   <Button
                     variant="secondary"
                     onClick={() => void loadAuthenticatedProfile(true)}
