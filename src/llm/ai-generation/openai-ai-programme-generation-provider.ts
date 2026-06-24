@@ -5,10 +5,13 @@ import { refinementError } from '../refinement-errors.js';
 import {
   AiStrategyOutputSchema,
   AiPhaseOutputSchema,
+  AiWeekOutputSchema,
 } from './ai-generation.schema.js';
 import type {
   AiStrategyGenerationResult,
   AiPhaseGenerationResult,
+  AiWeekGenerationResult,
+  AiWeekGenerationContext,
   AiGenerationProviderContext,
 } from './ai-generation.types.js';
 import type {
@@ -387,6 +390,82 @@ export class OpenAIAiProgrammeGenerationProvider
         'LLM_PROVIDER_ERROR',
         `The generation provider is unavailable: ${detail}`,
       );
+    }
+  }
+
+  async generateWeek(
+    weekCtx: AiWeekGenerationContext,
+    providerCtx: AiGenerationProviderContext,
+  ): Promise<AiWeekGenerationResult> {
+    const model = this.model;
+
+    const input: OpenAI.Responses.ResponseInputItem[] = [
+      { role: 'system', content: aiPhaseSystemPrompt },
+      { role: 'user', content: JSON.stringify({ phase_context: weekCtx.phaseContext, week_generation_instructions: weekCtx.weekPrompt }) },
+    ];
+
+    if (weekCtx.reasoning) {
+      input.push({ role: 'assistant', content: weekCtx.reasoning });
+    }
+    if (weekCtx.toolConversation && weekCtx.toolConversation.length > 0) {
+      input.push(...(weekCtx.toolConversation as OpenAI.Responses.ResponseInputItem[]));
+    }
+    input.push({
+      role: 'user',
+      content: weekCtx.weekPrompt + '\nOutput ONLY valid JSON for this single week object. No markdown fences.',
+    });
+
+    try {
+      const response = await withRateLimitRetry(() => this.client.responses.create({
+        model,
+        input,
+        text: { format: { type: 'json_object' } },
+        max_output_tokens: 8000,
+      }));
+
+      let weekJson = '';
+      for (const output of response.output) {
+        if (output.type === 'message') {
+          for (const item of output.content) {
+            if (item.type === 'output_text') {
+              weekJson += item.text;
+            }
+          }
+        }
+      }
+
+      let raw: unknown;
+      try {
+        raw = JSON.parse(weekJson);
+      } catch {
+        throw refinementError('LLM_OUTPUT_INVALID', 'Week output was not valid JSON.');
+      }
+
+      const parsed = AiWeekOutputSchema.safeParse(raw);
+      if (!parsed.success) {
+        const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+        throw refinementError('LLM_OUTPUT_INVALID', `Week validation failed: ${issues}`);
+      }
+
+      return {
+        output: parsed.data,
+        provider: 'openai',
+        model,
+        responseId: response.id ?? null,
+        usage: {
+          inputTokens: response.usage?.input_tokens ?? 0,
+          outputTokens: response.usage?.output_tokens ?? 0,
+        },
+      };
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && typeof error.code === 'string' && error.code.startsWith('LLM_')) {
+        throw error;
+      }
+      if (error instanceof Error && (error.name.includes('Timeout') || error.message.includes('timed out'))) {
+        throw refinementError('LLM_PROVIDER_TIMEOUT', 'The week generation call timed out.');
+      }
+      const detail = error instanceof Error ? error.message : String(error);
+      throw refinementError('LLM_PROVIDER_ERROR', `The generation provider is unavailable: ${detail}`);
     }
   }
 

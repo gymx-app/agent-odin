@@ -14,24 +14,19 @@ import { AthleteInputSchema } from '../../src/domain/athlete/athlete-input.schem
 import { seedExercises } from '../../src/exercises/approved-exercise-library.js';
 import { normalizeAthlete } from '../../src/normalization/athlete-normalizer.js';
 import { odinError } from '../../src/shared/errors/odin-errors.js';
-import { createOpenAIClient } from '../../src/llm/openai-client.js';
 import { OpenAIAiProgrammeGenerationProvider } from '../../src/llm/ai-generation/openai-ai-programme-generation-provider.js';
 import { AnthropicAiProgrammeGenerationProvider } from '../../src/llm/ai-generation/anthropic-ai-programme-generation-provider.js';
 import {
   buildAiStrategyContext,
   buildAiPhaseContext,
-  summarisePhase,
 } from '../../src/llm/ai-generation/ai-generation-context-builder.js';
 import { createToolExecutor } from '../../src/llm/ai-generation/agent-tool-executor.js';
 import { assembleProgramme } from '../../src/llm/ai-generation/ai-programme-assembler.js';
-import { validatePhaseInIsolation } from '../../src/llm/ai-generation/validate-phase-in-isolation.js';
 import { programmeValidationService } from '../../src/validation/programme-validation.service.js';
-import { refineV2Programme } from '../../src/application/v2-programme-refinement.service.js';
 import { LONGITUDINAL_VALIDATION_RULE_VERSION } from '../../src/validation/longitudinal-validation-registry.js';
-import { AiStrategyOutputSchema, AiPhaseOutputSchema, AiWeekOutputSchema } from '../../src/llm/ai-generation/ai-generation.schema.js';
+import { AiStrategyOutputSchema } from '../../src/llm/ai-generation/ai-generation.schema.js';
 import type { AiProgrammeGenerationProvider } from '../../src/llm/ai-generation/ai-programme-generation-provider.js';
 import type { HttpRequest, HttpResponse } from '../../src/infrastructure/http/types.js';
-import type { LongitudinalOdinProgramme } from '../../src/domain/programme/programme.types.js';
 
 const stripNulls = (obj: unknown): unknown => {
   if (obj === null) return undefined;
@@ -241,74 +236,30 @@ export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
           'Output a single JSON object representing this one week. Follow the ProgrammeWeekSchema exactly.',
         ].filter(Boolean).join('\n');
 
-        const userContent = {
-          phase_context: phaseCtx,
-          week_generation_instructions: weekPrompt,
+        if (!provider.generateWeek) {
+          throw odinError('AI_GENERATION_PROVIDER_MISSING', 'Provider does not support week generation.', 500);
+        }
+
+        const weekGenCtx: import('../../src/llm/ai-generation/ai-generation.types.js').AiWeekGenerationContext = {
+          phaseContext: phaseCtx,
+          weekPrompt,
         };
+        if (body.reasoning) weekGenCtx.reasoning = body.reasoning;
+        if (body.tool_conversation.length > 0) weekGenCtx.toolConversation = body.tool_conversation;
 
-        const { aiPhaseSystemPrompt: systemPrompt } = await import('../../src/llm/ai-generation/ai-generation-phase-prompt.js');
-
-        const openai = new OpenAI({
-          apiKey: appConfig.openaiApiKey,
-          timeout: appConfig.openaiGenerationTimeoutMs,
-          maxRetries: 0,
-        });
-
-        const input: OpenAI.Responses.ResponseInputItem[] = [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: JSON.stringify(userContent) },
-        ];
-
-        if (body.reasoning) {
-          input.push({ role: 'assistant', content: body.reasoning });
-        }
-        if (body.tool_conversation.length > 0) {
-          input.push(...(body.tool_conversation as OpenAI.Responses.ResponseInputItem[]));
-        }
-        input.push({
-          role: 'user',
-          content: weekPrompt + '\nOutput ONLY valid JSON for this single week object. No markdown fences.',
-        });
-
-        const response = await openai.responses.create({
-          model: appConfig.openaiGenerationModel ?? appConfig.openaiModel ?? 'gpt-4o',
-          input,
-          text: { format: { type: 'json_object' } },
-          max_output_tokens: 8000,
-        });
-
-        let weekJson = '';
-        for (const output of response.output) {
-          if (output.type === 'message') {
-            for (const item of output.content) {
-              if (item.type === 'output_text') {
-                weekJson += item.text;
-              }
-            }
-          }
-        }
-
-        let raw: unknown;
-        try {
-          raw = JSON.parse(weekJson);
-        } catch {
-          throw odinError('AI_GENERATION_INVALID_OUTPUT', 'Week output was not valid JSON.', 422);
-        }
-
-        const parsed = AiWeekOutputSchema.safeParse(raw);
-        if (!parsed.success) {
-          const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
-          throw odinError('AI_GENERATION_INVALID_OUTPUT', `Week validation failed: ${issues}`, 422);
-        }
+        const weekResult = await provider.generateWeek(
+          weekGenCtx,
+          { requestId: context.requestId },
+        );
 
         return successResponse({
           step: 'phase_week',
           phase_index: body.phase_index,
           week_index: body.week_index,
-          week: parsed.data,
+          week: weekResult.output,
           usage: {
-            inputTokens: response.usage?.input_tokens ?? 0,
-            outputTokens: response.usage?.output_tokens ?? 0,
+            inputTokens: weekResult.usage.inputTokens ?? 0,
+            outputTokens: weekResult.usage.outputTokens ?? 0,
           },
         });
       }

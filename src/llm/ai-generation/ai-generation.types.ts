@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import type {
   AiStrategyOutputSchema,
   AiPhaseOutputSchema,
+  AiWeekOutputSchema,
 } from './ai-generation.schema.js';
 import type { ToolExecutor } from './agent-tool-executor.js';
 
@@ -9,6 +10,7 @@ export const AI_GENERATION_PROMPT_VERSION = 'odin_ai_gen_v1';
 
 export type AiStrategyOutput = z.infer<typeof AiStrategyOutputSchema>;
 export type AiPhaseOutput = z.infer<typeof AiPhaseOutputSchema>;
+export type AiWeekOutput = z.infer<typeof AiWeekOutputSchema>;
 
 export type AiGenerationProviderContext = {
   requestId: string;
@@ -35,6 +37,14 @@ export type AiGenerationResult<T> = {
 
 export type AiStrategyGenerationResult = AiGenerationResult<AiStrategyOutput>;
 export type AiPhaseGenerationResult = AiGenerationResult<AiPhaseOutput>;
+export type AiWeekGenerationResult = AiGenerationResult<AiWeekOutput>;
+
+export type AiWeekGenerationContext = {
+  phaseContext: Record<string, unknown>;
+  weekPrompt: string;
+  reasoning?: string;
+  toolConversation?: unknown[];
+};
 
 export type PhaseSummary = {
   phase_id: string;

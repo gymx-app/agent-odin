@@ -2,6 +2,8 @@ import type {
   AiGenerationProviderContext,
   AiPhaseGenerationResult,
   AiStrategyGenerationResult,
+  AiWeekGenerationResult,
+  AiWeekGenerationContext,
 } from './ai-generation.types.js';
 import type { AiReasoningResult } from './agent-reasoning.js';
 
@@ -49,4 +51,9 @@ export interface AiProgrammeGenerationProvider {
     context: AiPhaseContext,
     providerCtx: AiGenerationProviderContext,
   ): Promise<AiReasoningResult>;
+
+  generateWeek?(
+    weekCtx: AiWeekGenerationContext,
+    providerCtx: AiGenerationProviderContext,
+  ): Promise<AiWeekGenerationResult>;
 }

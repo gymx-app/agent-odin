@@ -72737,6 +72737,7 @@ var AiStrategyOutputSchema = external_exports.object({
   review_triggers: external_exports.array(ReviewTriggerSchema2)
 });
 var AiPhaseOutputSchema = ProgrammePhaseSchema;
+var AiWeekOutputSchema = ProgrammeWeekSchema;
 
 // src/llm/ai-generation/ai-generation.types.ts
 var AI_GENERATION_PROMPT_VERSION = "odin_ai_gen_v1";
@@ -73107,10 +73108,58 @@ var OpenAIAiProgrammeGenerationProvider = class {
         content: "Now generate the phase using the tools to find exercises and check compliance. Output the complete structured phase."
       });
     }
+    if (providerCtx.toolConversation) {
+      input.push(...providerCtx.toolConversation);
+    }
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
     let previousResponseId;
     try {
+      if (providerCtx.toolConversation || providerCtx.toolsOnly === false) {
+        const response = await withRateLimitRetry(() => this.client.responses.create({
+          model,
+          input: [
+            ...input,
+            {
+              role: "user",
+              content: "Based on the exercise search results and compliance checks above, now output the complete structured phase as a single JSON object. Output ONLY valid JSON, no markdown fences or commentary."
+            }
+          ],
+          text: { format: { type: "json_object" } },
+          max_output_tokens: 2e4
+        }));
+        totalInputTokens += response.usage?.input_tokens ?? 0;
+        totalOutputTokens += response.usage?.output_tokens ?? 0;
+        for (const output of response.output) {
+          if (output.type === "message") {
+            for (const item2 of output.content) {
+              if (item2.type === "output_text" && item2.text) {
+                let raw;
+                try {
+                  raw = JSON.parse(item2.text);
+                } catch {
+                  throw refinementError("LLM_OUTPUT_INVALID", "Phase output was not valid JSON.");
+                }
+                const parsed = AiPhaseOutputSchema.safeParse(raw);
+                if (parsed.success) {
+                  return {
+                    output: parsed.data,
+                    provider: "openai",
+                    model,
+                    responseId: response.id,
+                    usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens }
+                  };
+                }
+                throw refinementError(
+                  "LLM_OUTPUT_INVALID",
+                  `Phase output failed validation: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`
+                );
+              }
+            }
+          }
+        }
+        throw refinementError("LLM_OUTPUT_INVALID", "No output in final phase generation call.");
+      }
       for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
         const response = await withRateLimitRetry(() => this.client.responses.parse({
           model,
@@ -73156,6 +73205,43 @@ var OpenAIAiProgrammeGenerationProvider = class {
               }
             }
           }
+        }
+        if (providerCtx.toolsOnly && toolCalls.length > 0 && providerCtx.toolExecutor) {
+          const toolResults = [];
+          for (const call of toolCalls) {
+            let args;
+            try {
+              args = JSON.parse(call.arguments);
+            } catch {
+              args = {};
+            }
+            const result = providerCtx.toolExecutor(call.name, args);
+            toolResults.push({
+              type: "function_call_output",
+              call_id: call.id,
+              output: JSON.stringify(result)
+            });
+          }
+          const conversationItems = [];
+          for (const output of response.output) {
+            if (output.type === "function_call") {
+              conversationItems.push({
+                type: "function_call",
+                call_id: output.call_id,
+                name: output.name,
+                arguments: output.arguments
+              });
+            }
+          }
+          conversationItems.push(...toolResults);
+          return {
+            output: null,
+            provider: "openai",
+            model,
+            responseId: previousResponseId ?? null,
+            usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+            toolConversation: conversationItems
+          };
         }
         if (parsedOutput) {
           return {
@@ -73263,6 +73349,71 @@ var OpenAIAiProgrammeGenerationProvider = class {
         "LLM_PROVIDER_ERROR",
         `The generation provider is unavailable: ${detail}`
       );
+    }
+  }
+  async generateWeek(weekCtx, providerCtx) {
+    const model = this.model;
+    const input = [
+      { role: "system", content: aiPhaseSystemPrompt },
+      { role: "user", content: JSON.stringify({ phase_context: weekCtx.phaseContext, week_generation_instructions: weekCtx.weekPrompt }) }
+    ];
+    if (weekCtx.reasoning) {
+      input.push({ role: "assistant", content: weekCtx.reasoning });
+    }
+    if (weekCtx.toolConversation && weekCtx.toolConversation.length > 0) {
+      input.push(...weekCtx.toolConversation);
+    }
+    input.push({
+      role: "user",
+      content: weekCtx.weekPrompt + "\nOutput ONLY valid JSON for this single week object. No markdown fences."
+    });
+    try {
+      const response = await withRateLimitRetry(() => this.client.responses.create({
+        model,
+        input,
+        text: { format: { type: "json_object" } },
+        max_output_tokens: 8e3
+      }));
+      let weekJson = "";
+      for (const output of response.output) {
+        if (output.type === "message") {
+          for (const item2 of output.content) {
+            if (item2.type === "output_text") {
+              weekJson += item2.text;
+            }
+          }
+        }
+      }
+      let raw;
+      try {
+        raw = JSON.parse(weekJson);
+      } catch {
+        throw refinementError("LLM_OUTPUT_INVALID", "Week output was not valid JSON.");
+      }
+      const parsed = AiWeekOutputSchema.safeParse(raw);
+      if (!parsed.success) {
+        const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+        throw refinementError("LLM_OUTPUT_INVALID", `Week validation failed: ${issues}`);
+      }
+      return {
+        output: parsed.data,
+        provider: "openai",
+        model,
+        responseId: response.id ?? null,
+        usage: {
+          inputTokens: response.usage?.input_tokens ?? 0,
+          outputTokens: response.usage?.output_tokens ?? 0
+        }
+      };
+    } catch (error2) {
+      if (error2 instanceof Error && "code" in error2 && typeof error2.code === "string" && error2.code.startsWith("LLM_")) {
+        throw error2;
+      }
+      if (error2 instanceof Error && (error2.name.includes("Timeout") || error2.message.includes("timed out"))) {
+        throw refinementError("LLM_PROVIDER_TIMEOUT", "The week generation call timed out.");
+      }
+      const detail = error2 instanceof Error ? error2.message : String(error2);
+      throw refinementError("LLM_PROVIDER_ERROR", `The generation provider is unavailable: ${detail}`);
     }
   }
   async generateStructured(systemPrompt, userContent, schema, schemaName, maxOutputTokens, openaiSchema) {

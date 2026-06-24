@@ -221,6 +221,7 @@ export const odinApi = {
       };
       const weeksCount = phaseSkeleton.weeks_count;
       const weeks: unknown[] = [];
+      const weekSummaries: { week_number: number; week_type: string }[] = [];
 
       for (let w = 0; w < weeksCount; w++) {
         onProgress?.({
@@ -248,11 +249,13 @@ export const odinApi = {
             prior_phase_summaries: summaries,
             reasoning: reasoningResult.reasoning,
             tool_conversation: toolsResult.tool_conversation,
-            prior_weeks: weeks,
+            prior_weeks: weekSummaries,
           },
         });
 
-        weeks.push(weekResult.week);
+        const weekData = weekResult.week as { week_number: number; week_type: string };
+        weeks.push(weekData);
+        weekSummaries.push({ week_number: weekData.week_number, week_type: weekData.week_type });
         totalInputTokens += weekResult.usage.inputTokens ?? 0;
         totalOutputTokens += weekResult.usage.outputTokens ?? 0;
       }
@@ -263,9 +266,29 @@ export const odinApi = {
         rationale: [],
       };
       phases.push(phase);
-      summaries.push({ phase_id: phaseSkeleton.phase_id, phase_type: phaseSkeleton.phase_type, objective: phaseSkeleton.objective, exercises_used: [], volume_per_muscle_group: {}, progression_model: phaseSkeleton.progression_model });
-      totalInputTokens += phaseResult.usage.inputTokens ?? 0;
-      totalOutputTokens += phaseResult.usage.outputTokens ?? 0;
+
+      const exercisesUsed = new Set<string>();
+      const volumeByMuscle: Record<string, number> = {};
+      for (const week of weeks) {
+        const w = week as { days: Array<{ exercises: Array<{ exercise_id: string; primary_muscles: string[]; sets: Array<{ set_type: string }> }> }> };
+        for (const day of w.days ?? []) {
+          for (const ex of day.exercises ?? []) {
+            exercisesUsed.add(ex.exercise_id);
+            const workingSets = (ex.sets ?? []).filter((s) => s.set_type === 'working').length;
+            for (const muscle of ex.primary_muscles ?? []) {
+              volumeByMuscle[muscle] = (volumeByMuscle[muscle] ?? 0) + workingSets;
+            }
+          }
+        }
+      }
+      summaries.push({
+        phase_id: phaseSkeleton.phase_id,
+        phase_type: phaseSkeleton.phase_type,
+        objective: phaseSkeleton.objective,
+        exercises_used: [...exercisesUsed],
+        volume_per_muscle_group: volumeByMuscle,
+        progression_model: phaseSkeleton.progression_model,
+      });
     }
 
     // Final step: Assemble + validate
