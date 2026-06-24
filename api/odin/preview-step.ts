@@ -60,12 +60,21 @@ const stepRequestSchema = z.discriminatedUnion('step', [
     prior_phase_summaries: z.array(z.any()).default([]),
   }),
   z.object({
+    step: z.literal('phase_tools'),
+    athlete: AthleteInputSchema,
+    strategy: z.any(),
+    phase_index: z.number().int().nonnegative(),
+    prior_phase_summaries: z.array(z.any()).default([]),
+    reasoning: z.string().optional(),
+  }),
+  z.object({
     step: z.literal('phase_generate'),
     athlete: AthleteInputSchema,
     strategy: z.any(),
     phase_index: z.number().int().nonnegative(),
     prior_phase_summaries: z.array(z.any()).default([]),
     reasoning: z.string().optional(),
+    tool_conversation: z.array(z.any()).default([]),
   }),
   z.object({
     step: z.literal('assemble'),
@@ -167,7 +176,7 @@ export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
         });
       }
 
-      if (body.step === 'phase_generate') {
+      if (body.step === 'phase_tools') {
         const strategy = AiStrategyOutputSchema.parse(stripNulls(body.strategy));
         const skeleton = strategy.phase_skeletons[body.phase_index];
         if (!skeleton) {
@@ -185,7 +194,42 @@ export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
         const result = await provider.generatePhase(phaseCtx, {
           requestId: context.requestId,
           toolExecutor,
+          toolsOnly: true,
           ...(body.reasoning ? { reasoningOutput: body.reasoning } : {}),
+        });
+
+        const toolConversation = (result as { toolConversation?: unknown[] }).toolConversation ?? [];
+
+        return successResponse({
+          step: 'phase_tools',
+          phase_index: body.phase_index,
+          tool_conversation: toolConversation,
+          usage: {
+            inputTokens: result.usage.inputTokens ?? 0,
+            outputTokens: result.usage.outputTokens ?? 0,
+          },
+        });
+      }
+
+      if (body.step === 'phase_generate') {
+        const strategy = AiStrategyOutputSchema.parse(stripNulls(body.strategy));
+        const skeleton = strategy.phase_skeletons[body.phase_index];
+        if (!skeleton) {
+          throw odinError('INVALID_PHASE_INDEX', `Phase index ${body.phase_index} out of range.`, 400);
+        }
+
+        const phaseCtx = buildAiPhaseContext(
+          normalized,
+          strategy,
+          skeleton,
+          seedExercises,
+          body.prior_phase_summaries,
+        );
+
+        const result = await provider.generatePhase(phaseCtx, {
+          requestId: context.requestId,
+          ...(body.reasoning ? { reasoningOutput: body.reasoning } : {}),
+          toolConversation: body.tool_conversation,
         });
 
         const phase = result.output;

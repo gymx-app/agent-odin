@@ -109,11 +109,59 @@ export class OpenAIAiProgrammeGenerationProvider
       });
     }
 
+    if (providerCtx.toolConversation) {
+      input.push(...(providerCtx.toolConversation as OpenAI.Responses.ResponseInputItem[]));
+    }
+
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
     let previousResponseId: string | undefined;
 
     try {
+      if (providerCtx.toolConversation || providerCtx.toolsOnly === false) {
+        const response = await withRateLimitRetry(() => this.client.responses.parse({
+          model,
+          input: [
+            ...input,
+            { role: 'user', content: 'Based on the exercise search results and compliance checks above, now output the complete structured phase.' } as OpenAI.Responses.ResponseInputItem,
+          ],
+          text: {
+            format: zodTextFormat(OpenAIPhaseSchema as never, 'ai_phase_generation'),
+          },
+          max_output_tokens: 32000,
+        }));
+
+        totalInputTokens += response.usage?.input_tokens ?? 0;
+        totalOutputTokens += response.usage?.output_tokens ?? 0;
+
+        for (const output of response.output) {
+          if (output.type === 'message') {
+            for (const item of output.content) {
+              if (item.type === 'refusal') {
+                throw refinementError('LLM_PROVIDER_REFUSAL', 'The generation provider declined the request.');
+              }
+              if (item.type === 'output_text' && item.parsed) {
+                const parsed = OpenAIPhaseSchema.safeParse(item.parsed);
+                if (parsed.success) {
+                  return {
+                    output: parsed.data as AiPhaseGenerationResult['output'],
+                    provider: 'openai',
+                    model,
+                    responseId: response.id,
+                    usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+                  };
+                }
+                throw refinementError(
+                  'LLM_OUTPUT_INVALID',
+                  `Phase output failed validation: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`,
+                );
+              }
+            }
+          }
+        }
+        throw refinementError('LLM_OUTPUT_INVALID', 'No structured output in final phase generation call.');
+      }
+
       for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
         const response = await withRateLimitRetry(() => this.client.responses.parse({
           model,
@@ -165,6 +213,43 @@ export class OpenAIAiProgrammeGenerationProvider
               }
             }
           }
+        }
+
+        if (providerCtx.toolsOnly && toolCalls.length > 0 && providerCtx.toolExecutor) {
+          const toolResults: OpenAI.Responses.ResponseInputItem[] = [];
+          for (const call of toolCalls) {
+            let args: Record<string, unknown>;
+            try { args = JSON.parse(call.arguments) as Record<string, unknown>; }
+            catch { args = {}; }
+            const result = providerCtx.toolExecutor(call.name, args);
+            toolResults.push({
+              type: 'function_call_output',
+              call_id: call.id,
+              output: JSON.stringify(result),
+            });
+          }
+
+          const conversationItems: unknown[] = [];
+          for (const output of response.output) {
+            if (output.type === 'function_call') {
+              conversationItems.push({
+                type: 'function_call',
+                call_id: output.call_id,
+                name: output.name,
+                arguments: output.arguments,
+              });
+            }
+          }
+          conversationItems.push(...toolResults);
+
+          return {
+            output: null as unknown as AiPhaseGenerationResult['output'],
+            provider: 'openai',
+            model,
+            responseId: previousResponseId ?? null,
+            usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+            toolConversation: conversationItems,
+          } as AiPhaseGenerationResult & { toolConversation: unknown[] };
         }
 
         if (parsedOutput) {

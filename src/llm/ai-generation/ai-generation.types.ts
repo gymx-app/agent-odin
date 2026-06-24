@@ -18,6 +18,8 @@ export type AiGenerationProviderContext = {
   };
   toolExecutor?: ToolExecutor;
   reasoningOutput?: string;
+  toolConversation?: unknown[];
+  toolsOnly?: boolean;
 };
 
 export type AiGenerationResult<T> = {

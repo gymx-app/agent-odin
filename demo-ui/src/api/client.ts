@@ -175,7 +175,36 @@ export const odinApi = {
       totalInputTokens += reasoningResult.usage.inputTokens ?? 0;
       totalOutputTokens += reasoningResult.usage.outputTokens ?? 0;
 
-      // Sub-step B: Generate phase structure
+      // Sub-step B: Tool calls (exercise search, volume compliance)
+      onProgress?.({
+        step: 'phase_tools',
+        detail: `Phase ${i + 1}/${totalPhases} — searching exercises...`,
+        phaseIndex: i,
+        totalPhases,
+      });
+
+      const toolsResult = await request<{
+        step: 'phase_tools';
+        phase_index: number;
+        tool_conversation: unknown[];
+        usage: { inputTokens: number; outputTokens: number };
+      }>(paths.previewStep, {
+        method: 'POST',
+        token,
+        body: {
+          step: 'phase_tools',
+          athlete,
+          strategy: strategyResult.strategy,
+          phase_index: i,
+          prior_phase_summaries: summaries,
+          reasoning: reasoningResult.reasoning,
+        },
+      });
+
+      totalInputTokens += toolsResult.usage.inputTokens ?? 0;
+      totalOutputTokens += toolsResult.usage.outputTokens ?? 0;
+
+      // Sub-step C: Generate phase structure (single LLM call, no tools)
       onProgress?.({
         step: 'phase_generate',
         detail: `Phase ${i + 1}/${totalPhases} — generating...`,
@@ -198,6 +227,7 @@ export const odinApi = {
           phase_index: i,
           prior_phase_summaries: summaries,
           reasoning: reasoningResult.reasoning,
+          tool_conversation: toolsResult.tool_conversation,
         },
       });
 
