@@ -147,6 +147,7 @@ type StoredForm = {
   profile: AthleteInput;
   refinementMode: RefinementMode;
   plannerVersion: PlannerVersion;
+  email?: string;
 };
 
 const loadStoredForm = (): Partial<StoredForm> => {
@@ -1157,26 +1158,30 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Save form (including profile) to localStorage on every change
   useEffect(() => {
-    saveForm({ profile, refinementMode, plannerVersion });
-  }, [profile, refinementMode, plannerVersion, generationMode]);
+    saveForm({ profile, refinementMode, plannerVersion, email: sessionEmail ?? undefined });
+  }, [profile, refinementMode, plannerVersion, generationMode, sessionEmail]);
 
-  // Auto-save per-user profile on every form change
+  // Also save per-user profile keyed by email
   const sessionEmailRef = useRef(sessionEmail);
   sessionEmailRef.current = sessionEmail;
   const profileRestoringRef = useRef(false);
 
   useEffect(() => {
-    const email = sessionEmailRef.current;
-    if (!email || profileRestoringRef.current) return;
+    const currentEmail = sessionEmailRef.current;
+    if (!currentEmail || profileRestoringRef.current) return;
     try {
-      localStorage.setItem(profileStorageKey(email), JSON.stringify(profile));
+      localStorage.setItem(profileStorageKey(currentEmail), JSON.stringify(profile));
     } catch { /* quota exceeded — ignore */ }
   }, [profile]);
 
-  // Restore per-user profile on login / page refresh
+  // Restore per-user profile when logging in as a DIFFERENT user than last session
   useEffect(() => {
     if (!sessionEmail) return;
+    const lastEmail = storedForm.email;
+    // Same user as last session — generic form already has correct data from mount
+    if (lastEmail === sessionEmail) return;
     try {
       const raw = localStorage.getItem(profileStorageKey(sessionEmail));
       if (!raw) return;
