@@ -267,22 +267,17 @@ export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
       }
 
       if (body.step === 'phase_week') {
-        const strategy = AiStrategyOutputSchema.parse(stripNulls(body.strategy));
-        const skeleton = strategy.phase_skeletons[body.phase_index];
+        const stripped = stripNulls(body.strategy) as {
+          phase_skeletons: Array<{ start_week: number; weeks_count: number }>;
+          fatigue_management_policy: { planned_deload_weeks: number[] };
+        };
+        const skeleton = stripped.phase_skeletons[body.phase_index];
         if (!skeleton) {
           throw odinError('INVALID_PHASE_INDEX', `Phase index ${body.phase_index} out of range.`, 400);
         }
 
-        const phaseCtx = buildAiPhaseContext(
-          normalized,
-          strategy,
-          skeleton,
-          seedExercises,
-          body.prior_phase_summaries,
-        );
-
         const weekNumber = skeleton.start_week + body.week_index;
-        const isDeload = strategy.fatigue_management_policy.planned_deload_weeks.includes(weekNumber);
+        const isDeload = stripped.fatigue_management_policy.planned_deload_weeks.includes(weekNumber);
 
         const weekPrompt = [
           `Generate ONLY week ${weekNumber} (week_index ${body.week_index + 1} of ${skeleton.weeks_count} in this phase).`,
@@ -299,12 +294,26 @@ export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
         }
 
         const weekGenCtx: import('../../src/llm/ai-generation/ai-generation.types.js').AiWeekGenerationContext = {
-          phaseContext: phaseCtx,
+          phaseContext: {},
           weekPrompt,
         };
-        if (body.reasoning) weekGenCtx.reasoning = body.reasoning;
-        if (body.tool_conversation.length > 0) weekGenCtx.toolConversation = body.tool_conversation;
-        if (body.previous_response_id) weekGenCtx.previousResponseId = body.previous_response_id;
+
+        if (body.previous_response_id) {
+          weekGenCtx.previousResponseId = body.previous_response_id;
+        } else {
+          const fullStrategy = AiStrategyOutputSchema.parse(stripped);
+          const fullSkeleton = fullStrategy.phase_skeletons[body.phase_index];
+          const phaseCtx = buildAiPhaseContext(
+            normalized,
+            fullStrategy,
+            fullSkeleton,
+            seedExercises,
+            body.prior_phase_summaries,
+          );
+          weekGenCtx.phaseContext = phaseCtx;
+          if (body.reasoning) weekGenCtx.reasoning = body.reasoning;
+          if (body.tool_conversation.length > 0) weekGenCtx.toolConversation = body.tool_conversation;
+        }
 
         const weekResult = await provider.generateWeek(
           weekGenCtx,

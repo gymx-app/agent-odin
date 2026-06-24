@@ -204,19 +204,24 @@ export const odinApi = {
           totalPhases,
         });
 
+        const fullStrategy = strategyResult.strategy as Record<string, unknown>;
         const weekBody: Record<string, unknown> = {
           step: 'phase_week',
           athlete,
-          strategy: strategyResult.strategy,
           phase_index: i,
           week_index: w,
-          prior_phase_summaries: summaries,
           prior_weeks: weekSummaries,
         };
 
         if (previousResponseId) {
           weekBody.previous_response_id = previousResponseId;
+          weekBody.strategy = {
+            phase_skeletons: (fullStrategy as { phase_skeletons: unknown[] }).phase_skeletons,
+            fatigue_management_policy: (fullStrategy as { fatigue_management_policy: unknown }).fatigue_management_policy,
+          };
         } else {
+          weekBody.strategy = strategyResult.strategy;
+          weekBody.prior_phase_summaries = summaries;
           weekBody.reasoning = prepResult.reasoning;
           weekBody.tool_conversation = prepResult.tool_conversation;
         }
