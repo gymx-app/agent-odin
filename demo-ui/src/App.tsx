@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   AlertCircle,
@@ -54,7 +54,6 @@ import {
 import { athleteInputSchema } from './profile/profile-schema';
 
 const STORAGE_KEY = 'odin_demo_form';
-const profileStorageKey = (email: string) => `odin_profile_${email}`;
 
 type GenerationMode =
   | 'ai_agent'
@@ -147,7 +146,6 @@ type StoredForm = {
   profile: AthleteInput;
   refinementMode: RefinementMode;
   plannerVersion: PlannerVersion;
-  email?: string;
 };
 
 const loadStoredForm = (): Partial<StoredForm> => {
@@ -1158,42 +1156,10 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Save form (including profile) to localStorage on every change
+  // Save full form state to localStorage on every change
   useEffect(() => {
-    saveForm({ profile, refinementMode, plannerVersion, email: sessionEmail ?? undefined });
-  }, [profile, refinementMode, plannerVersion, generationMode, sessionEmail]);
-
-  // Also save per-user profile keyed by email
-  const sessionEmailRef = useRef(sessionEmail);
-  sessionEmailRef.current = sessionEmail;
-  const profileRestoringRef = useRef(false);
-
-  useEffect(() => {
-    const currentEmail = sessionEmailRef.current;
-    if (!currentEmail || profileRestoringRef.current) return;
-    try {
-      localStorage.setItem(profileStorageKey(currentEmail), JSON.stringify(profile));
-    } catch { /* quota exceeded — ignore */ }
-  }, [profile]);
-
-  // Restore per-user profile when logging in as a DIFFERENT user than last session
-  useEffect(() => {
-    if (!sessionEmail) return;
-    const lastEmail = storedForm.email;
-    // Same user as last session — generic form already has correct data from mount
-    if (lastEmail === sessionEmail) return;
-    try {
-      const raw = localStorage.getItem(profileStorageKey(sessionEmail));
-      if (!raw) return;
-      const parsed = athleteInputSchema.safeParse(JSON.parse(raw));
-      if (parsed.success) {
-        profileRestoringRef.current = true;
-        setProfile(parsed.data);
-        setNotice({ tone: 'info', title: 'Profile restored', message: `Saved profile for ${sessionEmail} loaded.` });
-        queueMicrotask(() => { profileRestoringRef.current = false; });
-      }
-    } catch { /* ignore */ }
-  }, [sessionEmail]);
+    saveForm({ profile, refinementMode, plannerVersion });
+  }, [profile, refinementMode, plannerVersion, generationMode]);
 
   const loadAuthenticatedProfile = async (showNotice = true) => {
     const authClient = supabaseAuth;
@@ -1214,14 +1180,13 @@ function App() {
       if (error) throw error;
 
       if (!data) {
-        setProfile(defaultProfile);
         setProfileLoad({ status: 'not_found' });
         if (showNotice) {
           setNotice({
             tone: 'info',
             title: 'Signed in — no saved profile',
             message:
-              'Authentication succeeded, but this user has no GymX user_profiles row. The form remains on demo defaults.',
+              'No GymX user_profiles row found. Keeping current form values.',
           });
         }
         return;
@@ -2179,11 +2144,9 @@ function App() {
                     : 'User ID comes from the verified token'}
                 </span>
                 <div className="profile-actions">
-                  {sessionEmail && (
-                    <span className="auto-save-hint">
-                      <Database size={14} /> Auto-saved
-                    </span>
-                  )}
+                  <span className="auto-save-hint">
+                    <Database size={14} /> Auto-saved
+                  </span>
                   <Button
                     variant="secondary"
                     onClick={() => void loadAuthenticatedProfile(true)}
