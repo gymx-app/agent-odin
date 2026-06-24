@@ -17187,7 +17187,7 @@ var require_helpers = __commonJS({
     exports.generateCallbackId = generateCallbackId;
     exports.parseParametersFromURL = parseParametersFromURL;
     exports.decodeJWT = decodeJWT;
-    exports.sleep = sleep4;
+    exports.sleep = sleep5;
     exports.retryable = retryable;
     exports.generatePKCEVerifier = generatePKCEVerifier;
     exports.generatePKCEChallenge = generatePKCEChallenge;
@@ -17325,7 +17325,7 @@ var require_helpers = __commonJS({
       };
       return data;
     }
-    async function sleep4(time) {
+    async function sleep5(time) {
       return await new Promise((accept) => {
         setTimeout(() => accept(null), time);
       });
@@ -73068,6 +73068,29 @@ var toOpenAISchema = (schema) => {
 
 // src/llm/ai-generation/openai-ai-programme-generation-provider.ts
 var MAX_TOOL_TURNS = 10;
+var MAX_RATE_LIMIT_RETRIES = 3;
+var sleep4 = (ms) => new Promise((resolve4) => setTimeout(resolve4, ms));
+var isRateLimitError = (error2) => {
+  if (!(error2 instanceof Error)) return null;
+  const msg = error2.message ?? "";
+  if ("status" in error2 && error2.status === 429) {
+    const match = msg.match(/try again in ([\d.]+)s/i);
+    return match?.[1] ? Math.ceil(parseFloat(match[1]) * 1e3) : 1e4;
+  }
+  return null;
+};
+var withRateLimitRetry = async (fn) => {
+  for (let attempt = 0; attempt < MAX_RATE_LIMIT_RETRIES; attempt++) {
+    try {
+      return await fn();
+    } catch (error2) {
+      const waitMs = isRateLimitError(error2);
+      if (waitMs === null || attempt === MAX_RATE_LIMIT_RETRIES - 1) throw error2;
+      await sleep4(waitMs + 1e3);
+    }
+  }
+  throw new Error("unreachable");
+};
 var OpenAIStrategySchema = toOpenAISchema(AiStrategyOutputSchema);
 var OpenAIPhaseSchema = toOpenAISchema(AiPhaseOutputSchema);
 var OpenAIAiProgrammeGenerationProvider = class {
@@ -73113,7 +73136,7 @@ var OpenAIAiProgrammeGenerationProvider = class {
     let previousResponseId;
     try {
       for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
-        const response = await this.client.responses.parse({
+        const response = await withRateLimitRetry(() => this.client.responses.parse({
           model,
           input,
           ...previousResponseId ? { previous_response_id: previousResponseId } : {},
@@ -73122,7 +73145,7 @@ var OpenAIAiProgrammeGenerationProvider = class {
             format: zodTextFormat(OpenAIPhaseSchema, "ai_phase_generation")
           },
           max_output_tokens: 32e3
-        });
+        }));
         previousResponseId = response.id;
         totalInputTokens += response.usage?.input_tokens ?? 0;
         totalOutputTokens += response.usage?.output_tokens ?? 0;
@@ -73227,14 +73250,14 @@ var OpenAIAiProgrammeGenerationProvider = class {
     const model = this.model;
     const userContent = { phase_context: context, retry_feedback: providerCtx.retryFeedback ?? null };
     try {
-      const response = await this.client.responses.create({
+      const response = await withRateLimitRetry(() => this.client.responses.create({
         model,
         input: [
           { role: "system", content: aiReasoningPrompt },
           { role: "user", content: JSON.stringify(userContent) }
         ],
         max_output_tokens: 1500
-      });
+      }));
       let reasoning = "";
       for (const output of response.output) {
         if (output.type === "message") {
@@ -73269,7 +73292,7 @@ var OpenAIAiProgrammeGenerationProvider = class {
   async generateStructured(systemPrompt, userContent, schema, schemaName, maxOutputTokens, openaiSchema) {
     const model = this.model;
     try {
-      const response = await this.client.responses.parse({
+      const response = await withRateLimitRetry(() => this.client.responses.parse({
         model,
         input: [
           { role: "system", content: systemPrompt },
@@ -73279,7 +73302,7 @@ var OpenAIAiProgrammeGenerationProvider = class {
           format: zodTextFormat(openaiSchema ?? schema, schemaName)
         },
         max_output_tokens: maxOutputTokens
-      });
+      }));
       for (const output of response.output) {
         if (output.type !== "message") continue;
         for (const item2 of output.content) {

@@ -24,6 +24,32 @@ import { AGENT_TOOLS } from './agent-tools.js';
 import { toOpenAISchema } from './openai-schema-compat.js';
 
 const MAX_TOOL_TURNS = 10;
+const MAX_RATE_LIMIT_RETRIES = 3;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isRateLimitError = (error: unknown): number | null => {
+  if (!(error instanceof Error)) return null;
+  const msg = error.message ?? '';
+  if ('status' in error && (error as { status: number }).status === 429) {
+    const match = msg.match(/try again in ([\d.]+)s/i);
+    return match?.[1] ? Math.ceil(parseFloat(match[1]) * 1000) : 10_000;
+  }
+  return null;
+};
+
+const withRateLimitRetry = async <T>(fn: () => Promise<T>): Promise<T> => {
+  for (let attempt = 0; attempt < MAX_RATE_LIMIT_RETRIES; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      const waitMs = isRateLimitError(error);
+      if (waitMs === null || attempt === MAX_RATE_LIMIT_RETRIES - 1) throw error;
+      await sleep(waitMs + 1000);
+    }
+  }
+  throw new Error('unreachable');
+};
 
 const OpenAIStrategySchema = toOpenAISchema(AiStrategyOutputSchema);
 const OpenAIPhaseSchema = toOpenAISchema(AiPhaseOutputSchema);
@@ -89,7 +115,7 @@ export class OpenAIAiProgrammeGenerationProvider
 
     try {
       for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
-        const response = await this.client.responses.parse({
+        const response = await withRateLimitRetry(() => this.client.responses.parse({
           model,
           input,
           ...(previousResponseId
@@ -100,7 +126,7 @@ export class OpenAIAiProgrammeGenerationProvider
             format: zodTextFormat(OpenAIPhaseSchema as never, 'ai_phase_generation'),
           },
           max_output_tokens: 32000,
-        });
+        }));
 
         previousResponseId = response.id;
         totalInputTokens += response.usage?.input_tokens ?? 0;
@@ -229,14 +255,14 @@ export class OpenAIAiProgrammeGenerationProvider
     const userContent = { phase_context: context, retry_feedback: providerCtx.retryFeedback ?? null };
 
     try {
-      const response = await this.client.responses.create({
+      const response = await withRateLimitRetry(() => this.client.responses.create({
         model,
         input: [
           { role: 'system', content: aiReasoningPrompt },
           { role: 'user', content: JSON.stringify(userContent) },
         ],
         max_output_tokens: 1500,
-      });
+      }));
 
       let reasoning = '';
       for (const output of response.output) {
@@ -286,7 +312,7 @@ export class OpenAIAiProgrammeGenerationProvider
     const model = this.model;
 
     try {
-      const response = await this.client.responses.parse({
+      const response = await withRateLimitRetry(() => this.client.responses.parse({
         model,
         input: [
           { role: 'system', content: systemPrompt },
@@ -296,7 +322,7 @@ export class OpenAIAiProgrammeGenerationProvider
           format: zodTextFormat((openaiSchema ?? schema) as never, schemaName),
         },
         max_output_tokens: maxOutputTokens,
-      });
+      }));
 
       for (const output of response.output) {
         if (output.type !== 'message') continue;
