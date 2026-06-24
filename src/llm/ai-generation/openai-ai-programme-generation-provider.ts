@@ -119,15 +119,16 @@ export class OpenAIAiProgrammeGenerationProvider
 
     try {
       if (providerCtx.toolConversation || providerCtx.toolsOnly === false) {
-        const response = await withRateLimitRetry(() => this.client.responses.parse({
+        const response = await withRateLimitRetry(() => this.client.responses.create({
           model,
           input: [
             ...input,
-            { role: 'user', content: 'Based on the exercise search results and compliance checks above, now output the complete structured phase.' } as OpenAI.Responses.ResponseInputItem,
+            {
+              role: 'user',
+              content: 'Based on the exercise search results and compliance checks above, now output the complete structured phase as a single JSON object. Output ONLY valid JSON, no markdown fences or commentary.',
+            } as OpenAI.Responses.ResponseInputItem,
           ],
-          text: {
-            format: zodTextFormat(OpenAIPhaseSchema as never, 'ai_phase_generation'),
-          },
+          text: { format: { type: 'json_object' } },
           max_output_tokens: 20000,
         }));
 
@@ -137,11 +138,14 @@ export class OpenAIAiProgrammeGenerationProvider
         for (const output of response.output) {
           if (output.type === 'message') {
             for (const item of output.content) {
-              if (item.type === 'refusal') {
-                throw refinementError('LLM_PROVIDER_REFUSAL', 'The generation provider declined the request.');
-              }
-              if (item.type === 'output_text' && item.parsed) {
-                const parsed = OpenAIPhaseSchema.safeParse(item.parsed);
+              if (item.type === 'output_text' && item.text) {
+                let raw: unknown;
+                try {
+                  raw = JSON.parse(item.text);
+                } catch {
+                  throw refinementError('LLM_OUTPUT_INVALID', 'Phase output was not valid JSON.');
+                }
+                const parsed = AiPhaseOutputSchema.safeParse(raw);
                 if (parsed.success) {
                   return {
                     output: parsed.data as AiPhaseGenerationResult['output'],
@@ -159,7 +163,7 @@ export class OpenAIAiProgrammeGenerationProvider
             }
           }
         }
-        throw refinementError('LLM_OUTPUT_INVALID', 'No structured output in final phase generation call.');
+        throw refinementError('LLM_OUTPUT_INVALID', 'No output in final phase generation call.');
       }
 
       for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
