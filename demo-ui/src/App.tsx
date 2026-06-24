@@ -1064,6 +1064,7 @@ function App() {
   const [selectedPhase, setSelectedPhase] = useState(1);
   const [resultTab, setResultTab] = useState<ResultTab>('programme');
   const [busy, setBusy] = useState<BusyAction>(null);
+  const [progressDetail, setProgressDetail] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [health, setHealth] = useState<{
     status: 'checking' | 'online' | 'offline';
@@ -1095,6 +1096,7 @@ function App() {
       setNotice(errorNotice(error));
     } finally {
       setBusy(null);
+      setProgressDetail(null);
     }
   };
 
@@ -1376,16 +1378,27 @@ function App() {
       });
       return;
     }
+    const useSteppedApi = apiPlatform === 'supabase' && plannerVersion === 'ai_agent_v1';
     void run(
       'preview',
-      () =>
-        odinApi.preview(
+      () => {
+        if (useSteppedApi) {
+          setProgressDetail('Initializing AI agent...');
+          return odinApi.previewStepped(
+            token.trim(),
+            parsed.data,
+            (progress) => setProgressDetail(progress.detail),
+          );
+        }
+        return odinApi.preview(
           token.trim(),
           parsed.data,
           refinementMode,
           plannerVersion,
-        ),
+        );
+      },
       (data) => {
+        setProgressDetail(null);
         setProgramme(data);
         setResultTab('programme');
         if (isLegacyProgramme(data.programme)) {
@@ -2412,6 +2425,11 @@ function App() {
                   >
                     <Sparkles size={15} /> Generate preview
                   </Button>
+                  {progressDetail && busy === 'preview' && (
+                    <p className="auto-save-hint" style={{ marginTop: '0.5rem' }}>
+                      {progressDetail}
+                    </p>
+                  )}
                 </div>
               )}
             </section>

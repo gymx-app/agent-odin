@@ -82,6 +82,14 @@ const request = async <T>(
 const paths = {
   health: isEdgeFunction ? '/functions/v1/health' : '/api/health',
   preview: isEdgeFunction ? '/functions/v1/preview' : '/api/odin/preview',
+  previewStep: isEdgeFunction ? '/functions/v1/preview-step' : '/api/odin/preview-step',
+};
+
+export type StepProgress = {
+  step: string;
+  detail: string;
+  phaseIndex?: number;
+  totalPhases?: number;
 };
 
 export const odinApi = {
@@ -111,4 +119,87 @@ export const odinApi = {
         planner_version: plannerVersion,
       },
     }),
+
+  previewStepped: async (
+    token: string,
+    athlete: AthleteInput,
+    onProgress?: (progress: StepProgress) => void,
+  ): Promise<ProgrammePreviewResponse> => {
+    // Step 1: Strategy
+    onProgress?.({ step: 'strategy', detail: 'Generating training strategy...' });
+    const strategyResult = await request<{
+      step: 'strategy';
+      strategy: unknown;
+      usage: { inputTokens: number; outputTokens: number };
+    }>(paths.previewStep, {
+      method: 'POST',
+      token,
+      body: { step: 'strategy', athlete },
+    });
+
+    const strategy = strategyResult.strategy as { phase_skeletons: unknown[] };
+    const totalPhases = strategy.phase_skeletons.length;
+    let totalInputTokens = strategyResult.usage.inputTokens ?? 0;
+    let totalOutputTokens = strategyResult.usage.outputTokens ?? 0;
+
+    // Step 2..N: Phases
+    const phases: unknown[] = [];
+    const summaries: unknown[] = [];
+
+    for (let i = 0; i < totalPhases; i++) {
+      onProgress?.({
+        step: 'phase',
+        detail: `Generating phase ${i + 1} of ${totalPhases}...`,
+        phaseIndex: i,
+        totalPhases,
+      });
+
+      const phaseResult = await request<{
+        step: 'phase';
+        phase: unknown;
+        summary: unknown;
+        usage: { inputTokens: number; outputTokens: number };
+      }>(paths.previewStep, {
+        method: 'POST',
+        token,
+        body: {
+          step: 'phase',
+          athlete,
+          strategy: strategyResult.strategy,
+          phase_index: i,
+          prior_phase_summaries: summaries,
+        },
+      });
+
+      phases.push(phaseResult.phase);
+      summaries.push(phaseResult.summary);
+      totalInputTokens += phaseResult.usage.inputTokens ?? 0;
+      totalOutputTokens += phaseResult.usage.outputTokens ?? 0;
+    }
+
+    // Final step: Assemble + validate
+    onProgress?.({ step: 'assemble', detail: 'Assembling and validating programme...' });
+    const assembleResult = await request<ProgrammePreviewResponse>(paths.previewStep, {
+      method: 'POST',
+      token,
+      body: {
+        step: 'assemble',
+        athlete,
+        strategy: strategyResult.strategy,
+        phases,
+      },
+    });
+
+    // Attach AI generation metadata
+    assembleResult.generation = {
+      ...assembleResult.generation,
+      ai_generation: {
+        total_input_tokens: totalInputTokens,
+        total_output_tokens: totalOutputTokens,
+        fallback_used: false,
+      },
+    };
+
+    return assembleResult;
+  },
 };
