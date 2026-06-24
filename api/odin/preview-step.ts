@@ -33,6 +33,20 @@ import type { AiProgrammeGenerationProvider } from '../../src/llm/ai-generation/
 import type { HttpRequest, HttpResponse } from '../../src/infrastructure/http/types.js';
 import type { LongitudinalOdinProgramme } from '../../src/domain/programme/programme.types.js';
 
+const stripNulls = (obj: unknown): unknown => {
+  if (obj === null) return undefined;
+  if (Array.isArray(obj)) return obj.map(stripNulls);
+  if (typeof obj === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+      const stripped = stripNulls(v);
+      if (stripped !== undefined) result[k] = stripped;
+    }
+    return result;
+  }
+  return obj;
+};
+
 const stepRequestSchema = z.discriminatedUnion('step', [
   z.object({
     step: z.literal('strategy'),
@@ -106,7 +120,7 @@ export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
       }
 
       if (body.step === 'phase') {
-        const strategy = AiStrategyOutputSchema.parse(body.strategy);
+        const strategy = AiStrategyOutputSchema.parse(stripNulls(body.strategy));
         const skeleton = strategy.phase_skeletons[body.phase_index];
         if (!skeleton) {
           throw odinError('INVALID_PHASE_INDEX', `Phase index ${body.phase_index} out of range.`, 400);
@@ -156,7 +170,7 @@ export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
       }
 
       if (body.step === 'assemble') {
-        const strategy = AiStrategyOutputSchema.parse(body.strategy);
+        const strategy = AiStrategyOutputSchema.parse(stripNulls(body.strategy));
         const phases = body.phases;
 
         const programme = assembleProgramme({
