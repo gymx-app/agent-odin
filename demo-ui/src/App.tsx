@@ -938,7 +938,7 @@ const ProcessLogs = ({ data }: { data: ProgrammePreviewResponse }) => {
         <div className="card-title">
           <Clock3 size={18} />
           <strong>Stage Durations</strong>
-          <StatusPill tone="default">{totalMs.toLocaleString()} ms total</StatusPill>
+          <StatusPill tone="neutral">{totalMs.toLocaleString()} ms total</StatusPill>
         </div>
         <table className="log-table">
           <thead>
