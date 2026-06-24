@@ -79,6 +79,7 @@ const stepRequestSchema = z.discriminatedUnion('step', [
     reasoning: z.string().optional(),
     tool_conversation: z.array(z.any()).default([]),
     prior_weeks: z.array(z.any()).default([]),
+    previous_response_id: z.string().optional(),
   }),
   z.object({
     step: z.literal('assemble'),
@@ -303,6 +304,7 @@ export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
         };
         if (body.reasoning) weekGenCtx.reasoning = body.reasoning;
         if (body.tool_conversation.length > 0) weekGenCtx.toolConversation = body.tool_conversation;
+        if (body.previous_response_id) weekGenCtx.previousResponseId = body.previous_response_id;
 
         const weekResult = await provider.generateWeek(
           weekGenCtx,
@@ -314,6 +316,7 @@ export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
           phase_index: body.phase_index,
           week_index: body.week_index,
           week: weekResult.output,
+          response_id: weekResult.responseId,
           usage: {
             inputTokens: weekResult.usage.inputTokens ?? 0,
             outputTokens: weekResult.usage.outputTokens ?? 0,

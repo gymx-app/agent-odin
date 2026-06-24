@@ -399,26 +399,33 @@ export class OpenAIAiProgrammeGenerationProvider
   ): Promise<AiWeekGenerationResult> {
     const model = this.model;
 
-    const input: OpenAI.Responses.ResponseInputItem[] = [
-      { role: 'system', content: aiPhaseSystemPrompt },
-      { role: 'user', content: JSON.stringify({ phase_context: weekCtx.phaseContext, week_generation_instructions: weekCtx.weekPrompt }) },
-    ];
+    const weekUserMessage = weekCtx.weekPrompt + '\nOutput ONLY valid JSON for this single week object. No markdown fences.';
 
-    if (weekCtx.reasoning) {
-      input.push({ role: 'assistant', content: weekCtx.reasoning });
+    let input: OpenAI.Responses.ResponseInputItem[];
+    let previousResponseId: string | undefined;
+
+    if (weekCtx.previousResponseId) {
+      previousResponseId = weekCtx.previousResponseId;
+      input = [{ role: 'user', content: weekUserMessage }];
+    } else {
+      input = [
+        { role: 'system', content: aiPhaseSystemPrompt },
+        { role: 'user', content: JSON.stringify({ phase_context: weekCtx.phaseContext, week_generation_instructions: weekCtx.weekPrompt }) },
+      ];
+      if (weekCtx.reasoning) {
+        input.push({ role: 'assistant', content: weekCtx.reasoning });
+      }
+      if (weekCtx.toolConversation && weekCtx.toolConversation.length > 0) {
+        input.push(...(weekCtx.toolConversation as OpenAI.Responses.ResponseInputItem[]));
+      }
+      input.push({ role: 'user', content: weekUserMessage });
     }
-    if (weekCtx.toolConversation && weekCtx.toolConversation.length > 0) {
-      input.push(...(weekCtx.toolConversation as OpenAI.Responses.ResponseInputItem[]));
-    }
-    input.push({
-      role: 'user',
-      content: weekCtx.weekPrompt + '\nOutput ONLY valid JSON for this single week object. No markdown fences.',
-    });
 
     try {
       const response = await withRateLimitRetry(() => this.client.responses.create({
         model,
         input,
+        ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
         text: { format: { type: 'json_object' } },
         max_output_tokens: 8000,
       }));

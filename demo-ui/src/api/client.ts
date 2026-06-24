@@ -194,6 +194,7 @@ export const odinApi = {
       const weeksCount = phaseSkeleton.weeks_count;
       const weeks: unknown[] = [];
       const weekSummaries: { week_number: number; week_type: string }[] = [];
+      let previousResponseId: string | undefined;
 
       for (let w = 0; w < weeksCount; w++) {
         onProgress?.({
@@ -203,28 +204,37 @@ export const odinApi = {
           totalPhases,
         });
 
+        const weekBody: Record<string, unknown> = {
+          step: 'phase_week',
+          athlete,
+          strategy: strategyResult.strategy,
+          phase_index: i,
+          week_index: w,
+          prior_phase_summaries: summaries,
+          prior_weeks: weekSummaries,
+        };
+
+        if (previousResponseId) {
+          weekBody.previous_response_id = previousResponseId;
+        } else {
+          weekBody.reasoning = prepResult.reasoning;
+          weekBody.tool_conversation = prepResult.tool_conversation;
+        }
+
         const weekResult = await request<{
           step: 'phase_week';
           phase_index: number;
           week_index: number;
           week: unknown;
+          response_id: string | null;
           usage: { inputTokens: number; outputTokens: number };
         }>(paths.previewStep, {
           method: 'POST',
           token,
-          body: {
-            step: 'phase_week',
-            athlete,
-            strategy: strategyResult.strategy,
-            phase_index: i,
-            week_index: w,
-            prior_phase_summaries: summaries,
-            reasoning: prepResult.reasoning,
-            tool_conversation: prepResult.tool_conversation,
-            prior_weeks: weekSummaries,
-          },
+          body: weekBody,
         });
 
+        previousResponseId = weekResult.response_id ?? undefined;
         const weekData = weekResult.week as { week_number: number; week_type: string };
         weeks.push(weekData);
         weekSummaries.push({ week_number: weekData.week_number, week_type: weekData.week_type });

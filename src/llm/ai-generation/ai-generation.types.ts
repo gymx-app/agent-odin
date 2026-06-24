@@ -44,6 +44,7 @@ export type AiWeekGenerationContext = {
   weekPrompt: string;
   reasoning?: string;
   toolConversation?: unknown[];
+  previousResponseId?: string;
 };
 
 export type PhaseSummary = {
