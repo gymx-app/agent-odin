@@ -147,15 +147,44 @@ export const odinApi = {
     const summaries: unknown[] = [];
 
     for (let i = 0; i < totalPhases; i++) {
+      // Sub-step A: Reasoning (tool-use / exercise search)
       onProgress?.({
-        step: 'phase',
-        detail: `Generating phase ${i + 1} of ${totalPhases}...`,
+        step: 'phase_reasoning',
+        detail: `Phase ${i + 1}/${totalPhases} — reasoning...`,
+        phaseIndex: i,
+        totalPhases,
+      });
+
+      const reasoningResult = await request<{
+        step: 'phase_reasoning';
+        phase_index: number;
+        reasoning: string | null;
+        usage: { inputTokens: number; outputTokens: number };
+      }>(paths.previewStep, {
+        method: 'POST',
+        token,
+        body: {
+          step: 'phase_reasoning',
+          athlete,
+          strategy: strategyResult.strategy,
+          phase_index: i,
+          prior_phase_summaries: summaries,
+        },
+      });
+
+      totalInputTokens += reasoningResult.usage.inputTokens ?? 0;
+      totalOutputTokens += reasoningResult.usage.outputTokens ?? 0;
+
+      // Sub-step B: Generate phase structure
+      onProgress?.({
+        step: 'phase_generate',
+        detail: `Phase ${i + 1}/${totalPhases} — generating...`,
         phaseIndex: i,
         totalPhases,
       });
 
       const phaseResult = await request<{
-        step: 'phase';
+        step: 'phase_generate';
         phase: unknown;
         summary: unknown;
         usage: { inputTokens: number; outputTokens: number };
@@ -163,11 +192,12 @@ export const odinApi = {
         method: 'POST',
         token,
         body: {
-          step: 'phase',
+          step: 'phase_generate',
           athlete,
           strategy: strategyResult.strategy,
           phase_index: i,
           prior_phase_summaries: summaries,
+          reasoning: reasoningResult.reasoning,
         },
       });
 

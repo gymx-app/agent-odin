@@ -53,11 +53,19 @@ const stepRequestSchema = z.discriminatedUnion('step', [
     athlete: AthleteInputSchema,
   }),
   z.object({
-    step: z.literal('phase'),
+    step: z.literal('phase_reasoning'),
     athlete: AthleteInputSchema,
     strategy: z.any(),
     phase_index: z.number().int().nonnegative(),
     prior_phase_summaries: z.array(z.any()).default([]),
+  }),
+  z.object({
+    step: z.literal('phase_generate'),
+    athlete: AthleteInputSchema,
+    strategy: z.any(),
+    phase_index: z.number().int().nonnegative(),
+    prior_phase_summaries: z.array(z.any()).default([]),
+    reasoning: z.string().optional(),
   }),
   z.object({
     step: z.literal('assemble'),
@@ -119,7 +127,7 @@ export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
         });
       }
 
-      if (body.step === 'phase') {
+      if (body.step === 'phase_reasoning') {
         const strategy = AiStrategyOutputSchema.parse(stripNulls(body.strategy));
         const skeleton = strategy.phase_skeletons[body.phase_index];
         if (!skeleton) {
@@ -134,37 +142,63 @@ export const createPreviewStepHandler = (appConfig: AppConfig = config) => {
           body.prior_phase_summaries,
         );
 
-        let reasoningOutput: string | undefined;
-        let reasoningUsage = { inputTokens: 0, outputTokens: 0 };
-        if (provider.generateReasoning) {
-          const reasoningResult = await provider.generateReasoning(phaseCtx, {
-            requestId: context.requestId,
-            toolExecutor,
+        if (!provider.generateReasoning) {
+          return successResponse({
+            step: 'phase_reasoning',
+            phase_index: body.phase_index,
+            reasoning: null,
+            usage: { inputTokens: 0, outputTokens: 0 },
           });
-          reasoningOutput = reasoningResult.reasoning;
-          reasoningUsage = {
+        }
+
+        const reasoningResult = await provider.generateReasoning(phaseCtx, {
+          requestId: context.requestId,
+          toolExecutor,
+        });
+
+        return successResponse({
+          step: 'phase_reasoning',
+          phase_index: body.phase_index,
+          reasoning: reasoningResult.reasoning,
+          usage: {
             inputTokens: reasoningResult.usage.inputTokens ?? 0,
             outputTokens: reasoningResult.usage.outputTokens ?? 0,
-          };
+          },
+        });
+      }
+
+      if (body.step === 'phase_generate') {
+        const strategy = AiStrategyOutputSchema.parse(stripNulls(body.strategy));
+        const skeleton = strategy.phase_skeletons[body.phase_index];
+        if (!skeleton) {
+          throw odinError('INVALID_PHASE_INDEX', `Phase index ${body.phase_index} out of range.`, 400);
         }
+
+        const phaseCtx = buildAiPhaseContext(
+          normalized,
+          strategy,
+          skeleton,
+          seedExercises,
+          body.prior_phase_summaries,
+        );
 
         const result = await provider.generatePhase(phaseCtx, {
           requestId: context.requestId,
           toolExecutor,
-          ...(reasoningOutput !== undefined ? { reasoningOutput } : {}),
+          ...(body.reasoning ? { reasoningOutput: body.reasoning } : {}),
         });
 
         const phase = result.output;
         const summary = summarisePhase({ ...skeleton, weeks: phase.weeks });
 
         return successResponse({
-          step: 'phase',
+          step: 'phase_generate',
           phase_index: body.phase_index,
           phase,
           summary,
           usage: {
-            inputTokens: (result.usage.inputTokens ?? 0) + reasoningUsage.inputTokens,
-            outputTokens: (result.usage.outputTokens ?? 0) + reasoningUsage.outputTokens,
+            inputTokens: result.usage.inputTokens ?? 0,
+            outputTokens: result.usage.outputTokens ?? 0,
           },
         });
       }
