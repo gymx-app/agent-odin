@@ -11,11 +11,7 @@ export type Equipment =
   | 'bodyweight'
   | 'home_gym';
 export type FitnessLevel = 'beginner' | 'intermediate' | 'advanced';
-export type RefinementMode =
-  | 'deterministic'
-  | 'llm_optional'
-  | 'llm_required';
-export type PlannerVersion = 'legacy_v1' | 'longitudinal_v1' | 'ai_agent_v1';
+export type PlannerVersion = 'longitudinal_v1' | 'ai_agent_v1';
 
 export type DayOfWeek =
   | 'monday'
@@ -124,99 +120,6 @@ export type RefinementMetadata = {
   operation_count?: number;
   accepted_operation_types?: string[];
   retry_attempted?: boolean;
-};
-
-export type ExerciseSet = {
-  set_number: number;
-  target_reps: number;
-  target_rpe: number;
-  rpe_ceiling: number;
-  rest_seconds: number;
-  set_type: 'working' | 'backoff' | 'calibration';
-};
-
-export type ProgrammeExercise = {
-  display_order: number;
-  exercise_id: string;
-  exercise_name: string;
-  tags: string[];
-  coaching_cues: string[];
-  warnings: string[];
-  sets: ExerciseSet[];
-  progression_bounds: { rep_min: number; rep_max: number };
-  progression_rule: string;
-  equipment: string[];
-  movement_patterns: string[];
-  primary_muscles: string[];
-  secondary_muscles: string[];
-};
-
-export type ProgrammeDay = {
-  day_of_week: string;
-  workout_type: 'workout' | 'liss' | 'rest';
-  title: string;
-  subtitle: string;
-  duration_min: number | null;
-  tags: string[];
-  has_warmup: boolean;
-  liss_content: string | null;
-  cooldown_items: Array<{
-    item_key: string;
-    label: string;
-    detail: string;
-    display_order: number;
-  }>;
-  exercises: ProgrammeExercise[];
-};
-
-export type OdinProgramme = {
-  programme: {
-    name: string;
-    goal_type: AthleteGoal;
-    goal_description: string;
-    start_weight_kg: number;
-    target_weight_kg: number;
-    target_weeks: number;
-    available_days: number;
-    equipment: Equipment;
-    started_at: string;
-  };
-  config: {
-    start_date: string;
-    phase_weeks: number[];
-    min_active_days: number;
-    total_phases: number;
-  };
-  phases: Array<{
-    phase_number: number;
-    name: string;
-    goal: string;
-    weeks_count: number;
-    intensity_level: number;
-    volume_level: number;
-    progression_intent: string;
-  }>;
-  phase_week_templates: Array<{
-    phase_number: number;
-    days: ProgrammeDay[];
-  }>;
-  warmup_items: Array<{
-    item_key: string;
-    label: string;
-    detail: string;
-    display_order: number;
-  }>;
-  assumptions: string[];
-  review_triggers: string[];
-  validation_summary: {
-    passed: boolean;
-    scores: Record<string, number>;
-    warnings: Array<{
-      code: string;
-      severity: 'info' | 'warning' | 'error';
-      message: string;
-    }>;
-  };
 };
 
 // --- V2 longitudinal types ---
@@ -360,7 +263,7 @@ export type V2Phase = {
 
 export type LongitudinalOdinProgramme = {
   schema_version: '2.0';
-  planner_version: 'longitudinal_v1';
+  planner_version: 'longitudinal_v1' | 'ai_agent_v1';
   programme: {
     name: string;
     goal_type: string;
@@ -414,10 +317,10 @@ export type AiGenerationMeta = {
 };
 
 export type ProgrammePreviewResponse = {
-  source: 'deterministic' | 'llm_refined' | 'ai_generated';
+  source: 'deterministic' | 'ai_generated';
   planner_version: PlannerVersion;
-  schema_version: '1.0' | '2.0';
-  programme: OdinProgramme | LongitudinalOdinProgramme;
+  schema_version: '2.0';
+  programme: LongitudinalOdinProgramme;
   validation: ProgrammeValidation;
   refinement: RefinementMetadata;
   generation: {
@@ -440,28 +343,11 @@ export type ProgrammePreviewResponse = {
   };
 };
 
-export const isLegacyProgramme = (
-  programme: ProgrammePreviewResponse['programme'],
-): programme is OdinProgramme => 'phase_week_templates' in programme;
-
 export const isLongitudinalProgramme = (
   programme: ProgrammePreviewResponse['programme'],
 ): programme is LongitudinalOdinProgramme =>
   'schema_version' in programme &&
   (programme as LongitudinalOdinProgramme).schema_version === '2.0';
-
-export const isLegacyResponse = (
-  data: ProgrammePreviewResponse,
-): data is ProgrammePreviewResponse & { programme: OdinProgramme } =>
-  data.planner_version === 'legacy_v1' && data.schema_version === '1.0';
-
-export const isLongitudinalResponse = (
-  data: ProgrammePreviewResponse,
-): data is ProgrammePreviewResponse & {
-  programme: LongitudinalOdinProgramme;
-} =>
-  (data.planner_version === 'longitudinal_v1' || data.planner_version === 'ai_agent_v1') &&
-  data.schema_version === '2.0';
 
 export type SuccessEnvelope<T> = { success: true; data: T };
 export type ErrorEnvelope = {

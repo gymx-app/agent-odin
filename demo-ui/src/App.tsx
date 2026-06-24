@@ -34,14 +34,12 @@ import type {
   AthleteInput,
   DayOfWeek,
   LongitudinalOdinProgramme,
-  ProgrammeDay,
   ProgrammePreviewResponse,
   V2Day,
   V2Phase,
   V2Week,
 } from './api/contracts';
 import {
-  isLegacyProgramme,
   isLongitudinalProgramme,
 } from './api/contracts';
 import { defaultProfile } from './fixtures/default-profile';
@@ -90,10 +88,10 @@ type BusyAction =
   | 'health'
   | 'auth'
   | 'profile-load'
-  | 'preview'
+  | 'generate'
   | null;
 
-type WorkflowStep = 'connect' | 'preview' | 'review';
+type WorkflowStep = 'connect' | 'generate' | 'review';
 type ResultTab = 'programme' | 'validation' | 'json' | 'logs';
 
 type ProfileLoadState =
@@ -267,83 +265,8 @@ const ScoreRing = ({ score }: { score: number }) => (
   </div>
 );
 
-// --- V1 Legacy Programme View ---
 
-const WorkoutDay = ({ day }: { day: ProgrammeDay }) => (
-  <details className={`workout-day workout-${day.workout_type}`}>
-    <summary>
-      <div className="day-code">{day.day_of_week.slice(0, 3)}</div>
-      <div className="day-heading">
-        <strong>{day.title || labelize(day.workout_type)}</strong>
-        <span>
-          {day.subtitle ||
-            (day.workout_type === 'rest'
-              ? 'Recovery day'
-              : `${day.exercises.length} exercises`)}
-        </span>
-      </div>
-      <div className="day-meta">
-        {day.duration_min ? (
-          <span>
-            <Clock3 size={14} /> {day.duration_min} min
-          </span>
-        ) : null}
-        <StatusPill>
-          {day.workout_type === 'liss' ? 'LISS' : labelize(day.workout_type)}
-        </StatusPill>
-        <ChevronDown size={18} className="chevron" />
-      </div>
-    </summary>
-    <div className="day-content">
-      {day.liss_content ? <p className="liss-copy">{day.liss_content}</p> : null}
-      {day.exercises.map((exercise) => (
-        <div className="exercise-row" key={exercise.exercise_id}>
-          <div className="exercise-order">
-            {String(exercise.display_order + 1).padStart(2, '0')}
-          </div>
-          <div className="exercise-main">
-            <strong>{exercise.exercise_name}</strong>
-            <span>{exercise.primary_muscles.map(labelize).join(' · ')}</span>
-          </div>
-          <div className="set-chips">
-            {exercise.sets.map((set) => (
-              <span key={set.set_number}>
-                {set.target_reps} reps
-                <small> RPE {set.target_rpe}</small>
-              </span>
-            ))}
-          </div>
-          <div className="rest-copy">
-            {exercise.sets[0]?.rest_seconds ?? 0}s rest
-          </div>
-        </div>
-      ))}
-    </div>
-  </details>
-);
 
-const LegacyProgrammeView = ({
-  programme,
-  selectedPhase,
-}: {
-  programme: import('./api/contracts').OdinProgramme;
-  selectedPhase: number;
-}) => {
-  const activeDays =
-    programme.phase_week_templates.find(
-      (template) => template.phase_number === selectedPhase,
-    )?.days ?? [];
-
-  return (
-    <div className="workout-list">
-      {activeDays.map((day) => (
-        <WorkoutDay key={day.day_of_week} day={day} />
-      ))}
-    </div>
-  );
-};
-
-// --- V2 Longitudinal Programme View ---
 
 const dayTypeLabel = (type: string) => {
   const map: Record<string, string> = {
@@ -963,7 +886,6 @@ function App() {
     useState<ProfileLoadState>({ status: 'default' });
   const [programme, setProgramme] =
     useState<ProgrammePreviewResponse | null>(null);
-  const [selectedPhase, setSelectedPhase] = useState(1);
   const [resultTab, setResultTab] = useState<ResultTab>('programme');
   const [busy, setBusy] = useState<BusyAction>(null);
   const [progressDetail, setProgressDetail] = useState<string | null>(null);
@@ -980,7 +902,7 @@ function App() {
   const workflowStep: WorkflowStep = !token.trim()
     ? 'connect'
     : !programme
-      ? 'preview'
+      ? 'generate'
       : 'review';
 
   const isBusy = busy !== null;
@@ -1267,7 +1189,7 @@ function App() {
     });
   };
 
-  const generatePreview = () => {
+  const generateProgramme = () => {
     if (!requireToken()) return;
     const parsed = athleteInputSchema.safeParse(profile);
     if (!parsed.success) {
@@ -1275,13 +1197,13 @@ function App() {
         tone: 'error',
         title: 'PROFILE_VALIDATION_FAILED',
         message:
-          'Review the validation details and correct the profile before generating a preview.',
+          'Review the validation details and correct the profile before generating a programme.',
         details: parsed.error.flatten().fieldErrors,
       });
       return;
     }
     void run(
-      'preview',
+      'generate',
       () => {
         setProgressDetail('Initializing AI agent...');
         return odinApi.generateProgramme(
@@ -1294,12 +1216,9 @@ function App() {
         setProgressDetail(null);
         setProgramme(data);
         setResultTab('programme');
-        if (isLegacyProgramme(data.programme)) {
-          setSelectedPhase(data.programme.phases[0]?.phase_number ?? 1);
-        }
         setNotice({
           tone: 'success',
-          title: 'Programme preview generated',
+          title: 'Programme generated',
           message: `${data.programme.programme.name} is ready to review. Nothing was persisted.`,
         });
         document
@@ -1310,13 +1229,7 @@ function App() {
   };
 
   const programmeName = programme?.programme.programme.name ?? '';
-  const programmeDescription = programme
-    ? isLegacyProgramme(programme.programme)
-      ? programme.programme.programme.goal_description
-      : isLongitudinalProgramme(programme.programme)
-        ? programme.programme.programme.goal_description
-        : ''
-    : '';
+  const programmeDescription = programme?.programme.programme.goal_description ?? '';
 
   return (
     <div className="app-shell">
@@ -1332,7 +1245,7 @@ function App() {
         </a>
         <nav>
           <a href="#athlete">Athlete</a>
-          <a href="#generate">Preview</a>
+          <a href="#generate">Generate</a>
           <a href="#programme">Programme</a>
         </nav>
         <button
@@ -1365,7 +1278,7 @@ function App() {
           </h1>
           <p>
             A focused interface for Odin's authenticated API—from transient
-            athlete input to a validated, exercise-level programme preview.
+            athlete input to a validated, AI-generated training programme.
           </p>
           <div className="hero-steps">
             <span><b>01</b> Connect</span>
@@ -2077,9 +1990,9 @@ function App() {
                 <div>
                   <span className="section-number">02</span>
                   <div>
-                    <h2>Generate preview</h2>
+                    <h2>Generate programme</h2>
                     <p>
-                      Athlete input is sent transiently and is not persisted by Odin.
+                      AI strategy + deterministic build. Nothing is persisted.
                     </p>
                   </div>
                 </div>
@@ -2089,14 +2002,14 @@ function App() {
               <div className="preview-actions">
                 <span>
                   <ShieldCheck size={16} />
-                  Authenticated, stateless preview
+                  Authenticated, stateless generation
                 </span>
                 <Button
-                  onClick={generatePreview}
-                  busy={busy === 'preview'}
+                  onClick={generateProgramme}
+                  busy={busy === 'generate'}
                   disabled={isBusy}
                 >
-                  <Sparkles size={16} /> Generate preview
+                  <Sparkles size={16} /> Generate programme
                 </Button>
               </div>
             </section>
@@ -2116,7 +2029,7 @@ function App() {
                 <div className="programme-result">
                   <div className="programme-overview">
                     <div>
-                      <div className="eyebrow">Stateless preview</div>
+                      <div className="eyebrow">AI-generated programme</div>
                       <h3>{programmeName}</h3>
                       <p>{programmeDescription}</p>
                       <div className="overview-pills">
@@ -2126,12 +2039,7 @@ function App() {
                         <StatusPill tone={programme.source === 'ai_generated' ? 'purple' : 'neutral'}>{labelize(programme.source)}</StatusPill>
                         <StatusPill>{labelize(programme.planner_version)}</StatusPill>
                         <StatusPill>Schema {programme.schema_version}</StatusPill>
-                        {isLegacyProgramme(programme.programme) ? (
-                          <>
-                            <StatusPill>{programme.programme.programme.target_weeks} weeks</StatusPill>
-                            <StatusPill>{programme.programme.programme.available_days} days</StatusPill>
-                          </>
-                        ) : isLongitudinalProgramme(programme.programme) ? (
+                        {isLongitudinalProgramme(programme.programme) ? (
                           <StatusPill>{programme.programme.programme.target_weeks} weeks</StatusPill>
                         ) : null}
                       </div>
@@ -2144,28 +2052,7 @@ function App() {
 
                   {resultTab === 'programme' ? (
                     <>
-                      {isLegacyProgramme(programme.programme) ? (
-                        <>
-                          <div className="phase-tabs">
-                            {programme.programme.phases.map((phase) => (
-                              <button
-                                type="button"
-                                key={phase.phase_number}
-                                className={selectedPhase === phase.phase_number ? 'active' : ''}
-                                onClick={() => setSelectedPhase(phase.phase_number)}
-                              >
-                                <span>Phase {phase.phase_number}</span>
-                                <strong>{phase.name}</strong>
-                                <small>{phase.weeks_count} weeks</small>
-                              </button>
-                            ))}
-                          </div>
-                          <LegacyProgrammeView
-                            programme={programme.programme}
-                            selectedPhase={selectedPhase}
-                          />
-                        </>
-                      ) : isLongitudinalProgramme(programme.programme) ? (
+                      {isLongitudinalProgramme(programme.programme) ? (
                         <LongitudinalProgrammeView programme={programme.programme} />
                       ) : (
                         <UnsupportedVersionView />
@@ -2275,19 +2162,19 @@ function App() {
               ) : (
                 <div className="empty-programme">
                   <div className="empty-orbit"><Activity size={28} /></div>
-                  <h3>No preview generated</h3>
+                  <h3>No programme generated</h3>
                   <p>
-                    Configure the athlete and generate a validated, stateless programme preview.
+                    Configure the athlete and generate a validated, AI-powered training programme.
                   </p>
                   <Button
                     variant="secondary"
-                    onClick={generatePreview}
-                    busy={busy === 'preview'}
+                    onClick={generateProgramme}
+                    busy={busy === 'generate'}
                     disabled={isBusy}
                   >
-                    <Sparkles size={15} /> Generate preview
+                    <Sparkles size={15} /> Generate programme
                   </Button>
-                  {progressDetail && busy === 'preview' && (
+                  {progressDetail && busy === 'generate' && (
                     <p className="auto-save-hint" style={{ marginTop: '0.5rem' }}>
                       {progressDetail}
                     </p>
@@ -2312,7 +2199,7 @@ function App() {
                   <span>{token.trim() ? <Check size={13} /> : '2'}</span>
                   <div><strong>Configure athlete</strong><small>Transient input</small></div>
                 </li>
-                <li className={workflowStep === 'preview' ? 'active' : programme ? 'done' : ''}>
+                <li className={workflowStep === 'generate' ? 'active' : programme ? 'done' : ''}>
                   <span>{programme ? <Check size={13} /> : '3'}</span>
                   <div><strong>Generate programme</strong><small>POST /api/odin/generate-programme</small></div>
                 </li>
