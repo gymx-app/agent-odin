@@ -213,6 +213,7 @@ main { max-width: 1400px; margin: 0 auto; padding: 0 24px 80px; }
 .panel-actions { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 18px; display: flex; justify-content: space-between; align-items: center; }
 .panel-actions > span { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 10px; }
 .profile-actions { display: flex; align-items: center; gap: 8px; }
+.auto-save-hint { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted); opacity: .7; }
 .button { min-height: 39px; border-radius: 9px; padding: 0 14px; border: 1px solid transparent; display: inline-flex; justify-content: center; align-items: center; gap: 7px; font-size: 11px; font-weight: 800; transition: transform .15s, background .15s; }
 .button:hover:not(:disabled) { transform: translateY(-1px); }
 .button:disabled { opacity: .55; box-shadow: none; }

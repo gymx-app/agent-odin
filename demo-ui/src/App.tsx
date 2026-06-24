@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   AlertCircle,
@@ -1161,6 +1161,20 @@ function App() {
     saveForm({ profile, refinementMode, plannerVersion });
   }, [profile, refinementMode, plannerVersion, generationMode]);
 
+  // Auto-save per-user profile on every form change
+  const sessionEmailRef = useRef(sessionEmail);
+  sessionEmailRef.current = sessionEmail;
+  const profileRestoringRef = useRef(false);
+
+  useEffect(() => {
+    const email = sessionEmailRef.current;
+    if (!email || profileRestoringRef.current) return;
+    try {
+      localStorage.setItem(profileStorageKey(email), JSON.stringify(profile));
+    } catch { /* quota exceeded — ignore */ }
+  }, [profile]);
+
+  // Restore per-user profile on login / page refresh
   useEffect(() => {
     if (!sessionEmail) return;
     try {
@@ -1168,21 +1182,13 @@ function App() {
       if (!raw) return;
       const parsed = athleteInputSchema.safeParse(JSON.parse(raw));
       if (parsed.success) {
+        profileRestoringRef.current = true;
         setProfile(parsed.data);
-        setNotice({ tone: 'info', title: 'Profile loaded', message: `Saved profile for ${sessionEmail} restored.` });
+        setNotice({ tone: 'info', title: 'Profile restored', message: `Saved profile for ${sessionEmail} loaded.` });
+        queueMicrotask(() => { profileRestoringRef.current = false; });
       }
     } catch { /* ignore */ }
   }, [sessionEmail]);
-
-  const saveProfileToStorage = () => {
-    if (!sessionEmail) return;
-    try {
-      localStorage.setItem(profileStorageKey(sessionEmail), JSON.stringify(profile));
-      setNotice({ tone: 'success', title: 'Profile saved', message: `Profile saved locally for ${sessionEmail}.` });
-    } catch {
-      setNotice({ tone: 'error', title: 'Save failed', message: 'Could not save profile to local storage.' });
-    }
-  };
 
   const loadAuthenticatedProfile = async (showNotice = true) => {
     const authClient = supabaseAuth;
@@ -2168,13 +2174,11 @@ function App() {
                     : 'User ID comes from the verified token'}
                 </span>
                 <div className="profile-actions">
-                  <Button
-                    variant="secondary"
-                    onClick={saveProfileToStorage}
-                    disabled={!sessionEmail}
-                  >
-                    <Database size={16} /> Save profile
-                  </Button>
+                  {sessionEmail && (
+                    <span className="auto-save-hint">
+                      <Database size={14} /> Auto-saved
+                    </span>
+                  )}
                   <Button
                     variant="secondary"
                     onClick={() => void loadAuthenticatedProfile(true)}
