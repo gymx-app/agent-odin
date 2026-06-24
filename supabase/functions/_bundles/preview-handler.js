@@ -73012,35 +73012,12 @@ var AGENT_TOOLS = [
 ];
 
 // src/llm/ai-generation/openai-schema-compat.ts
-var containsRecord = (schema) => {
-  if (schema instanceof external_exports.ZodRecord) return true;
-  if (schema instanceof external_exports.ZodOptional || schema instanceof external_exports.ZodNullable)
-    return containsRecord(schema.unwrap());
-  if (schema instanceof external_exports.ZodDefault)
-    return containsRecord(schema.removeDefault());
-  if (schema instanceof external_exports.ZodEffects)
-    return containsRecord(schema.innerType());
-  if (schema instanceof external_exports.ZodArray) return containsRecord(schema.element);
-  if (schema instanceof external_exports.ZodObject) {
-    const shape = schema.shape;
-    return Object.values(shape).some(containsRecord);
-  }
-  return false;
-};
 var toOpenAISchema = (schema) => {
   if (schema instanceof external_exports.ZodOptional) {
-    const inner = schema.unwrap();
-    if (containsRecord(inner)) {
-      return external_exports.null();
-    }
-    return toOpenAISchema(inner).nullable();
+    return toOpenAISchema(schema.unwrap()).nullable();
   }
   if (schema instanceof external_exports.ZodNullable) {
-    const inner = schema.unwrap();
-    if (containsRecord(inner)) {
-      return external_exports.null();
-    }
-    return toOpenAISchema(inner).nullable();
+    return toOpenAISchema(schema.unwrap()).nullable();
   }
   if (schema instanceof external_exports.ZodRecord) {
     return external_exports.null();
@@ -73049,7 +73026,6 @@ var toOpenAISchema = (schema) => {
     const shape = schema.shape;
     const newShape = {};
     for (const [key, value] of Object.entries(shape)) {
-      if (containsRecord(value)) continue;
       newShape[key] = toOpenAISchema(value);
     }
     return external_exports.object(newShape);
@@ -73168,7 +73144,7 @@ var OpenAIAiProgrammeGenerationProvider = class {
                 );
               }
               if (item2.type === "output_text" && item2.parsed) {
-                const parsed = AiPhaseOutputSchema.safeParse(item2.parsed);
+                const parsed = OpenAIPhaseSchema.safeParse(item2.parsed);
                 if (parsed.success) {
                   parsedOutput = parsed.data;
                 } else {

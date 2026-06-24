@@ -153,9 +153,9 @@ export class OpenAIAiProgrammeGenerationProvider
                 );
               }
               if (item.type === 'output_text' && item.parsed) {
-                const parsed = AiPhaseOutputSchema.safeParse(item.parsed);
+                const parsed = OpenAIPhaseSchema.safeParse(item.parsed);
                 if (parsed.success) {
-                  parsedOutput = parsed.data;
+                  parsedOutput = parsed.data as AiPhaseGenerationResult['output'];
                 } else {
                   throw refinementError(
                     'LLM_OUTPUT_INVALID',
