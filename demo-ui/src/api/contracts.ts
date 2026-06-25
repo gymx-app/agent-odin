@@ -309,6 +309,35 @@ export type LongitudinalOdinProgramme = {
   [key: string]: unknown;
 };
 
+export type StrategyRationaleItem = {
+  decision: string;
+  value: string;
+  reason: string;
+  confidence: string;
+};
+
+export type DeterministicRationaleItem = {
+  area: string;
+  detail: string;
+};
+
+export type RationaleSummary = {
+  ai_strategy: {
+    decisions: StrategyRationaleItem[];
+    assumptions: Array<{ assumption: string; confidence: string }>;
+    key_policies: Array<{ policy: string; detail: string }>;
+  };
+  deterministic: {
+    build_decisions: DeterministicRationaleItem[];
+    phase_rationale: Array<{
+      phase: string;
+      phase_type: string;
+      decisions: Array<{ decision: string; value: string; reason: string }>;
+    }>;
+  };
+  combined: string[];
+};
+
 export type AiGenerationMeta = {
   total_input_tokens: number;
   total_output_tokens: number;
@@ -322,6 +351,7 @@ export type ProgrammePreviewResponse = {
   schema_version: '2.0';
   programme: LongitudinalOdinProgramme;
   validation: ProgrammeValidation;
+  rationale?: RationaleSummary;
   refinement: RefinementMetadata;
   generation: {
     planner_version: PlannerVersion;

@@ -3,7 +3,9 @@ import {
   Activity,
   AlertCircle,
   ArrowRight,
+  BookOpen,
   Bot,
+  BrainCircuit,
   Check,
   ChevronDown,
   ChevronRight,
@@ -35,6 +37,7 @@ import type {
   DayOfWeek,
   LongitudinalOdinProgramme,
   ProgrammePreviewResponse,
+  RationaleSummary as RationaleSummaryType,
   V2Day,
   V2Phase,
   V2Week,
@@ -92,7 +95,7 @@ type BusyAction =
   | null;
 
 type WorkflowStep = 'connect' | 'generate' | 'review';
-type ResultTab = 'programme' | 'validation' | 'json' | 'logs';
+type ResultTab = 'programme' | 'rationale' | 'validation' | 'json' | 'logs';
 
 type ProfileLoadState =
   | { status: 'default' }
@@ -741,16 +744,122 @@ const ResultTabs = ({
   onChange: (tab: ResultTab) => void;
 }) => (
   <div className="result-tabs">
-    {(['programme', 'validation', 'json', 'logs'] as const).map((tab) => (
+    {(['programme', 'rationale', 'validation', 'json', 'logs'] as const).map((tab) => (
       <button
         key={tab}
         type="button"
         className={active === tab ? 'active' : ''}
         onClick={() => onChange(tab)}
       >
-        {{ programme: 'Programme', validation: 'Validation', json: 'Raw JSON', logs: 'Process Logs' }[tab]}
+        {{ programme: 'Programme', rationale: 'Rationale', validation: 'Validation', json: 'Raw JSON', logs: 'Process Logs' }[tab]}
       </button>
     ))}
+  </div>
+);
+
+// --- Rationale View ---
+
+const RationaleView = ({ rationale }: { rationale: RationaleSummaryType }) => (
+  <div className="validation-grid">
+    <div className="validation-card" style={{ gridColumn: '1 / -1' }}>
+      <div className="card-title">
+        <BookOpen size={18} />
+        <strong>Programme Rationale</strong>
+        <StatusPill tone="positive">Combined</StatusPill>
+      </div>
+      <ul className="rationale-list">
+        {rationale.combined.map((line, i) => (
+          <li key={i}>{line}</li>
+        ))}
+      </ul>
+    </div>
+
+    <div className="validation-card">
+      <div className="card-title">
+        <BrainCircuit size={18} />
+        <strong>AI Coaching Decisions</strong>
+        <StatusPill tone="neutral">{rationale.ai_strategy.decisions.length} decisions</StatusPill>
+      </div>
+      <table className="log-table">
+        <thead>
+          <tr><th>Decision</th><th>Value</th><th>Reason</th></tr>
+        </thead>
+        <tbody>
+          {rationale.ai_strategy.decisions.map((d, i) => (
+            <tr key={i}>
+              <td><code>{d.decision}</code></td>
+              <td>{d.value}</td>
+              <td>{d.reason}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {rationale.ai_strategy.assumptions.length > 0 && (
+        <>
+          <div className="card-title" style={{ marginTop: '1rem' }}>
+            <strong>Assumptions</strong>
+          </div>
+          <ul className="rationale-list">
+            {rationale.ai_strategy.assumptions.map((a, i) => (
+              <li key={i}>
+                {a.assumption}
+                <span className="confidence-badge">{a.confidence}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {rationale.ai_strategy.key_policies.length > 0 && (
+        <>
+          <div className="card-title" style={{ marginTop: '1rem' }}>
+            <strong>Key Policies</strong>
+          </div>
+          <dl className="metadata-list">
+            {rationale.ai_strategy.key_policies.map((p, i) => (
+              <div key={i}><dt>{p.policy}</dt><dd>{p.detail}</dd></div>
+            ))}
+          </dl>
+        </>
+      )}
+    </div>
+
+    <div className="validation-card">
+      <div className="card-title">
+        <Settings size={18} />
+        <strong>Build Decisions</strong>
+        <StatusPill tone="neutral">Deterministic</StatusPill>
+      </div>
+      <dl className="metadata-list">
+        {rationale.deterministic.build_decisions.map((d, i) => (
+          <div key={i}><dt>{d.area}</dt><dd>{d.detail}</dd></div>
+        ))}
+      </dl>
+      {rationale.deterministic.phase_rationale.map((phase, i) => (
+        <div key={i} style={{ marginTop: '1rem' }}>
+          <div className="card-title">
+            <strong>{phase.phase} <small>({phase.phase_type})</small></strong>
+          </div>
+          {phase.decisions.length > 0 ? (
+            <table className="log-table">
+              <thead>
+                <tr><th>Decision</th><th>Value</th><th>Reason</th></tr>
+              </thead>
+              <tbody>
+                {phase.decisions.map((d, j) => (
+                  <tr key={j}>
+                    <td><code>{d.decision}</code></td>
+                    <td>{d.value}</td>
+                    <td>{d.reason}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p style={{ opacity: 0.6, fontSize: '0.85rem' }}>No phase-specific decisions recorded.</p>
+          )}
+        </div>
+      ))}
+    </div>
   </div>
 );
 
@@ -2058,6 +2167,14 @@ function App() {
                         <UnsupportedVersionView />
                       )}
                     </>
+                  ) : resultTab === 'rationale' ? (
+                    programme.rationale ? (
+                      <RationaleView rationale={programme.rationale} />
+                    ) : (
+                      <div className="empty-programme">
+                        <p>No rationale data available. Re-generate to see the coaching rationale.</p>
+                      </div>
+                    )
                   ) : resultTab === 'validation' ? (
                     <div className="validation-grid">
                       <div className="validation-card">

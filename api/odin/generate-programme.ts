@@ -26,6 +26,7 @@ import { programmeValidationService } from '../../src/validation/programme-valid
 import { LONGITUDINAL_VALIDATION_RULE_VERSION } from '../../src/validation/longitudinal-validation-registry.js';
 import { AiStrategyOutputSchema } from '../../src/llm/ai-generation/ai-generation.schema.js';
 import { buildProgrammeFromAiStrategy } from '../../src/planning/longitudinal-programme-planner.js';
+import { buildRationaleSummary } from '../../src/planning/rationale-summary.js';
 import type { AiProgrammeGenerationProvider } from '../../src/llm/ai-generation/ai-programme-generation-provider.js';
 import type { HttpRequest, HttpResponse } from '../../src/infrastructure/http/types.js';
 
@@ -348,6 +349,8 @@ export const createGenerateProgrammeHandler = (appConfig: AppConfig = config) =>
           { startDate: new Date().toISOString().slice(0, 10) },
         );
 
+        const rationale = buildRationaleSummary(strategy, programme);
+
         return successResponse({
           step: 'build',
           source: 'ai_generated' as const,
@@ -355,6 +358,7 @@ export const createGenerateProgrammeHandler = (appConfig: AppConfig = config) =>
           schema_version: '2.0' as const,
           programme,
           validation,
+          rationale,
           refinement: {
             requested: false,
             attempted: false,

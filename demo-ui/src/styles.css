@@ -551,6 +551,10 @@ footer p { margin-left: auto; font-size: 9px; }
 .v2-rationale-value { display: inline-block; margin-left: 4px; font: 500 8px 'DM Mono'; color: var(--green-dark); background: var(--green-soft); padding: 1px 5px; border-radius: 3px; }
 .v2-rationale-phase { border-color: #b9dfca; margin-bottom: 10px; }
 
+.rationale-list { margin: 8px 0 0; padding: 0 0 0 20px; list-style: disc; }
+.rationale-list li { font-size: 13px; color: var(--ink); line-height: 1.7; padding: 3px 0; }
+.confidence-badge { display: inline-block; margin-left: 6px; font: 500 10px 'DM Mono'; color: var(--green-dark); background: var(--green-soft); padding: 1px 6px; border-radius: 3px; vertical-align: middle; }
+
 .v2-review-triggers { margin-top: 10px; }
 .v2-review-triggers h5 { margin: 0 0 6px; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .v2-trigger { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 9px; }
