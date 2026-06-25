@@ -3,6 +3,8 @@ import type { NormalizedAthleteProfile } from '../domain/athlete/athlete.types.j
 import type { Exercise } from '../domain/exercise/exercise.types.js';
 import type { LongitudinalOdinProgramme } from '../domain/programme/programme.types.js';
 import type { AiStrategyOutput } from '../llm/ai-generation/ai-generation.types.js';
+import type { AiProgrammeGenerationProvider } from '../llm/ai-generation/ai-programme-generation-provider.js';
+import type { AiStrategyContext } from '../llm/ai-generation/ai-programme-generation-provider.js';
 import { programmeValidationService } from '../validation/programme-validation.service.js';
 import { LONGITUDINAL_VALIDATION_RULE_VERSION } from '../validation/longitudinal-validation-registry.js';
 import { planTrainingCalendar } from './calendar/calendar-planner.js';
@@ -13,6 +15,8 @@ import { buildProgrammeResistanceSessions } from './sessions/session-builder.js'
 import { selectProgrammeStrategyV2 } from './strategy/strategy-selector.js';
 import type { TrainingStrategyV2 } from './strategy/strategy.types.js';
 import { planProgrammeWeeks } from './weeks/week-progression-planner.js';
+
+const MAX_REPAIR_ATTEMPTS = 2;
 
 export type LongitudinalProgrammePlannerOptions = {
   startDate?: string;
@@ -280,15 +284,25 @@ const mapAiStrategyToTrainingStrategy = (
   rationale: ai.rationale,
 });
 
+type ValidationResult = ReturnType<typeof programmeValidationService.validateVersioned>;
+type ValidationFinding = ValidationResult['findings'][number];
+
+type BuildResult = {
+  programme: LongitudinalOdinProgramme;
+  validation: ValidationResult;
+  errorFindings: ValidationFinding[];
+} | {
+  programme: null;
+  validation: ValidationResult;
+  errorFindings: ValidationFinding[];
+};
+
 export const buildProgrammeFromAiStrategy = (
   profile: NormalizedAthleteProfile,
   exercises: Exercise[],
   aiStrategy: AiStrategyOutput,
   options: LongitudinalProgrammePlannerOptions = {},
-): {
-  programme: LongitudinalOdinProgramme;
-  validation: ReturnType<typeof programmeValidationService.validateVersioned>;
-} => {
+): BuildResult => {
   const startDate = options.startDate ?? new Date().toISOString().slice(0, 10);
   const generatedAt = options.generatedAt ?? new Date().toISOString();
   const run =
@@ -450,16 +464,16 @@ export const buildProgrammeFromAiStrategy = (
     }),
   );
 
+  const errorFindings = result.validation.findings.filter(
+    (f) => f.severity === 'error',
+  );
+
   if (result.programme.schema_version !== '2.0' || !result.validation.passed) {
-    throw new PlannerError(
-      'PROGRAMME_REPAIR_FAILED',
-      `AI-strategy-driven programme remained invalid after bounded repair: ${result.validation.findings.filter((f) => f.severity === 'error').map((f) => f.code).join(', ')}`,
-      {
-        status: result.validation.status,
-        summary: result.validation.summary,
-        findings: result.validation.findings.filter((f) => f.severity === 'error').map((f) => ({ code: f.code, message: f.message, phase: f.phase_number })),
-      },
-    );
+    return {
+      programme: null,
+      validation: result.validation,
+      errorFindings,
+    };
   }
 
   const programme = run('final_validation', () =>
@@ -469,5 +483,97 @@ export const buildProgrammeFromAiStrategy = (
     }),
   );
 
-  return { programme, validation: result.validation };
+  return { programme, validation: result.validation, errorFindings: [] };
+};
+
+export type RepairAttempt = {
+  attempt: number;
+  errorCodes: string[];
+  repaired: boolean;
+};
+
+export type BuildWithRepairResult = {
+  programme: LongitudinalOdinProgramme;
+  validation: ReturnType<typeof programmeValidationService.validateVersioned>;
+  repair_log: RepairAttempt[];
+};
+
+export const buildProgrammeWithRepair = async (
+  profile: NormalizedAthleteProfile,
+  exercises: Exercise[],
+  aiStrategy: AiStrategyOutput,
+  provider: AiProgrammeGenerationProvider,
+  strategyContext: AiStrategyContext,
+  options: LongitudinalProgrammePlannerOptions = {},
+): Promise<BuildWithRepairResult> => {
+  const repairLog: RepairAttempt[] = [];
+  let currentStrategy = aiStrategy;
+
+  for (let attempt = 0; attempt <= MAX_REPAIR_ATTEMPTS; attempt++) {
+    const result = buildProgrammeFromAiStrategy(
+      profile,
+      exercises,
+      currentStrategy,
+      options,
+    );
+
+    if (result.programme) {
+      if (attempt > 0) {
+        repairLog.push({
+          attempt,
+          errorCodes: [],
+          repaired: true,
+        });
+      }
+      return {
+        programme: result.programme,
+        validation: result.validation,
+        repair_log: repairLog,
+      };
+    }
+
+    const errorCodes = result.errorFindings.map((f) => f.code);
+    const errorMessages = result.errorFindings.map(
+      (f) => `[${f.code}] ${f.message}${f.phase_number != null ? ` (phase ${f.phase_number})` : ''}`,
+    );
+
+    repairLog.push({
+      attempt,
+      errorCodes,
+      repaired: false,
+    });
+
+    if (attempt === MAX_REPAIR_ATTEMPTS) {
+      throw new PlannerError(
+        'PROGRAMME_REPAIR_EXHAUSTED',
+        `AI-strategy-driven programme remained invalid after ${MAX_REPAIR_ATTEMPTS} repair attempts: ${errorCodes.join(', ')}`,
+        {
+          status: result.validation.status,
+          summary: result.validation.summary,
+          findings: result.errorFindings.map((f) => ({
+            code: f.code,
+            message: f.message,
+            phase: f.phase_number,
+          })),
+          repair_log: repairLog,
+        },
+      );
+    }
+
+    const repaired = await provider.generateStrategy(strategyContext, {
+      requestId: `repair-${attempt + 1}`,
+      retryFeedback: {
+        validationCodes: errorCodes,
+        messages: errorMessages,
+        previousStrategy: currentStrategy,
+      },
+    });
+
+    currentStrategy = repaired.output;
+  }
+
+  throw new PlannerError(
+    'PROGRAMME_REPAIR_EXHAUSTED',
+    'Unreachable: repair loop exited without result.',
+  );
 };

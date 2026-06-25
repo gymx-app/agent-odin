@@ -338,6 +338,12 @@ export type RationaleSummary = {
   combined: string[];
 };
 
+export type RepairAttempt = {
+  attempt: number;
+  errorCodes: string[];
+  repaired: boolean;
+};
+
 export type AiGenerationMeta = {
   total_input_tokens: number;
   total_output_tokens: number;
@@ -360,6 +366,7 @@ export type ProgrammePreviewResponse = {
     exercise_library_version: string;
     repair_attempted: boolean;
     repair_applied: boolean;
+    repair_log?: RepairAttempt[];
     planner_resolution?: {
       selected_version: string;
       requested_version: string | null;

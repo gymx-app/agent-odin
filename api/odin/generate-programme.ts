@@ -25,7 +25,7 @@ import { assembleProgramme } from '../../src/llm/ai-generation/ai-programme-asse
 import { programmeValidationService } from '../../src/validation/programme-validation.service.js';
 import { LONGITUDINAL_VALIDATION_RULE_VERSION } from '../../src/validation/longitudinal-validation-registry.js';
 import { AiStrategyOutputSchema } from '../../src/llm/ai-generation/ai-generation.schema.js';
-import { buildProgrammeFromAiStrategy } from '../../src/planning/longitudinal-programme-planner.js';
+import { buildProgrammeWithRepair } from '../../src/planning/longitudinal-programme-planner.js';
 import { buildRationaleSummary } from '../../src/planning/rationale-summary.js';
 import { interpretUnknownInjuries } from '../../src/normalization/injury-interpreter.js';
 import type { AiProgrammeGenerationProvider } from '../../src/llm/ai-generation/ai-programme-generation-provider.js';
@@ -347,14 +347,18 @@ export const createGenerateProgrammeHandler = (appConfig: AppConfig = config) =>
 
       if (body.step === 'build') {
         const strategy = AiStrategyOutputSchema.parse(stripNulls(body.strategy));
-        const { programme, validation } = buildProgrammeFromAiStrategy(
+        const strategyCtx = buildAiStrategyContext(normalized, seedExercises);
+        const { programme, validation, repair_log } = await buildProgrammeWithRepair(
           normalized,
           seedExercises,
           strategy,
+          provider,
+          strategyCtx,
           { startDate: new Date().toISOString().slice(0, 10) },
         );
 
         const rationale = buildRationaleSummary(strategy, programme);
+        const repairAttempted = repair_log.length > 0;
 
         return successResponse({
           step: 'build',
@@ -366,10 +370,10 @@ export const createGenerateProgrammeHandler = (appConfig: AppConfig = config) =>
           rationale,
           refinement: {
             requested: false,
-            attempted: false,
-            applied: false,
-            retry_attempted: false,
-            status: 'not_requested',
+            attempted: repairAttempted,
+            applied: repairAttempted && repair_log.some((r) => r.repaired),
+            retry_attempted: repairAttempted,
+            status: repairAttempted ? 'self_repair' : 'not_requested',
             reason_code: null,
           },
           generation: {
@@ -377,8 +381,9 @@ export const createGenerateProgrammeHandler = (appConfig: AppConfig = config) =>
             schema_version: '2.0' as const,
             validation_rule_version: LONGITUDINAL_VALIDATION_RULE_VERSION,
             exercise_library_version: 'approved-library-v1',
-            repair_attempted: validation.repair?.attempted ?? false,
-            repair_applied: validation.repair?.applied ?? false,
+            repair_attempted: validation.repair?.attempted ?? repairAttempted,
+            repair_applied: validation.repair?.applied ?? (repairAttempted && repair_log.some((r) => r.repaired)),
+            repair_log,
           },
         });
       }

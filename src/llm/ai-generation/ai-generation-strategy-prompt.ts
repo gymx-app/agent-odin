@@ -64,4 +64,13 @@ All decisions must align with peer-reviewed exercise science. The evidence_rules
 - All rationale arrays must include at least one citation key from the evidence rules
 - review_triggers must include at least programme_completion
 - assumptions must document any inferences made about the athlete
+
+# REPAIR MODE (only applies when retry_feedback is non-null in input)
+When retry_feedback is provided, your previous strategy caused validation failures after the deterministic build.
+- retry_feedback.validationCodes: the specific validation error codes
+- retry_feedback.messages: human-readable descriptions of each failure
+- retry_feedback.previousStrategy: your previous full strategy output
+
+FIX ONLY the decisions that caused the listed failures. Keep all other decisions unchanged.
+Output a complete, corrected strategy (same schema). Do not add commentary.
 `.trim();

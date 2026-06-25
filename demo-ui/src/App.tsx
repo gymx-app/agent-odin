@@ -931,6 +931,11 @@ const ProcessLogs = ({ data }: { data: ProgrammePreviewResponse }) => {
           <div><dt>Exercise library</dt><dd><code>{gen.exercise_library_version}</code></dd></div>
           <div><dt>Repair attempted</dt><dd>{gen.repair_attempted ? 'Yes' : 'No'}</dd></div>
           <div><dt>Repair applied</dt><dd>{gen.repair_applied ? 'Yes' : 'No'}</dd></div>
+          {gen.repair_log && gen.repair_log.length > 0 && (
+            <div><dt>Self-repair log</dt><dd>{gen.repair_log.map((r: { attempt: number; errorCodes: string[]; repaired: boolean }) =>
+              `Attempt ${r.attempt}: ${r.repaired ? 'fixed' : r.errorCodes.join(', ')}`
+            ).join(' → ')}</dd></div>
+          )}
         </dl>
       </div>
 

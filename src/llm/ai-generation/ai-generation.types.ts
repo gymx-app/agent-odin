@@ -17,6 +17,7 @@ export type AiGenerationProviderContext = {
   retryFeedback?: {
     validationCodes: string[];
     messages: string[];
+    previousStrategy?: unknown;
   };
   toolExecutor?: ToolExecutor;
   reasoningOutput?: string;
