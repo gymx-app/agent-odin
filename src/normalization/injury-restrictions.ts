@@ -27,14 +27,25 @@ const baseRestrictionTagsByArea: Record<string, MovementDemandTag[]> = {
 const normalizeInjuryArea = (area: string): string =>
   area.trim().toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
 
+const areaAliases: Record<string, string> = {
+  knees: 'knee',
+  kneecap: 'knee',
+  patella: 'knee',
+  back: 'lower_back',
+  low_back: 'lower_back',
+  lowerback: 'lower_back',
+  lumbar: 'lower_back',
+  spine: 'lower_back',
+  wrists: 'wrist',
+  shoulders: 'shoulder',
+  rotator_cuff: 'shoulder',
+  elbows: 'elbow',
+  ankles: 'ankle',
+};
+
 const mapAreaAlias = (area: string): string => {
   const normalizedArea = normalizeInjuryArea(area);
-
-  if (['back', 'low_back', 'lowerback', 'lumbar'].includes(normalizedArea)) {
-    return 'lower_back';
-  }
-
-  return normalizedArea;
+  return areaAliases[normalizedArea] ?? normalizedArea;
 };
 
 const isVagueArea = (area: string): boolean =>

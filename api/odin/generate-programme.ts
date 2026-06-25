@@ -27,6 +27,7 @@ import { LONGITUDINAL_VALIDATION_RULE_VERSION } from '../../src/validation/longi
 import { AiStrategyOutputSchema } from '../../src/llm/ai-generation/ai-generation.schema.js';
 import { buildProgrammeFromAiStrategy } from '../../src/planning/longitudinal-programme-planner.js';
 import { buildRationaleSummary } from '../../src/planning/rationale-summary.js';
+import { interpretUnknownInjuries } from '../../src/normalization/injury-interpreter.js';
 import type { AiProgrammeGenerationProvider } from '../../src/llm/ai-generation/ai-programme-generation-provider.js';
 import type { HttpRequest, HttpResponse } from '../../src/infrastructure/http/types.js';
 
@@ -133,7 +134,11 @@ export const createGenerateProgrammeHandler = (appConfig: AppConfig = config) =>
       await requireAuthenticatedUser(request, authClient);
       const body = await readJsonBody(request, stepRequestSchema, REQUEST_BODY_LIMITS.preview);
       const provider = getProvider(appConfig);
-      const normalized = normalizeAthlete(body.athlete);
+      const athleteInput = {
+        ...body.athlete,
+        injuries: await interpretUnknownInjuries(body.athlete.injuries, appConfig),
+      };
+      const normalized = normalizeAthlete(athleteInput);
       const toolExecutor = createToolExecutor(seedExercises, normalized);
 
       if (body.step === 'strategy') {

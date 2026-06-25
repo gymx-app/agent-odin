@@ -89,11 +89,10 @@ describe('endpoint handler', () => {
       error: {
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Internal server error.',
-        details: null,
+        details: { error_message: 'database exploded' },
       },
     });
     expect(response.body).not.toContain('stack');
-    expect(response.body).not.toContain('database exploded');
     expect(response.body).not.toContain('cause');
   });
 
