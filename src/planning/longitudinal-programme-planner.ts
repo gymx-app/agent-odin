@@ -453,11 +453,11 @@ export const buildProgrammeFromAiStrategy = (
   if (result.programme.schema_version !== '2.0' || !result.validation.passed) {
     throw new PlannerError(
       'PROGRAMME_REPAIR_FAILED',
-      'AI-strategy-driven programme remained invalid after bounded repair.',
+      `AI-strategy-driven programme remained invalid after bounded repair: ${result.validation.findings.filter((f) => f.severity === 'error').map((f) => f.code).join(', ')}`,
       {
         status: result.validation.status,
         summary: result.validation.summary,
-        finding_codes: result.validation.findings.map((item) => item.code),
+        findings: result.validation.findings.filter((f) => f.severity === 'error').map((f) => ({ code: f.code, message: f.message, phase: f.phase_number })),
       },
     );
   }

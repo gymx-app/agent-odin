@@ -138,10 +138,15 @@ export const createEndpointHandler = <Data>({
         response.setHeader('Allow', createAllowHeader(allowedMethods));
       }
 
+      const details = appError.details ??
+        (appError.httpStatus >= 500 && error instanceof Error
+          ? { error_message: error.message }
+          : null);
+
       const responseBody = errorResponse(
         appError.code,
         appError.message,
-        appError.details,
+        details,
       );
 
       sendJson(response, appError.httpStatus, responseBody);
