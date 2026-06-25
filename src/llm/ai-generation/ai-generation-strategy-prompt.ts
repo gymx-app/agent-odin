@@ -48,6 +48,8 @@ All decisions must align with peer-reviewed exercise science. The evidence_rules
 - Total weeks = sum of all phase weeks_count = programme.target_weeks
 - Phase boundaries must be consecutive (phase N end_week + 1 = phase N+1 start_week)
 - Phase numbering starts at 1
+- phase_type 'realization' is ONLY permitted when primary_objective is 'strength' or 'sport_support' — it represents competition peaking and is invalid for hypertrophy, fat loss, or general fitness goals
+- For muscle_gain / fat_loss / recomposition / endurance goals, use foundation, accumulation, intensification, recovery, or maintenance phases only
 
 ## Policies
 - progression_policy.policy_id must be referenced by all exercise progression_rule_ids in later phases
