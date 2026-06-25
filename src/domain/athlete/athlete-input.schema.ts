@@ -208,7 +208,7 @@ export const AthleteInputSchema = z
     equipment: EquipmentAvailabilitySchema,
     fitness_level: FitnessLevelSchema,
     injuries: z.array(InjurySchema),
-    inbody: InBodySchema.nullable(),
+    inbody: InBodySchema.nullable().default(null),
     training_history: TrainingHistorySchema.optional(),
     schedule: ScheduleSchema.optional(),
     lifestyle: LifestyleSchema.optional(),

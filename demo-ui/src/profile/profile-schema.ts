@@ -101,7 +101,7 @@ export const athleteInputSchema = z.object({
   ]),
   fitness_level: z.enum(['beginner', 'intermediate', 'advanced']),
   injuries: z.array(injurySchema),
-  inbody: inBodySchema.nullable(),
+  inbody: inBodySchema.nullable().default(null),
   training_history: trainingHistorySchema,
   nutrition: nutritionSchema,
   lifestyle: lifestyleSchema,

@@ -14,11 +14,11 @@ const getHandler = () => {
 
 Deno.serve(async (req: Request): Promise<Response> => {
   try {
-    let body: unknown;
+    let body: string | undefined;
     const contentType = req.headers.get('content-type') ?? '';
     if (contentType.includes('application/json') && req.body) {
       try {
-        body = await req.json();
+        body = await req.text();
       } catch {
         body = undefined;
       }
