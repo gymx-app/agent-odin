@@ -510,12 +510,29 @@ export const buildProgrammeWithRepair = async (
   let currentStrategy = aiStrategy;
 
   for (let attempt = 0; attempt <= MAX_REPAIR_ATTEMPTS; attempt++) {
-    const result = buildProgrammeFromAiStrategy(
-      profile,
-      exercises,
-      currentStrategy,
-      options,
-    );
+    let result: ReturnType<typeof buildProgrammeFromAiStrategy>;
+    try {
+      result = buildProgrammeFromAiStrategy(profile, exercises, currentStrategy, options);
+    } catch (err) {
+      // Schema-level failure: the assembled candidate didn't match
+      // LongitudinalOdinProgrammeSchema. Treat as a retryable attempt so the
+      // repair loop can regenerate the strategy and try again.
+      if (err instanceof PlannerError && err.code === 'PROGRAMME_SCHEMA_VALIDATION_FAILED') {
+        repairLog.push({ attempt, errorCodes: ['PROGRAMME_SCHEMA_VALIDATION_FAILED'], repaired: false });
+        if (attempt === MAX_REPAIR_ATTEMPTS) throw err;
+        const repaired = await provider.generateStrategy(strategyContext, {
+          requestId: `repair-schema-${attempt + 1}`,
+          retryFeedback: {
+            validationCodes: ['PROGRAMME_SCHEMA_VALIDATION_FAILED'],
+            messages: ['Generated programme failed schema validation. Revise the strategy to produce a structurally valid programme.'],
+            previousStrategy: currentStrategy,
+          },
+        });
+        currentStrategy = repaired.output;
+        continue;
+      }
+      throw err;
+    }
 
     if (result.programme) {
       if (attempt > 0) {
