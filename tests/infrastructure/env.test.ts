@@ -27,6 +27,7 @@ describe('environment configuration', () => {
       anthropicModel: null,
       anthropicTimeoutMs: 45000,
       allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1', 'ai_agent_v1'],
+      rateLimitStrategyPerDay: 10,
     });
   });
 

@@ -73,6 +73,19 @@ export class GoneError extends AppError {
   }
 }
 
+export class TooManyRequestsError extends AppError {
+  constructor(options: HttpErrorOptions = {}) {
+    super(
+      createOptions(
+        'RATE_LIMIT_EXCEEDED',
+        'Too many requests. Please try again later.',
+        429,
+        options,
+      ),
+    );
+  }
+}
+
 export class InternalServerError extends AppError {
   constructor(options: HttpErrorOptions = {}) {
     super(

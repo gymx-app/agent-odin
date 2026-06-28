@@ -100,6 +100,12 @@ export const envSchema = z
       .min(5000)
       .max(300000)
       .default(45000),
+    ODIN_RATE_LIMIT_STRATEGY_PER_DAY: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(1000)
+      .default(10),
   })
   .superRefine((env, context) => {
     if (!env.ODIN_LLM_REFINEMENT_ENABLED) {
@@ -158,6 +164,7 @@ export type AppConfig = {
   anthropicApiKey: string | null;
   anthropicModel: string | null;
   anthropicTimeoutMs: number;
+  rateLimitStrategyPerDay: number;
 };
 
 export type RawEnv = Partial<Record<keyof z.input<typeof envSchema>, string>>;
@@ -204,5 +211,6 @@ export const parseEnv = (rawEnv: RawEnv): AppConfig => {
     anthropicApiKey: parsed.data.ANTHROPIC_API_KEY ?? null,
     anthropicModel: parsed.data.ANTHROPIC_MODEL ?? null,
     anthropicTimeoutMs: parsed.data.ANTHROPIC_TIMEOUT_MS,
+    rateLimitStrategyPerDay: parsed.data.ODIN_RATE_LIMIT_STRATEGY_PER_DAY,
   };
 };

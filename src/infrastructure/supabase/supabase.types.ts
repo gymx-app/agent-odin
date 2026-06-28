@@ -15,6 +15,8 @@ export type SupabaseQueryBuilder<T = unknown> = {
   update: (values: unknown) => SupabaseQueryBuilder<T>;
   eq: (column: string, value: unknown) => SupabaseQueryBuilder<T>;
   neq: (column: string, value: unknown) => SupabaseQueryBuilder<T>;
+  gte: (column: string, value: unknown) => SupabaseQueryBuilder<T>;
+  lt: (column: string, value: unknown) => SupabaseQueryBuilder<T>;
   order: (column: string, options?: unknown) => SupabaseQueryBuilder<T>;
   limit: (count: number) => SupabaseQueryBuilder<T>;
   single: () => Promise<SupabaseSingleResult<T>>;

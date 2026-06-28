@@ -32,6 +32,8 @@ import { AiStrategyOutputSchema } from '../../src/llm/ai-generation/ai-generatio
 import { buildProgrammeWithRepair } from '../../src/planning/longitudinal-programme-planner.js';
 import { buildRationaleSummary } from '../../src/planning/rationale-summary.js';
 import { interpretUnknownInjuries } from '../../src/normalization/injury-interpreter.js';
+import { createSupabaseAdminClient } from '../../src/infrastructure/supabase/admin-client.js';
+import { checkRateLimit, logGeneration } from '../../src/infrastructure/supabase/generation-log.js';
 import type { AiProgrammeGenerationProvider } from '../../src/llm/ai-generation/ai-programme-generation-provider.js';
 import type { HttpRequest, HttpResponse } from '../../src/infrastructure/http/types.js';
 
@@ -140,13 +142,14 @@ const getProvider = (appConfig: AppConfig): AiProgrammeGenerationProvider => {
 
 export const createGenerateProgrammeHandler = (appConfig: AppConfig = config) => {
   const authClient = createSupabaseAuthClient(appConfig);
+  const adminClient = createSupabaseAdminClient(appConfig);
 
   return createEndpointHandler({
     allowedMethods: ['POST'],
     config: appConfig,
     logger: createLogger(appConfig),
     handle: async (request, context) => {
-      await requireAuthenticatedUser(request, authClient);
+      const user = await requireAuthenticatedUser(request, authClient);
       const body = await readJsonBody(request, stepRequestSchema, REQUEST_BODY_LIMITS.preview);
       const provider = getProvider(appConfig);
       const athleteInput = {
@@ -157,10 +160,22 @@ export const createGenerateProgrammeHandler = (appConfig: AppConfig = config) =>
       const toolExecutor = createToolExecutor(seedExercises, normalized);
 
       if (body.step === 'strategy') {
+        await checkRateLimit(user.id, 'strategy', adminClient, appConfig.rateLimitStrategyPerDay);
+
         const strategyCtx = buildAiStrategyContext(normalized, seedExercises);
         const result = await provider.generateStrategy(strategyCtx, {
           requestId: context.requestId,
         });
+
+        void logGeneration(adminClient, {
+          user_id: user.id,
+          step: 'strategy',
+          tokens_input: result.usage.inputTokens ?? 0,
+          tokens_output: result.usage.outputTokens ?? 0,
+          repair_attempted: false,
+          athlete_goal: body.athlete.goal,
+        });
+
         return successResponse({
           step: 'strategy',
           strategy: result.output,
@@ -374,6 +389,15 @@ export const createGenerateProgrammeHandler = (appConfig: AppConfig = config) =>
 
         const rationale = buildRationaleSummary(strategy, programme);
         const repairAttempted = repair_log.length > 0;
+
+        void logGeneration(adminClient, {
+          user_id: user.id,
+          step: 'build',
+          tokens_input: 0,
+          tokens_output: 0,
+          repair_attempted: repairAttempted,
+          athlete_goal: body.athlete.goal,
+        });
 
         return successResponse({
           step: 'build',

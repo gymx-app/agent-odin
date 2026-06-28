@@ -5,6 +5,7 @@ import {
   ForbiddenError,
   InternalServerError,
   MethodNotAllowedError,
+  TooManyRequestsError,
 } from '../../shared/errors/http-errors.js';
 import { errorResponse, isSuccessResult } from './api-response.js';
 import { applyCorsHeaders } from './cors.js';
@@ -141,6 +142,14 @@ export const createEndpointHandler = <Data>({
 
       if (appError instanceof MethodNotAllowedError) {
         response.setHeader('Allow', createAllowHeader(allowedMethods));
+      }
+
+      if (appError instanceof TooManyRequestsError) {
+        // Tell clients how long to wait before retrying (next UTC midnight, max 24h).
+        const secondsUntilMidnight = Math.ceil(
+          (new Date(new Date().toISOString().slice(0, 10) + 'T24:00:00Z').getTime() - Date.now()) / 1000,
+        );
+        response.setHeader('Retry-After', String(secondsUntilMidnight));
       }
 
       const details = appError.details ??

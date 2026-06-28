@@ -31,6 +31,7 @@ const config: AppConfig = {
   anthropicModel: null,
   anthropicTimeoutMs: 45000,
   allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1'],
+  rateLimitStrategyPerDay: 10,
 };
 
 describe('GET /api/health', () => {
