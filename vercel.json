@@ -1,5 +1,4 @@
 {
-  "buildCommand": null,
   "rewrites": [
     { "source": "/api/v1/health", "destination": "/api/health" },
     { "source": "/api/v1/odin/generate-programme", "destination": "/api/odin/generate-programme" }
