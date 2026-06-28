@@ -63,10 +63,10 @@ export const applyCorsHeaders = (
 
   if (result.allowed && result.origin) {
     response.setHeader('Access-Control-Allow-Origin', result.origin);
+    response.setHeader('Access-Control-Allow-Methods', corsMethods.join(', '));
+    response.setHeader('Access-Control-Allow-Headers', corsHeaders.join(', '));
+    response.setHeader('Access-Control-Max-Age', '86400');
   }
-
-  response.setHeader('Access-Control-Allow-Methods', corsMethods.join(', '));
-  response.setHeader('Access-Control-Allow-Headers', corsHeaders.join(', '));
 
   return result;
 };

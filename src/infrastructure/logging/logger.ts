@@ -1,8 +1,13 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { AppConfig } from '../config/env.schema.js';
 
 export type LogLevel = AppConfig['logLevel'];
 
 export type LogMetadata = Record<string, unknown>;
+
+export type RequestContext = { requestId: string };
+
+export const requestContext = new AsyncLocalStorage<RequestContext>();
 
 export type Logger = {
   debug: (message: string, metadata?: LogMetadata) => void;
@@ -31,10 +36,12 @@ export const createLogger = (config: Pick<AppConfig, 'logLevel'>): Logger => {
       return;
     }
 
+    const ctx = requestContext.getStore();
     const entry = {
       level,
       timestamp: new Date().toISOString(),
       message,
+      ...(ctx?.requestId && !metadata.requestId ? { requestId: ctx.requestId } : {}),
       ...metadata,
     };
 

@@ -11,6 +11,10 @@ import { createLogger } from '../../src/infrastructure/logging/logger.js';
 import { requireAuthenticatedUser } from '../../src/infrastructure/supabase/auth.js';
 import { createSupabaseAuthClient } from '../../src/infrastructure/supabase/auth-client.js';
 import { AthleteInputSchema } from '../../src/domain/athlete/athlete-input.schema.js';
+import {
+  ProgrammePhaseSchema,
+  ProgrammeWeekSchema,
+} from '../../src/domain/programme/longitudinal-programme.schema.js';
 import { seedExercises } from '../../src/exercises/approved-exercise-library.js';
 import { normalizeAthlete } from '../../src/normalization/athlete-normalizer.js';
 import { odinError } from '../../src/shared/errors/odin-errors.js';
@@ -30,6 +34,17 @@ import { buildRationaleSummary } from '../../src/planning/rationale-summary.js';
 import { interpretUnknownInjuries } from '../../src/normalization/injury-interpreter.js';
 import type { AiProgrammeGenerationProvider } from '../../src/llm/ai-generation/ai-programme-generation-provider.js';
 import type { HttpRequest, HttpResponse } from '../../src/infrastructure/http/types.js';
+
+const PhaseSummarySchema = z.object({
+  phase_id: z.string().min(1),
+  phase_type: z.string().min(1),
+  objective: z.string().min(1),
+  exercises_used: z.array(z.string()),
+  volume_per_muscle_group: z.record(z.number()),
+  progression_model: z.string().min(1),
+});
+
+const ToolConversationItemSchema = z.record(z.unknown());
 
 const stripNulls = (obj: unknown): unknown => {
   if (obj === null) return undefined;
@@ -53,47 +68,47 @@ const stepRequestSchema = z.discriminatedUnion('step', [
   z.object({
     step: z.literal('phase_prep'),
     athlete: AthleteInputSchema,
-    strategy: z.any(),
+    strategy: AiStrategyOutputSchema,
     phase_index: z.number().int().nonnegative(),
-    prior_phase_summaries: z.array(z.any()).default([]),
+    prior_phase_summaries: z.array(PhaseSummarySchema).default([]),
   }),
   z.object({
     step: z.literal('phase_reasoning'),
     athlete: AthleteInputSchema,
-    strategy: z.any(),
+    strategy: AiStrategyOutputSchema,
     phase_index: z.number().int().nonnegative(),
-    prior_phase_summaries: z.array(z.any()).default([]),
+    prior_phase_summaries: z.array(PhaseSummarySchema).default([]),
   }),
   z.object({
     step: z.literal('phase_tools'),
     athlete: AthleteInputSchema,
-    strategy: z.any(),
+    strategy: AiStrategyOutputSchema,
     phase_index: z.number().int().nonnegative(),
-    prior_phase_summaries: z.array(z.any()).default([]),
+    prior_phase_summaries: z.array(PhaseSummarySchema).default([]),
     reasoning: z.string().optional(),
   }),
   z.object({
     step: z.literal('phase_week'),
     athlete: AthleteInputSchema,
-    strategy: z.any(),
+    strategy: AiStrategyOutputSchema,
     phase_index: z.number().int().nonnegative(),
     week_index: z.number().int().nonnegative(),
-    prior_phase_summaries: z.array(z.any()).default([]),
+    prior_phase_summaries: z.array(PhaseSummarySchema).default([]),
     reasoning: z.string().optional(),
-    tool_conversation: z.array(z.any()).default([]),
-    prior_weeks: z.array(z.any()).default([]),
+    tool_conversation: z.array(ToolConversationItemSchema).default([]),
+    prior_weeks: z.array(ProgrammeWeekSchema).default([]),
     previous_response_id: z.string().optional(),
   }),
   z.object({
     step: z.literal('assemble'),
     athlete: AthleteInputSchema,
-    strategy: z.any(),
-    phases: z.array(z.any()).min(1),
+    strategy: AiStrategyOutputSchema,
+    phases: z.array(ProgrammePhaseSchema).min(1),
   }),
   z.object({
     step: z.literal('build'),
     athlete: AthleteInputSchema,
-    strategy: z.any(),
+    strategy: AiStrategyOutputSchema,
   }),
 ]);
 

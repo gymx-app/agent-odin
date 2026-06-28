@@ -14,15 +14,8 @@ import { createLogger } from '../src/infrastructure/logging/logger.js';
 
 export const healthDataSchema = z.object({
   service: z.literal('agent-odin'),
-  version: z.string().min(1),
   status: z.literal('ok'),
-  default_planner_version: z.enum(['legacy_v1', 'longitudinal_v1', 'ai_agent_v1']),
-  longitudinal_planner_enabled: z.boolean(),
-  ai_agent_enabled: z.boolean(),
-  openai_connected: z.boolean(),
-  ai_generation_provider: z.enum(['openai', 'anthropic']),
-  ai_provider_connected: z.boolean(),
-  supported_planner_versions: z.array(z.enum(['legacy_v1', 'longitudinal_v1', 'ai_agent_v1'])),
+  timestamp: z.string().datetime(),
 });
 
 export const healthResponseSchema =
@@ -36,17 +29,8 @@ export const createHealthHandler = (appConfig: AppConfig = config) =>
     handle: () =>
       successResponse({
         service: 'agent-odin' as const,
-        version: appConfig.appVersion,
         status: 'ok' as const,
-        default_planner_version: appConfig.defaultPlannerVersion,
-        longitudinal_planner_enabled: appConfig.longitudinalPlannerEnabled,
-        ai_agent_enabled: appConfig.aiAgentPlannerEnabled,
-        openai_connected: !!(appConfig.openaiApiKey && appConfig.openaiGenerationModel),
-        ai_generation_provider: appConfig.aiGenerationProvider,
-        ai_provider_connected: appConfig.aiGenerationProvider === 'anthropic'
-          ? !!(appConfig.anthropicApiKey && appConfig.anthropicModel)
-          : !!(appConfig.openaiApiKey && appConfig.openaiGenerationModel),
-        supported_planner_versions: appConfig.allowedPlannerVersions,
+        timestamp: new Date().toISOString(),
       }),
   });
 

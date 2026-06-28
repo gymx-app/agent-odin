@@ -46,7 +46,7 @@ export const repairProgramme = (
     };
   }
 
-  const programme = structuredClone(input.programme);
+  const programme = structuredClone(input.programme) as LongitudinalOdinProgramme;
   const operations: DeterministicRepairOperation[] = [];
   const add = (
     operation: Omit<DeterministicRepairOperation, 'operation_id'>,

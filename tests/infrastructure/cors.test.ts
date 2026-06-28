@@ -86,10 +86,14 @@ describe('CORS helper', () => {
     );
   });
 
-  it('sets preflight headers', () => {
+  it('sets preflight headers for allowed origins', () => {
     const response = createTestResponse();
 
-    applyCorsHeaders(response, createTestRequest(), createConfig());
+    applyCorsHeaders(
+      response,
+      createTestRequest({ headers: { origin: 'https://app.example.com' } }),
+      createConfig(),
+    );
 
     expect(header(response.headers['access-control-allow-methods'])).toBe(
       'GET, POST, PUT, OPTIONS',
@@ -97,5 +101,15 @@ describe('CORS helper', () => {
     expect(header(response.headers['access-control-allow-headers'])).toBe(
       'Content-Type, Authorization, Idempotency-Key, X-Request-Id',
     );
+    expect(header(response.headers['access-control-max-age'])).toBe('86400');
+  });
+
+  it('omits preflight headers when no origin is sent', () => {
+    const response = createTestResponse();
+
+    applyCorsHeaders(response, createTestRequest(), createConfig());
+
+    expect(response.headers['access-control-allow-methods']).toBeUndefined();
+    expect(response.headers['access-control-allow-headers']).toBeUndefined();
   });
 });

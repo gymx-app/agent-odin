@@ -94,8 +94,11 @@ export const generateProgrammeForUser = async (
   let persisted = false;
 
   try {
-    const athlete = await timed('athlete_profile_load', () =>
-      context.athleteProfiles.getByUserId(userId),
+    const [athlete, exercises] = await timed('profile_and_exercises_load', () =>
+      Promise.all([
+        context.athleteProfiles.getByUserId(userId),
+        context.exercises.loadActiveApproved(),
+      ]),
     );
     assertWithinDeadline();
     run = await context.agentRuns.start(userId, context.requestId, {
@@ -108,10 +111,6 @@ export const generateProgrammeForUser = async (
       injury_count: athlete.injuries.length,
     });
     const normalized = normalizeAthlete(athlete);
-    const exercises = await timed('exercise_library_load', () =>
-      context.exercises.loadActiveApproved(),
-    );
-    assertWithinDeadline();
     const programme = await timed('planner', async () =>
       buildBaselineProgramme(normalized, exercises),
     );

@@ -40,21 +40,15 @@ describe('GET /api/health', () => {
     await createHealthHandler(config)(createTestRequest(), response);
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({
+    const json = response.json();
+    expect(json).toMatchObject({
       success: true,
       data: {
         service: 'agent-odin',
-        version: '9.8.7',
         status: 'ok',
-        default_planner_version: 'legacy_v1',
-        longitudinal_planner_enabled: false,
-        ai_agent_enabled: false,
-        openai_connected: false,
-        ai_generation_provider: 'openai',
-        ai_provider_connected: false,
-        supported_planner_versions: ['legacy_v1', 'longitudinal_v1'],
       },
     });
+    expect((json as { data: { timestamp: unknown } }).data.timestamp).toEqual(expect.any(String));
   });
 
   it('returns a generated request ID', async () => {

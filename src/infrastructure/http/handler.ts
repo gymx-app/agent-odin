@@ -1,5 +1,5 @@
 import type { AppConfig } from '../config/env.schema.js';
-import type { Logger } from '../logging/logger.js';
+import { requestContext, type Logger } from '../logging/logger.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import {
   ForbiddenError,
@@ -77,7 +77,12 @@ export const createEndpointHandler = <Data>({
     const path = getRequestPath(request);
 
     response.setHeader('x-request-id', requestId);
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('X-Frame-Options', 'DENY');
+    response.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains');
+    response.setHeader('Cache-Control', 'no-store');
 
+    await requestContext.run({ requestId }, async () => {
     try {
       const corsResult = applyCorsHeaders(response, request, config);
 
@@ -139,7 +144,7 @@ export const createEndpointHandler = <Data>({
       }
 
       const details = appError.details ??
-        (appError.httpStatus >= 500 && error instanceof Error
+        (appError.httpStatus >= 500 && error instanceof Error && config.nodeEnv !== 'production'
           ? { error_message: error.message }
           : null);
 
@@ -163,5 +168,6 @@ export const createEndpointHandler = <Data>({
           : {}),
       });
     }
+    });
   };
 };

@@ -10,11 +10,13 @@ const getHeaderValue = (
   return value;
 };
 
-export const getRequestId = (request: HttpRequest): string => {
-  const incomingRequestId = getHeaderValue(request.headers['x-request-id']);
+const VALID_REQUEST_ID = /^[a-zA-Z0-9_\-:.]{1,128}$/;
 
-  if (incomingRequestId && incomingRequestId.trim().length > 0) {
-    return incomingRequestId.trim();
+export const getRequestId = (request: HttpRequest): string => {
+  const incomingRequestId = getHeaderValue(request.headers['x-request-id'])?.trim();
+
+  if (incomingRequestId && VALID_REQUEST_ID.test(incomingRequestId)) {
+    return incomingRequestId;
   }
 
   if (globalThis.crypto?.randomUUID) {

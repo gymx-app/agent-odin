@@ -54,7 +54,8 @@ export const isSuccessResult = (
   'body' in value &&
   typeof value.body === 'object' &&
   value.body !== null &&
-  'success' in value.body;
+  'success' in value.body &&
+  (value.body as { success: unknown }).success === true;
 
 export const errorResponse = (
   code: string,

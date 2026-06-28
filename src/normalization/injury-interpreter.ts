@@ -3,6 +3,23 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { AppConfig } from '../infrastructure/config/env.schema.js';
 import type { AthleteInput } from '../domain/athlete/athlete.types.js';
 
+let cachedOpenAI: { key: string; client: OpenAI } | null = null;
+let cachedAnthropic: { key: string; client: Anthropic } | null = null;
+
+const getOpenAIClient = (apiKey: string): OpenAI => {
+  if (cachedOpenAI?.key === apiKey) return cachedOpenAI.client;
+  const client = new OpenAI({ apiKey, timeout: 10_000, maxRetries: 0 });
+  cachedOpenAI = { key: apiKey, client };
+  return client;
+};
+
+const getAnthropicClient = (apiKey: string): Anthropic => {
+  if (cachedAnthropic?.key === apiKey) return cachedAnthropic.client;
+  const client = new Anthropic({ apiKey, timeout: 10_000, maxRetries: 0 });
+  cachedAnthropic = { key: apiKey, client };
+  return client;
+};
+
 type Injury = AthleteInput['injuries'][number];
 
 const KNOWN_AREAS = [
@@ -59,11 +76,7 @@ const interpretViaOpenAI = async (
   injuries: Injury[],
   config: AppConfig,
 ): Promise<InterpretedInjury[]> => {
-  const client = new OpenAI({
-    apiKey: config.openaiApiKey!,
-    timeout: 10_000,
-    maxRetries: 0,
-  });
+  const client = getOpenAIClient(config.openaiApiKey!);
 
   const response = await client.chat.completions.create({
     model: config.openaiGenerationModel ?? 'gpt-4o-mini',
@@ -84,11 +97,7 @@ const interpretViaAnthropic = async (
   injuries: Injury[],
   config: AppConfig,
 ): Promise<InterpretedInjury[]> => {
-  const client = new Anthropic({
-    apiKey: config.anthropicApiKey!,
-    timeout: 10_000,
-    maxRetries: 0,
-  });
+  const client = getAnthropicClient(config.anthropicApiKey!);
 
   const response = await client.messages.create({
     model: config.anthropicModel ?? 'claude-haiku-4-5-20251001',

@@ -1,9 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { seedExercises } from '../../fixtures/exercises/seed-exercises.js';
-import { ExerciseLibraryRepository } from '../../src/repositories/exercise-library.repository.js';
+import { ExerciseLibraryRepository, clearExerciseLibraryCache } from '../../src/repositories/exercise-library.repository.js';
 import { createQueryClient } from './test-supabase-client.js';
 
 describe('ExerciseLibraryRepository', () => {
+  beforeEach(() => {
+    clearExerciseLibraryCache();
+  });
+
   it('loads the validated active exercise library', async () => {
     const { client, calls } = createQueryClient({
       list: {

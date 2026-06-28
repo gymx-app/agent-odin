@@ -11,10 +11,22 @@ type ExerciseLibraryRow = {
   schema_version: number;
 };
 
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+let exerciseCache: { exercises: Exercise[]; expiresAt: number } | null = null;
+
+export const clearExerciseLibraryCache = (): void => {
+  exerciseCache = null;
+};
+
 export class ExerciseLibraryRepository {
   constructor(private readonly client: SupabaseClientLike) {}
 
   async loadActiveApproved(): Promise<Exercise[]> {
+    if (exerciseCache && Date.now() < exerciseCache.expiresAt) {
+      return exerciseCache.exercises;
+    }
+
     const result = await this.client
       .from<ExerciseLibraryRow>('exercise_library')
       .select('id,exercise_data,status,schema_version')
@@ -53,6 +65,7 @@ export class ExerciseLibraryRepository {
       );
     }
 
+    exerciseCache = { exercises, expiresAt: Date.now() + CACHE_TTL_MS };
     return exercises;
   }
 }
