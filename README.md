@@ -1,63 +1,81 @@
-# agent-odin
+# Agent Odin
 
-Agent Odin is GymX's authenticated, stateless programme-preview service. It
-accepts a complete transient athlete profile, builds a deterministic baseline,
-independently validates it, optionally applies bounded OpenAI refinement, and
-returns the preview without updating profiles or persisting programmes.
+**GymX's AI-powered programme generation engine.**
 
-The deterministic planner is authoritative. Model output is untrusted until
-schema validation, bounded application, and full programme validation succeed.
+Agent Odin is the intelligence service behind GymX. It accepts an athlete profile, reasons about training strategy using an AI agent backed by OpenAI or Anthropic, builds a periodised multi-phase programme with evidence-based exercise prescriptions, validates it against 20+ rule categories, self-repairs failures, and returns the result — all within a single API call.
 
-## Authority boundary
-
-Odin may:
-
-- verify a Supabase access token
-- accept transient athlete planning input
-- normalize that input deterministically
-- use only bundled approved exercise IDs and metadata
-- build and validate a programme preview
-- optionally apply bounded model refinement
-- return programme, validation, and refinement metadata
-
-Odin may not:
-
-- create or update athlete or user profiles
-- write generated previews to GymX or Supabase
-- activate, archive, or finalize programmes
-- prescribe exact weights
-- bypass deterministic planning or validation
-
-A separate user-authorized application service must own approval and finalized
-programme persistence.
-
-## Public API
-
-| Method | Endpoint            | Purpose                                      |
-| ------ | ------------------- | -------------------------------------------- |
-| `GET`  | `/api/health`       | Process health                               |
-| `POST` | `/api/odin/preview` | Authenticated stateless programme generation |
-
-The previous persistence-oriented endpoints return
-`410 ENDPOINT_RETIRED`:
-
-- `PUT /api/profile`
-- `POST /api/odin/generate`
-- `GET /api/programmes/current`
-- `GET /api/programmes/:id`
-
-## Authentication
-
-`POST /api/odin/preview` requires:
-
-```http
-Authorization: Bearer <Supabase access token>
+```
+Athlete Profile → Normalisation → AI Strategy → Phase Generation → Validation → Self-Repair → Programme
 ```
 
-The token is verified through Supabase and supplies the authenticated identity.
-The preview request may not select or impersonate another user.
+## Table of Contents
 
-## Preview request
+- [Architecture Overview](#architecture-overview)
+- [API Reference](#api-reference)
+- [Programme Generation Pipeline](#programme-generation-pipeline)
+- [Planner Versions](#planner-versions)
+- [Validation Engine](#validation-engine)
+- [Exercise Library](#exercise-library)
+- [Security](#security)
+- [Environment Configuration](#environment-configuration)
+- [Local Development](#local-development)
+- [Deployment](#deployment)
+- [Project Structure](#project-structure)
+- [Design Documentation](#design-documentation)
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Vercel Serverless                       │
+│  ┌──────────┐  ┌────────────────────────────────────────┐   │
+│  │  Health   │  │       Generate Programme (POST)        │   │
+│  │  (GET)    │  │                                        │   │
+│  └──────────┘  │  Auth → Normalize → Plan → Validate    │   │
+│                │                                        │   │
+│                └───────────┬──────────┬─────────────────┘   │
+│                            │          │                     │
+│                    ┌───────▼──┐  ┌────▼──────────┐          │
+│                    │ Supabase │  │ OpenAI /       │          │
+│                    │ Auth+DB  │  │ Anthropic LLM  │          │
+│                    └──────────┘  └───────────────┘          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Stack**: TypeScript (ESM) · Node.js · Vercel Serverless · Supabase · OpenAI · Anthropic · Zod
+
+**Core numbers**: ~33,000 lines of source across 212 files · 83 test suites · 614 tests · 20+ validation rule categories
+
+## API Reference
+
+### Versioned Routes (recommended)
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `GET` | `/api/v1/health` | Service health check |
+| `POST` | `/api/v1/odin/generate-programme` | Authenticated programme generation |
+
+### Legacy Routes (still active)
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `GET` | `/api/health` | Service health check |
+| `POST` | `/api/odin/generate-programme` | Authenticated programme generation |
+
+### Authentication
+
+All generation requests require a Supabase access token:
+
+```http
+Authorization: Bearer <supabase-access-token>
+```
+
+### Request
+
+```http
+POST /api/v1/odin/generate-programme
+Content-Type: application/json
+```
 
 ```json
 {
@@ -76,166 +94,352 @@ The preview request may not select or impersonate another user.
     "injuries": [],
     "inbody": null
   },
-  "refinement_mode": "deterministic",
-  "planner_version": "longitudinal_v1",
-  "start_date": "2026-06-22"
+  "planner_version": "ai_agent_v1",
+  "start_date": "2026-06-28"
 }
 ```
 
-`planner_version` is optional and controlled:
+The `athlete` object is validated through `AthleteInputSchema`. Request bodies are limited to 64 KiB.
 
-- `legacy_v1`
-- `longitudinal_v1`
-
-Omitting it uses `ODIN_DEFAULT_PLANNER_VERSION`. Longitudinal generation must
-also be enabled by configuration. Explicit V2 requests never silently fall
-back to V1.
-
-`refinement_mode` values:
-
-- `deterministic`
-- `llm_optional`
-- `llm_required`
-
-The `athlete` object is validated through the authoritative
-`AthleteInputSchema`. It is used only for the current request and is not stored
-by Odin.
-
-Preview bodies are limited to 64 KiB.
-
-## Preview response
+### Response
 
 ```json
 {
   "success": true,
   "data": {
-    "source": "deterministic",
-    "planner_version": "longitudinal_v1",
+    "source": "ai_generated",
+    "planner_version": "ai_agent_v1",
     "schema_version": "2.0",
-    "programme": {},
-    "validation": {},
-    "refinement": {},
-    "generation": {}
+    "programme": { },
+    "validation": { },
+    "generation": { }
   }
 }
 ```
 
-Consumers should discriminate the response with `planner_version` and
-`schema_version`, not by guessing from the programme shape.
+### Error Response
 
-The response intentionally contains no:
-
-- `programme_id`
-- persistence version
-- draft or activation status
-- approval claim
-
-All errors use the shared envelope:
+All errors follow a consistent envelope:
 
 ```json
 {
   "success": false,
   "error": {
-    "code": "BAD_REQUEST",
-    "message": "Invalid request body.",
+    "code": "ATHLETE_PROFILE_INVALID",
+    "message": "Athlete profile failed validation.",
     "details": null
   }
 }
 ```
 
-## Preview flow
+Error codes are typed as a string literal union (`OdinErrorCode`) for compile-time safety. See `src/shared/errors/odin-errors.ts` for the full list.
 
-1. Verify the Supabase bearer token.
-2. Validate the transient athlete request.
-3. Normalize the athlete deterministically.
-4. Load Odin's bundled approved exercise library.
-5. Build and validate the deterministic baseline.
-6. Optionally request and apply bounded refinement.
-7. Validate the result again.
-8. Return the preview without persistence.
+## Programme Generation Pipeline
 
-## Exercise library
+### 1. Authentication & Input Validation
 
-The preview service uses Odin's bundled approved exercise library. Exercise IDs
-remain stable contracts. Model-generated exercise names cannot enter a
-programme unless they resolve to an approved ID supplied in refinement context.
+The bearer token is verified via Supabase. The athlete input is parsed and validated through Zod schemas with strict typing.
 
-The bundled library avoids requiring or mutating a GymX database table during
-preview.
+### 2. Athlete Normalisation
 
-## Deterministic planning and validation
+Raw athlete input is normalised into a rich training profile:
 
-The planner honors equipment, movement restrictions, required movement slots,
-and session duration. It does not use random selection or prescribe exact
-weights.
+- **Training status classification** — beginner / intermediate / advanced based on training history
+- **Weekly training minutes** — derived from available days and session duration
+- **Equipment capabilities** — mapped from equipment level to available movement patterns
+- **Recovery capacity** — estimated from age, training status, and lifestyle factors
+- **Health flags** — injury restrictions, contraindicated movements, required modifications
+- **Injury interpretation** — unknown or ambiguous injury descriptions are interpreted via AI (OpenAI or Anthropic) to map to specific anatomical areas and restrictions
+- **Nutrition state & weight change trajectory** — goal-driven macro context
+- **Sport interference** — secondary sport demands factored into recovery budgets
+- **Programme horizon & confidence** — how far to plan and how much to trust inputs
 
-The validator is deterministic and non-mutating. Avoid-restriction violations
-are hard failures. Validation findings use stable machine-readable codes, and
-no model may override a validation error.
+### 3. AI Agent Strategy Generation (`ai_agent_v1`)
 
-Validation composition, rule versioning, and future rule registration are
-documented in [docs/validation-architecture.md](docs/validation-architecture.md).
+The AI agent receives the normalised profile and reasons about the optimal training strategy:
 
-The additive enriched athlete request and normalized athlete-state model are
-documented in [docs/athlete-input-v2.md](docs/athlete-input-v2.md).
+- **Phase sequencing** — determines the macro-cycle: which phases (hypertrophy, strength, peaking, deload, realization) in what order
+- **Split selection** — full body, upper/lower, push/pull/legs based on frequency and goals
+- **Volume budgeting** — weekly sets per muscle group, distributed across sessions
+- **Progression model** — how load, volume, and intensity advance week-to-week
 
-## Optional LLM refinement
+The agent has access to tools for searching the exercise library, checking volume compliance against evidence-based guidelines, and retrieving evidence rules.
 
-- `deterministic`: never calls a model
-- `llm_optional`: falls back to the deterministic baseline
-- `llm_required`: fails safely if refinement is unavailable or rejected
+### 4. Phase-by-Phase Programme Construction
 
-For `longitudinal_v1`, deterministic mode is supported, `llm_optional` returns
-the valid deterministic V2 programme with
-`REFINEMENT_UNSUPPORTED_FOR_PLANNER_VERSION`, and `llm_required` fails safely.
-The V1 refinement applier is never used on V2 programmes.
+Each phase is generated with full context of prior phases:
 
-Model output cannot control persistence, exercise identity, programme naming,
-or validation.
+- Session construction with warmup, main work, and conditioning
+- Exercise selection from the approved library with substitution groups
+- Prescription building (sets, reps, RPE, tempo, rest periods)
+- Exercise sequencing optimised for fatigue management
+- Conditioning programming (modality, placement, intensity, progression)
 
-## Environment
+### 5. Validation (20+ Rule Categories)
+
+Every generated programme passes through a deterministic validation engine:
+
+| Category | What It Checks |
+|----------|---------------|
+| Structural | Schema conformance, required fields, phase/week/session counts |
+| Strategy | Goal alignment, split appropriateness, volume distribution |
+| Phase | Phase ordering, deload placement, progressive overload |
+| Week | Week type progression, load variation, recovery weeks |
+| Session | Duration within bounds, balanced muscle targeting |
+| Exercise Reference | All exercise IDs exist in the approved library |
+| Exercise Sequence | No conflicting supersets, appropriate ordering |
+| Prescription | Sets/reps/RPE within evidence-based ranges |
+| Movement Balance | Push/pull ratio, bilateral balance, antagonist pairing |
+| Duration | Session time estimates within athlete constraints |
+| Equipment | All exercises compatible with available equipment |
+| Athlete Constraints | Injury restrictions respected, contraindicated movements avoided |
+| Fatigue | Weekly fatigue budget not exceeded, recovery adequate |
+| Warmup | Appropriate warmup prescription for main movements |
+| Recovery | Minimum rest between same-muscle sessions |
+| Calendar | Day distribution matches athlete availability |
+| Conditioning | Interference risk, modality appropriateness |
+| Progression | Progressive overload across weeks |
+| Naming | Exercise names match canonical library names |
+| Goal Specificity | Programme specificity matches stated goals |
+| Programme Coherence | Cross-phase consistency, no contradictions |
+
+### 6. Self-Repair Loop
+
+When validation finds issues, the system enters a self-repair loop:
+
+1. Validation failures are fed back to the AI agent with specific failure context
+2. The agent re-generates the failing phase with corrections
+3. Re-validation confirms the repair
+4. Up to 3 retries per phase, with 1 full strategy replan if all phase retries exhaust
+
+### 7. Programme Assembly & Response
+
+The validated programme is assembled with:
+- Three-way rationale summary (strategy rationale, phase rationales, overall summary)
+- Generation metadata (tokens used, stage durations, retry counts)
+- Full validation report
+
+## Planner Versions
+
+| Version | Type | Description |
+|---------|------|-------------|
+| `ai_agent_v1` | AI Agent | **Default.** Multi-turn AI agent with tool use, self-repair, and evidence-based reasoning |
+| `longitudinal_v1` | Deterministic + AI | Multi-phase deterministic planner with optional LLM refinement |
+| `legacy_v1` | Deterministic | Single-phase baseline planner (original) |
+
+The active planner version is controlled by `ODIN_DEFAULT_PLANNER_VERSION` and `ODIN_ALLOWED_PLANNER_VERSIONS`. Requests for a disabled version return `PLANNER_VERSION_DISABLED`.
+
+## Exercise Library
+
+Odin uses a curated, approved exercise library loaded from Supabase. Every exercise has:
+
+- Canonical ID (stable contract across versions)
+- Movement pattern classification (push, pull, hinge, squat, carry, etc.)
+- Equipment requirements
+- Muscle group targeting (primary, secondary, tertiary)
+- Difficulty grading
+
+The library is cached in-memory with a 5-minute TTL for performance. Exercise IDs are validated at both generation time and in the validation engine — no model-hallucinated exercise can enter a programme.
+
+## Security
+
+- **CORS**: Strict origin allowlist; no wildcard origins; localhost allowed only in development
+- **Headers**: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security`, `Cache-Control: no-store`
+- **Request ID**: Sanitised against injection (alphanumeric + dashes/underscores, max 128 chars)
+- **Error details**: Production responses never leak internal error messages or stack traces
+- **Input validation**: All API boundaries use Zod schemas with strict typing — no `z.any()`
+- **Body limits**: 64 KiB maximum request body
+- **Auth**: Supabase token verification on all mutation endpoints
+- **Logging**: No authorization headers, tokens, request bodies, athlete profiles, injury notes, prompts, model responses, or provider errors are logged
+
+## Environment Configuration
 
 Copy `.env.example` and configure:
 
-- `NODE_ENV`
-- `APP_VERSION`
-- `ALLOWED_ORIGINS`
-- `LOG_LEVEL`
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `ODIN_GENERATION_TIMEOUT_MS`
-- `ODIN_LLM_REFINEMENT_ENABLED`
-- `ODIN_DEFAULT_PLANNER_VERSION`
-- `ODIN_LONGITUDINAL_PLANNER_ENABLED`
-- `ODIN_ALLOWED_PLANNER_VERSIONS`
-- `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_TIMEOUT_MS`,
-  `OPENAI_MAX_RETRIES` when refinement is enabled
+### Required
 
-`SUPABASE_SERVICE_ROLE_KEY` is not required by the public preview path.
+| Variable | Description |
+|----------|-------------|
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_ANON_KEY` | Supabase anonymous key |
 
-`ALLOWED_ORIGINS` is a comma-separated allowlist. Wildcard origins are not
-supported; localhost is accepted automatically only in development.
+### AI Generation (required for `ai_agent_v1`)
 
-## Local setup and testing
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AI_GENERATION_PROVIDER` | `openai` | LLM provider: `openai` or `anthropic` |
+| `OPENAI_API_KEY` | — | OpenAI API key |
+| `OPENAI_GENERATION_MODEL` | — | Model for programme generation |
+| `OPENAI_GENERATION_TIMEOUT_MS` | `45000` | Generation request timeout |
+| `ANTHROPIC_API_KEY` | — | Anthropic API key |
+| `ANTHROPIC_MODEL` | — | Anthropic model ID |
+| `ANTHROPIC_TIMEOUT_MS` | `45000` | Anthropic request timeout |
+
+### LLM Refinement (optional, for `legacy_v1` / `longitudinal_v1`)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ODIN_LLM_REFINEMENT_ENABLED` | `false` | Enable LLM refinement for deterministic planners |
+| `OPENAI_API_KEY` | — | Required when refinement is enabled |
+| `OPENAI_MODEL` | — | Required when refinement is enabled |
+| `OPENAI_TIMEOUT_MS` | `20000` | Refinement request timeout |
+| `OPENAI_MAX_RETRIES` | `1` | Max retries for refinement calls |
+
+### Planner Control
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ODIN_DEFAULT_PLANNER_VERSION` | `legacy_v1` | Default planner when not specified in request |
+| `ODIN_ALLOWED_PLANNER_VERSIONS` | `legacy_v1,longitudinal_v1,ai_agent_v1` | Comma-separated allowed versions |
+| `ODIN_LONGITUDINAL_PLANNER_ENABLED` | `false` | Enable longitudinal planner |
+| `ODIN_AI_AGENT_PLANNER_ENABLED` | `true` | Enable AI agent planner |
+
+### General
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NODE_ENV` | `development` | Environment: `development`, `test`, `production` |
+| `APP_VERSION` | `0.1.0` | Application version string |
+| `ALLOWED_ORIGINS` | — | Comma-separated CORS origin allowlist |
+| `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
+| `ODIN_GENERATION_TIMEOUT_MS` | `60000` | Overall generation deadline |
+
+## Local Development
 
 ```bash
+# Install dependencies
 npm install
+
+# Type check
 npm run typecheck
+
+# Lint
 npm run lint
+
+# Format check
 npm run format:check
+
+# Run tests
 npm test
+
+# Watch mode
+npm run test:watch
+
+# Build
 npm run build
+
+# Start local API (via Supabase CLI)
 npm run dev:api
 ```
 
-Import `postman/agent-odin.postman_collection.json` for manual checks. The
-collection contains no real tokens or secrets.
+## Deployment
 
-## Data handling
+### Vercel (Primary)
 
-Athlete and health-adjacent inputs are sensitive. Odin uses them transiently for
-preview generation. Request logging does not include authorization headers,
-tokens, full request bodies, athlete profiles, injury notes, prompts, model
-responses, service-role keys, or raw provider errors.
+The API is deployed as Vercel Serverless Functions. Routes are defined in `vercel.json` with `/api/v1/` versioned prefixes.
 
-Never store hidden chain-of-thought or raw provider internals.
+### Supabase Edge Functions (Secondary)
+
+Edge function wrappers in `supabase/functions/` call the same handler code bundled via esbuild:
+
+```bash
+# Bundle and deploy
+npm run deploy:functions
+```
+
+## Project Structure
+
+```
+agent-odin/
+├── api/                          # Vercel serverless entry points
+│   ├── health.ts                 # GET /api/health
+│   └── odin/
+│       └── generate-programme.ts # POST /api/odin/generate-programme
+├── src/
+│   ├── application/              # Application services (orchestration)
+│   ├── domain/                   # Domain models and schemas
+│   │   ├── athlete/              # Athlete input schemas and types
+│   │   ├── exercise/             # Exercise schema, types, taxonomy
+│   │   ├── programme/            # Programme schemas (v1 + v2)
+│   │   └── shared/               # Shared domain enums
+│   ├── exercises/                # Exercise library, filtering, eligibility
+│   ├── infrastructure/           # Cross-cutting concerns
+│   │   ├── config/               # Environment parsing (Zod-validated)
+│   │   ├── http/                 # Handler, CORS, request parsing, responses
+│   │   ├── logging/              # Structured logger with AsyncLocalStorage
+│   │   └── supabase/             # Auth and admin client wrappers
+│   ├── llm/                      # LLM integration
+│   │   ├── ai-generation/        # AI agent planner (strategy, phases, tools)
+│   │   ├── refinement*.ts        # V1 refinement (legacy)
+│   │   └── v2-refinement*.ts     # V2 refinement (longitudinal)
+│   ├── normalization/            # Athlete profile normalisation pipeline
+│   ├── planning/                 # Deterministic planning engine
+│   │   ├── calendar/             # Training day scheduling
+│   │   ├── conditioning/         # Conditioning and finisher programming
+│   │   ├── exercises/            # Exercise selection and prescription
+│   │   ├── fatigue/              # Fatigue budget management
+│   │   ├── intensity/            # Intensity planning
+│   │   ├── phases/               # Phase sequencing and deload policy
+│   │   ├── progression/          # Load progression policies
+│   │   ├── sequencing/           # Exercise ordering within sessions
+│   │   ├── sessions/             # Session construction
+│   │   ├── strategy/             # Training strategy selection
+│   │   ├── templates/            # Split templates (2-6 day)
+│   │   ├── volume/               # Volume budgeting per muscle group
+│   │   ├── warmup/               # Warmup and ramp-up set planning
+│   │   └── weeks/                # Week-level progression
+│   ├── repair/                   # Programme self-repair service
+│   ├── repositories/             # Data access (Supabase)
+│   ├── shared/                   # Shared utilities and error types
+│   └── validation/               # 20+ validation rule categories
+├── tests/                        # 83 test suites, 614 tests
+├── fixtures/                     # Test fixtures and seed data
+├── docs/                         # Architecture documentation
+├── supabase/                     # Edge functions and migrations
+└── vercel.json                   # API versioning rewrites
+```
+
+## Design Documentation
+
+Detailed architecture docs live in `docs/`:
+
+| Document | Topic |
+|----------|-------|
+| [Architecture History](docs/architecture-history.md) | Evolution of the system design |
+| [Athlete Input V2](docs/athlete-input-v2.md) | Enriched athlete input model |
+| [Programme Schema V2](docs/programme-schema-v2.md) | Longitudinal programme schema |
+| [Strategy & Phase Planner V2](docs/strategy-and-phase-planner-v2.md) | Phase sequencing and strategy |
+| [Calendar Planner V2](docs/calendar-planner-v2.md) | Training day scheduling |
+| [Session Construction V2](docs/session-construction-v2.md) | Session building pipeline |
+| [Conditioning Planner V2](docs/conditioning-planner-v2.md) | Conditioning programming |
+| [Warmup & Sequencing V2](docs/warmup-and-exercise-sequencing-v2.md) | Warmup and exercise ordering |
+| [Week Progression V2](docs/week-progression-planner-v2.md) | Weekly progression model |
+| [Validation Architecture](docs/validation-architecture.md) | Validation engine design |
+| [E2E Longitudinal Validation](docs/end-to-end-longitudinal-validation.md) | Integration test strategy |
+
+## Authority Boundary
+
+Odin **may**:
+- Verify Supabase access tokens
+- Accept and normalise athlete profiles
+- Generate programmes using AI or deterministic planners
+- Validate programmes against evidence-based rules
+- Self-repair validation failures
+- Return programme, validation, and generation metadata
+
+Odin **may not**:
+- Create or update athlete profiles
+- Persist generated programmes
+- Activate, archive, or finalise programmes
+- Prescribe exact weights (RPE-based only)
+- Bypass validation or self-repair rules
+
+A separate user-authorised application service owns approval and programme persistence.
+
+## Data Handling
+
+Athlete and health-adjacent inputs are sensitive. Odin processes them transiently for programme generation. Request logging excludes authorisation headers, tokens, request bodies, athlete profiles, injury notes, prompts, model responses, service-role keys, and raw provider errors.
+
+## License
+
+Private. Copyright GymX.
