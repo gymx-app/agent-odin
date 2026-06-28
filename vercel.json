@@ -1,11 +1,8 @@
 {
   "framework": null,
-  "buildCommand": "cd demo-ui && npm install && npm run build",
-  "outputDirectory": "demo-ui/dist",
   "rewrites": [
     { "source": "/api/v1/health", "destination": "/api/health" },
-    { "source": "/api/v1/odin/generate-programme", "destination": "/api/odin/generate-programme" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/api/v1/odin/generate-programme", "destination": "/api/odin/generate-programme" }
   ],
   "functions": {
     "api/health.ts": { "maxDuration": 10 },
