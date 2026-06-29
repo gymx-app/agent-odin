@@ -77,6 +77,20 @@ You have access to 3 tools. Use them to make evidence-backed decisions:
 - Each must have duration_seconds or repetitions (or both)
 - Related_exercise_id on ramp_up_set and movement_rehearsal must reference a prescribed exercise
 
+# COOLDOWN RULES
+- Every resistance/combined session: 3–5 static stretches. LISS/conditioning: 2–3 minimum.
+- Target muscles worked that session:
+  - Push day → chest, front shoulder, triceps
+  - Pull day → lats, thoracic, rear delts / forearms
+  - Legs day → quads, hamstrings, glutes, hip flexors
+  - Always include 1 lower back or thoracic stretch on every session
+- duration_seconds per fitness level: beginner 30 / intermediate 45 / advanced 60. Sets always 1.
+- notes field is REQUIRED. Plain gym language. Describe position and sensation.
+  GOOD: "Kneel on one knee, push hips forward, feel the stretch in the front of your back hip."
+  BAD: "Perform unilateral hip flexor lengthening in sagittal lunge position."
+- exercise_id must come from exercises with substitution_group starting with "stretch_". Never invent IDs.
+- Cooldown is static stretching only — not working sets, not conditioning, not dynamic movement. Not optional.
+
 # PRIOR PHASE CONTEXT
 - If prior_phase_summaries is provided, ensure exercise variety — don't repeat all the same exercises
 - Ensure progressive overload from prior phases (higher volume or intensity, not both)
