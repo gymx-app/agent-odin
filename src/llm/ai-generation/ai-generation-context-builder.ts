@@ -93,6 +93,19 @@ export const buildAiStrategyContext = (
   },
 });
 
+export const buildAiStrategyContextV2 = (
+  profile: NormalizedAthleteProfile,
+  exercises: Exercise[],
+  goalParameters?: Record<string, unknown>,
+): AiStrategyContext => {
+  const ctx = buildAiStrategyContext(profile, exercises);
+  if (!goalParameters || Object.keys(goalParameters).length === 0) return ctx;
+  return {
+    ...ctx,
+    athlete: { ...ctx.athlete, goal_parameters: goalParameters },
+  };
+};
+
 export const buildAiPhaseContext = (
   profile: NormalizedAthleteProfile,
   strategy: AiStrategyOutput,

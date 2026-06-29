@@ -1,6 +1,8 @@
 import type {
   AthleteInput,
+  AthleteInputV2,
   ErrorEnvelope,
+  InBodyParseResult,
   ProgrammePreviewResponse,
   SuccessEnvelope,
 } from './contracts';
@@ -80,6 +82,8 @@ const request = async <T>(
 const paths = {
   health: isEdgeFunction ? '/functions/v1/health' : '/api/health',
   generateProgramme: isEdgeFunction ? '/functions/v1/generate-programme' : '/api/odin/generate-programme',
+  generateProgrammeV2: '/api/v2/odin/generate-programme',
+  parseInBody: '/api/v1/inbody/parse',
 };
 
 export type StepProgress = {
@@ -131,6 +135,51 @@ export const odinApi = {
         athlete,
         strategy: strategyResult.strategy,
       },
+    });
+
+    buildResult.generation = {
+      ...buildResult.generation,
+      ai_generation: {
+        total_input_tokens: totalInputTokens,
+        total_output_tokens: totalOutputTokens,
+        fallback_used: false,
+      },
+    };
+
+    return buildResult;
+  },
+
+  parseInBody: (token: string, file: string, media_type: string): Promise<InBodyParseResult> =>
+    request<InBodyParseResult>(paths.parseInBody, {
+      method: 'POST',
+      token,
+      body: { file, media_type },
+    }),
+
+  generateProgrammeV2: async (
+    token: string,
+    athlete: AthleteInputV2,
+    onProgress?: (progress: StepProgress) => void,
+  ): Promise<ProgrammePreviewResponse> => {
+    onProgress?.({ step: 'strategy', detail: 'Generating training strategy (v2)...' });
+    const strategyResult = await request<{
+      step: 'strategy';
+      strategy: unknown;
+      usage: { inputTokens: number; outputTokens: number };
+    }>(paths.generateProgrammeV2, {
+      method: 'POST',
+      token,
+      body: { step: 'strategy', athlete },
+    });
+
+    const totalInputTokens = strategyResult.usage.inputTokens ?? 0;
+    const totalOutputTokens = strategyResult.usage.outputTokens ?? 0;
+
+    onProgress?.({ step: 'build', detail: 'Building programme structure (v2)...' });
+    const buildResult = await request<ProgrammePreviewResponse>(paths.generateProgrammeV2, {
+      method: 'POST',
+      token,
+      body: { step: 'build', athlete, strategy: strategyResult.strategy },
     });
 
     buildResult.generation = {

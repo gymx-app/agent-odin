@@ -32,6 +32,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { ApiError, odinApi, apiPlatform } from './api/client';
+import { V2FormPanel } from './v2/V2FormPanel';
 import type {
   AthleteInput,
   DayOfWeek,
@@ -94,6 +95,7 @@ type BusyAction =
   | 'generate'
   | null;
 
+type ApiVersion = 'v1' | 'v2';
 type WorkflowStep = 'connect' | 'generate' | 'review';
 type ResultTab = 'programme' | 'rationale' | 'validation' | 'json' | 'logs';
 
@@ -990,6 +992,7 @@ const RawJsonViewer = ({ data }: { data: unknown }) => {
 
 function App() {
   const [storedForm] = useState(loadStoredForm);
+  const [apiVersion, setApiVersion] = useState<ApiVersion>('v1');
   const [token, setToken] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -1516,6 +1519,19 @@ function App() {
                     <p>Inputs match the current transient athlete contract.</p>
                   </div>
                 </div>
+                <div className="version-toggle" role="group" aria-label="API version">
+                  {(['v1', 'v2'] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      className={`version-tab ${apiVersion === v ? 'active' : ''}`}
+                      onClick={() => setApiVersion(v)}
+                      disabled={isBusy}
+                    >
+                      {v === 'v1' ? 'v1 (stable)' : 'v2 (goal-aware)'}
+                    </button>
+                  ))}
+                </div>
                 <StatusPill
                   tone={
                     profileLoad.status === 'loaded'
@@ -1544,6 +1560,27 @@ function App() {
                 </StatusPill>
               </div>
 
+              {apiVersion === 'v2' ? (
+                <V2FormPanel
+                  token={token}
+                  disabled={isBusy}
+                  onResult={(data) => {
+                    setProgramme(data);
+                    setResultTab('programme');
+                    setNotice({
+                      tone: 'success',
+                      title: 'Programme generated',
+                      message: `${data.programme.programme.name} (v2) is ready to review.`,
+                    });
+                    document.querySelector('#programme')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  onProgress={(p) => setProgressDetail(p.detail)}
+                  onError={(err) => setNotice(errorNotice(err))}
+                  onBusyChange={(b) => { if (!b) setProgressDetail(null); }}
+                />
+              ) : null}
+
+              {apiVersion === 'v1' ? <>
               <div className="form-grid">
                 <Field label="Name">
                   <input
@@ -2097,8 +2134,10 @@ function App() {
                   </Button>
                 </div>
               </div>
+              </> : null}
             </section>
 
+            {apiVersion === 'v1' ? (
             <section className="panel" id="generate">
               <div className="panel-heading">
                 <div>
@@ -2127,6 +2166,7 @@ function App() {
                 </Button>
               </div>
             </section>
+            ) : null}
 
             <section className="panel programme-panel" id="programme">
               <div className="panel-heading programme-heading">

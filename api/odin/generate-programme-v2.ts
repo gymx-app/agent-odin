@@ -21,7 +21,7 @@ import { odinError } from '../../src/shared/errors/odin-errors.js';
 import { OpenAIAiProgrammeGenerationProvider } from '../../src/llm/ai-generation/openai-ai-programme-generation-provider.js';
 import { AnthropicAiProgrammeGenerationProvider } from '../../src/llm/ai-generation/anthropic-ai-programme-generation-provider.js';
 import {
-  buildAiStrategyContext,
+  buildAiStrategyContextV2,
   buildAiPhaseContext,
 } from '../../src/llm/ai-generation/ai-generation-context-builder.js';
 import { createToolExecutor } from '../../src/llm/ai-generation/agent-tool-executor.js';
@@ -165,7 +165,11 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
       if (body.step === 'strategy') {
         await checkRateLimit(user.id, 'strategy', adminClient, appConfig.rateLimitStrategyPerDay);
 
-        const strategyCtx = buildAiStrategyContext(normalized, seedExercises);
+        const strategyCtx = buildAiStrategyContextV2(
+          normalized,
+          seedExercises,
+          body.athlete.goal_parameters as Record<string, unknown> | undefined,
+        );
         const result = await provider.generateStrategy(strategyCtx, {
           requestId: context.requestId,
           strategySystemPrompt: aiStrategySystemPromptV2,
@@ -381,7 +385,7 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
 
       if (body.step === 'build') {
         const strategy = AiStrategyOutputSchema.parse(stripNulls(body.strategy));
-        const strategyCtx = buildAiStrategyContext(normalized, seedExercises);
+        const strategyCtx = buildAiStrategyContextV2(normalized, seedExercises);
         const { programme, validation, repair_log } = await buildProgrammeWithRepair(
           normalized,
           seedExercises,

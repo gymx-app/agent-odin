@@ -11,7 +11,7 @@ export type Equipment =
   | 'bodyweight'
   | 'home_gym';
 export type FitnessLevel = 'beginner' | 'intermediate' | 'advanced';
-export type PlannerVersion = 'longitudinal_v1' | 'ai_agent_v1';
+export type PlannerVersion = 'longitudinal_v1' | 'ai_agent_v1' | 'ai_agent_v2';
 
 export type DayOfWeek =
   | 'monday'
@@ -390,4 +390,38 @@ export type SuccessEnvelope<T> = { success: true; data: T };
 export type ErrorEnvelope = {
   success: false;
   error: { code: string; message: string; details: unknown | null };
+};
+
+// --- V2 goal-specific types ---
+
+export type GoalParametersV2 = {
+  current_body_fat_pct?: number;
+  target_body_fat_pct?: number;
+  target_muscle_gain_kg?: number;
+  timeframe_weeks?: number;
+  primary_lift?: 'squat' | 'deadlift' | 'bench_press' | 'overhead_press';
+  current_1rm_kg?: number;
+  target_1rm_kg?: number;
+  endurance_focus?: 'cardio' | 'mobility' | 'general';
+};
+
+export type InBodyV2 = {
+  body_fat_pct: number;
+  smm_kg: number;
+  visceral_fat_area: number;
+  bmr: number;
+};
+
+export type AthleteInputV2 = Omit<AthleteInput, 'inbody'> & {
+  inbody: InBodyV2 | null;
+  goal_parameters?: GoalParametersV2;
+};
+
+export type InBodyParseResult = {
+  body_fat_pct: number | null;
+  smm_kg: number | null;
+  body_fat_mass_kg: number | null;
+  bmr: number | null;
+  visceral_fat_area: number | null;
+  total_body_water_l: number | null;
 };
