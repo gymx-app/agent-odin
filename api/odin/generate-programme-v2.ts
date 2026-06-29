@@ -32,6 +32,7 @@ import { assembleProgramme } from '../../src/llm/ai-generation/ai-programme-asse
 import { programmeValidationService } from '../../src/validation/programme-validation.service.js';
 import { LONGITUDINAL_VALIDATION_RULE_VERSION } from '../../src/validation/longitudinal-validation-registry.js';
 import { AiStrategyOutputSchema } from '../../src/llm/ai-generation/ai-generation.schema.js';
+import type { AiStrategyOutput } from '../../src/llm/ai-generation/ai-generation.types.js';
 import { buildProgrammeWithRepair } from '../../src/planning/longitudinal-programme-planner.js';
 import { buildRationaleSummary } from '../../src/planning/rationale-summary.js';
 import { interpretUnknownInjuries } from '../../src/normalization/injury-interpreter.js';
@@ -68,6 +69,10 @@ const stripNulls = (obj: unknown): unknown => {
   return obj;
 };
 
+const DAY_OF_WEEK = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
+
+// Used for phase_prep/reasoning/tools/week steps where strategy comes from the client.
+// For the build step, use coerceStrategy (more lenient — LLM may null optional fields).
 const parseStrategy = (raw: unknown): z.infer<typeof AiStrategyOutputSchema> => {
   try {
     return AiStrategyOutputSchema.parse(stripNulls(raw));
@@ -76,6 +81,23 @@ const parseStrategy = (raw: unknown): z.infer<typeof AiStrategyOutputSchema> => 
       message: `Strategy validation failed: ${err instanceof Error ? err.message : String(err)}`,
     });
   }
+};
+
+// Lenient strategy coercion for the build step: fixes nulled optional fields that the
+// LLM may output (OpenAI schema converts optional→nullable, stripNulls then removes them,
+// but CalendarSchema.superRefine rejects missing day_of_week on weekly cycles).
+const coerceStrategy = (raw: unknown): AiStrategyOutput => {
+  const stripped = stripNulls(raw) as Record<string, unknown>;
+  const calendar = stripped.calendar as Record<string, unknown> | undefined;
+  if (calendar?.cycle_type === 'weekly' && Array.isArray(calendar.days)) {
+    calendar.days = (calendar.days as Array<Record<string, unknown>>).map((day, i) => {
+      if (day.day_of_week === undefined || day.day_of_week === null) {
+        return { ...day, day_of_week: DAY_OF_WEEK[i % 7] };
+      }
+      return day;
+    });
+  }
+  return stripped as unknown as AiStrategyOutput;
 };
 
 const stepRequestSchema = z.discriminatedUnion('step', [
@@ -397,7 +419,7 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
       }
 
       if (body.step === 'build') {
-        const strategy = parseStrategy(body.strategy);
+        const strategy = coerceStrategy(body.strategy);
         const strategyCtx = buildAiStrategyContextV2(normalized, seedExercises);
         let buildResult: Awaited<ReturnType<typeof buildProgrammeWithRepair>>;
         try {
