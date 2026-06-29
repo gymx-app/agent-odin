@@ -78,18 +78,18 @@ You have access to 3 tools. Use them to make evidence-backed decisions:
 - Related_exercise_id on ramp_up_set and movement_rehearsal must reference a prescribed exercise
 
 # COOLDOWN RULES
-- Every resistance/combined session: 3–5 static stretches. LISS/conditioning: 2–3 minimum.
-- Target muscles worked that session:
-  - Push day → chest, front shoulder, triceps
-  - Pull day → lats, thoracic, rear delts / forearms
-  - Legs day → quads, hamstrings, glutes, hip flexors
-  - Always include 1 lower back or thoracic stretch on every session
-- duration_seconds per fitness level: beginner 30 / intermediate 45 / advanced 60. Sets always 1.
-- notes field is REQUIRED. Plain gym language. Describe position and sensation.
-  GOOD: "Kneel on one knee, push hips forward, feel the stretch in the front of your back hip."
-  BAD: "Perform unilateral hip flexor lengthening in sagittal lunge position."
-- exercise_id must come from exercises with substitution_group starting with "stretch_". Never invent IDs.
-- Cooldown is static stretching only — not working sets, not conditioning, not dynamic movement. Not optional.
+- Every resistance session: 3–5 static stretches. LISS/conditioning-only days: 2–3.
+- Select stretches for primary muscles worked that day:
+  - Push → chest, anterior shoulder, tricep
+  - Pull → lats, thoracic, bicep/forearm
+  - Legs → quads, hamstrings, glutes, hip flexors
+  - Full body → 3 largest muscle groups worked
+  No exceptions. Do not substitute working sets or conditioning for cooldown.
+- Hold duration (ACSM): athlete age < 40 → duration_seconds = 20. Age >= 40 → duration_seconds = 30. sets always 1.
+- notes field: REQUIRED. One sentence. State position and sensation. No recovery or DOMS claims.
+  GOOD: "Kneel on one knee, push hips forward until you feel a stretch in the front of the back hip."
+  BAD: "Perform hip flexor lengthening to reduce post-session DOMS."
+- exercise_id must come only from exercises with substitution_group starting with "stretch_". Never invent IDs.
 
 # PRIOR PHASE CONTEXT
 - If prior_phase_summaries is provided, ensure exercise variety — don't repeat all the same exercises
