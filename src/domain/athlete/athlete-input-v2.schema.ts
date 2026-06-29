@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AthleteInputSchema } from './athlete-input.schema.js';
+import { AthleteInputBaseSchema } from './athlete-input.schema.js';
 
 const InBodyV2Schema = z.object({
   body_fat_pct: z.number().nonnegative(),
@@ -30,7 +30,7 @@ export const GoalParametersV2Schema = z.object({
   endurance_focus: z.enum(['cardio', 'mobility', 'general']).optional(),
 });
 
-export const AthleteInputV2Schema = AthleteInputSchema.omit({ inbody: true }).extend({
+export const AthleteInputV2Schema = AthleteInputBaseSchema.omit({ inbody: true }).extend({
   inbody: InBodyV2Schema.nullable().default(null),
   goal_parameters: GoalParametersV2Schema.optional(),
 });

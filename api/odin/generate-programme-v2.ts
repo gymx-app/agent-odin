@@ -11,6 +11,7 @@ import { createLogger } from '../../src/infrastructure/logging/logger.js';
 import { requireAuthenticatedUser } from '../../src/infrastructure/supabase/auth.js';
 import { createSupabaseAuthClient } from '../../src/infrastructure/supabase/auth-client.js';
 import { AthleteInputV2Schema } from '../../src/domain/athlete/athlete-input-v2.schema.js';
+import type { AthleteInput } from '../../src/domain/athlete/athlete.types.js';
 import {
   ProgrammePhaseSchema,
   ProgrammeWeekSchema,
@@ -159,7 +160,7 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
         ...body.athlete,
         injuries: await interpretUnknownInjuries(body.athlete.injuries, appConfig),
       };
-      const normalized = normalizeAthlete(athleteInput);
+      const normalized = normalizeAthlete(athleteInput as unknown as AthleteInput);
       const toolExecutor = createToolExecutor(seedExercises, normalized);
 
       if (body.step === 'strategy') {

@@ -194,8 +194,7 @@ const OriginMetadataSchema = z
   })
   .strict();
 
-export const AthleteInputSchema = z
-  .object({
+export const AthleteInputBaseSchema = z.object({
     name: z.string().trim().min(1),
     age: z.number().int().min(16).max(100),
     sex: SexSchema,
@@ -221,7 +220,9 @@ export const AthleteInputSchema = z
     waist_circumference_cm: z.number().positive().max(300).optional(),
     lean_mass_kg: z.number().positive().max(500).optional(),
     origin_metadata: OriginMetadataSchema.optional(),
-  })
+  });
+
+export const AthleteInputSchema = AthleteInputBaseSchema
   .superRefine((input, context) => {
     const available = input.schedule?.available_days;
     const unavailable = new Set(input.schedule?.unavailable_days ?? []);
