@@ -51,7 +51,7 @@ const dynamicMobilityForSession = (
     items.push(
       item(input, order, 'shoulder-mob', {
         component_type: 'dynamic_mobility',
-        activity_name: 'Wall Slides',
+        activity_name: 'Wall Shoulder Slide',
         exercise_id: 'wall_slide',
         repetitions: 8,
         intensity: 'Controlled, full range',
@@ -64,7 +64,7 @@ const dynamicMobilityForSession = (
     items.push(
       item(input, order + items.length, 'thoracic-mob', {
         component_type: 'dynamic_mobility',
-        activity_name: 'Thoracic Spine Rotation',
+        activity_name: 'Upper Back Rotation',
         exercise_id: 'thoracic_spine_rotation',
         repetitions: 8,
         intensity: 'Controlled, gentle end-range',
@@ -173,7 +173,7 @@ export const buildWarmupComponents = (
   const pulseExercise = lower
     ? { name: 'Stationary Bike', id: 'stationary_bike' }
     : upper
-      ? { name: 'Rower LISS', id: 'rower_liss' }
+      ? { name: 'Rowing Machine', id: 'rower_liss' }
       : { name: 'Treadmill Walk', id: 'treadmill_walk' };
   const basePulseSeconds = shortSession ? 60 : power ? 180 : 120;
   const pulseDurationSeconds = am ? Math.round(basePulseSeconds * 1.25) : basePulseSeconds;
