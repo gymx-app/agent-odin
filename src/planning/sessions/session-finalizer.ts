@@ -3,6 +3,7 @@ import { PlannerError } from '../planner-errors.js';
 import { sequenceSessionExercises } from '../sequencing/exercise-sequencer.js';
 import { planSessionWarmup } from '../warmup/warmup-planner.js';
 import { estimateWarmupItemSeconds } from '../warmup/warmup.types.js';
+import { planSessionCooldown } from '../cooldown/cooldown-planner.js';
 import { estimateResistanceSessionDuration } from './session-duration-estimator.js';
 import type {
   PlannedResistanceSession,
@@ -46,6 +47,11 @@ export const finalizeResistanceSession = (
   session: PlannedResistanceSession,
 ): PlannedResistanceSession => {
   let warmup = planSessionWarmup({
+    profile: input.profile,
+    session,
+    exercises: input.exercises,
+  });
+  const cooldown = planSessionCooldown({
     profile: input.profile,
     session,
     exercises: input.exercises,
@@ -114,6 +120,7 @@ export const finalizeResistanceSession = (
     day: {
       ...session.day,
       warmup: warmup.items,
+      cooldown: cooldown.items,
       exercises: sequence.exercises,
       estimated_duration_min: duration.estimated_duration_min,
       training_budget: session.day.training_budget
