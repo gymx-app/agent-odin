@@ -1,5 +1,18 @@
 import type { WarmupItem, WarmupPlannerInput } from './warmup.types.js';
 
+// Morning muscle temperature is ~0.31°C lower than evening (Waterhouse et al.).
+// Extending the Raise phase for AM sessions equalises starting muscle temp
+// with evening levels (Racinais et al., Edwards et al.).
+const isAmSession = (input: WarmupPlannerInput): boolean => {
+  const raw = (input.profile.source.schedule?.preferred_workout_time ?? '').toLowerCase().trim();
+  if (!raw) return false;
+  if (/\b(morning|am|early)\b/.test(raw)) return true;
+  // Hour-based: "6am", "07:00", "8 am" — anything before 12:00
+  const hourMatch = raw.match(/^(\d{1,2})(?:[:h]|am|$)/);
+  if (hourMatch?.[1]) return parseInt(hourMatch[1], 10) < 12;
+  return false;
+};
+
 const hasPattern = (input: WarmupPlannerInput, pattern: string): boolean =>
   input.session.day.exercises.some((exercise) =>
     exercise.movement_patterns.includes(pattern),
@@ -153,6 +166,7 @@ export const buildWarmupComponents = (
   const power = input.session.day.exercises.some(
     (exercise) => exercise.sequence_role === 'power',
   );
+  const am = !shortSession && isAmSession(input);
   const clinicianRestrictions = input.profile.movement_restrictions.filter(
     (restriction) => restriction.clinician_restriction,
   );
@@ -161,12 +175,14 @@ export const buildWarmupComponents = (
     : upper
       ? { name: 'Rower LISS', id: 'rower_liss' }
       : { name: 'Treadmill Walk', id: 'treadmill_walk' };
+  const basePulseSeconds = shortSession ? 60 : power ? 180 : 120;
+  const pulseDurationSeconds = am ? Math.round(basePulseSeconds * 1.25) : basePulseSeconds;
   const components: WarmupItem[] = [
     item(input, 1, 'pulse', {
       component_type: 'pulse_raiser',
       activity_name: pulseExercise.name,
       exercise_id: pulseExercise.id,
-      duration_seconds: shortSession ? 60 : power ? 180 : 120,
+      duration_seconds: pulseDurationSeconds,
       intensity: 'Easy conversational effort',
       purpose: 'Raise body temperature without creating fatigue.',
       rationale_codes: [
@@ -175,6 +191,7 @@ export const buildWarmupComponents = (
           : upper
             ? 'UPPER_BODY_PULSE_RAISER_SELECTED'
             : 'GENERAL_PULSE_RAISER_SELECTED',
+        ...(am ? ['AM_RAISE_PHASE_EXTENDED'] : []),
       ],
     }),
   ];
