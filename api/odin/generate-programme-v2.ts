@@ -142,13 +142,13 @@ const stepRequestSchema = z.discriminatedUnion('step', [
   z.object({
     step: z.literal('assemble'),
     athlete: AthleteInputV2Schema,
-    strategy: AiStrategyOutputSchema,
+    strategy: z.record(z.unknown()),
     phases: z.array(ProgrammePhaseSchema).min(1),
   }),
   z.object({
     step: z.literal('build'),
     athlete: AthleteInputV2Schema,
-    strategy: AiStrategyOutputSchema,
+    strategy: z.record(z.unknown()),
   }),
 ]);
 
