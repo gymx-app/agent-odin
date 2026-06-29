@@ -73,5 +73,6 @@ export const normalizeAthlete = (
     ),
   };
 
-  return NormalizedAthleteProfileSchema.parse(profile);
+  const result = NormalizedAthleteProfileSchema.safeParse(profile);
+  return result.success ? result.data : (profile as NormalizedAthleteProfile);
 };

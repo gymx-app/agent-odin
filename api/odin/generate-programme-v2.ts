@@ -19,6 +19,8 @@ import {
 import { seedExercises } from '../../src/exercises/approved-exercise-library.js';
 import { normalizeAthlete } from '../../src/normalization/athlete-normalizer.js';
 import { odinError } from '../../src/shared/errors/odin-errors.js';
+import { BadRequestError } from '../../src/shared/errors/http-errors.js';
+import { AppError } from '../../src/shared/errors/app-error.js';
 import { OpenAIAiProgrammeGenerationProvider } from '../../src/llm/ai-generation/openai-ai-programme-generation-provider.js';
 import { AnthropicAiProgrammeGenerationProvider } from '../../src/llm/ai-generation/anthropic-ai-programme-generation-provider.js';
 import {
@@ -64,6 +66,16 @@ const stripNulls = (obj: unknown): unknown => {
     return result;
   }
   return obj;
+};
+
+const parseStrategy = (raw: unknown): z.infer<typeof AiStrategyOutputSchema> => {
+  try {
+    return AiStrategyOutputSchema.parse(stripNulls(raw));
+  } catch (err) {
+    throw new BadRequestError({
+      message: `Strategy validation failed: ${err instanceof Error ? err.message : String(err)}`,
+    });
+  }
 };
 
 const stepRequestSchema = z.discriminatedUnion('step', [
@@ -193,7 +205,7 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
       }
 
       if (body.step === 'phase_prep') {
-        const strategy = AiStrategyOutputSchema.parse(stripNulls(body.strategy));
+        const strategy = parseStrategy(body.strategy);
         const skeleton = strategy.phase_skeletons[body.phase_index];
         if (!skeleton) {
           throw odinError('INVALID_PHASE_INDEX', `Phase index ${body.phase_index} out of range.`, 400);
@@ -243,7 +255,7 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
       }
 
       if (body.step === 'phase_reasoning') {
-        const strategy = AiStrategyOutputSchema.parse(stripNulls(body.strategy));
+        const strategy = parseStrategy(body.strategy);
         const skeleton = strategy.phase_skeletons[body.phase_index];
         if (!skeleton) {
           throw odinError('INVALID_PHASE_INDEX', `Phase index ${body.phase_index} out of range.`, 400);
@@ -283,7 +295,7 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
       }
 
       if (body.step === 'phase_tools') {
-        const strategy = AiStrategyOutputSchema.parse(stripNulls(body.strategy));
+        const strategy = parseStrategy(body.strategy);
         const skeleton = strategy.phase_skeletons[body.phase_index];
         if (!skeleton) {
           throw odinError('INVALID_PHASE_INDEX', `Phase index ${body.phase_index} out of range.`, 400);
@@ -352,7 +364,7 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
         if (body.previous_response_id) {
           weekGenCtx.previousResponseId = body.previous_response_id;
         } else {
-          const fullStrategy = AiStrategyOutputSchema.parse(stripped);
+          const fullStrategy = parseStrategy(stripped);
           const fullSkeleton = fullStrategy.phase_skeletons[body.phase_index]!;
           const phaseCtx = buildAiPhaseContext(
             normalized,
@@ -385,16 +397,27 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
       }
 
       if (body.step === 'build') {
-        const strategy = AiStrategyOutputSchema.parse(stripNulls(body.strategy));
+        const strategy = parseStrategy(body.strategy);
         const strategyCtx = buildAiStrategyContextV2(normalized, seedExercises);
-        const { programme, validation, repair_log } = await buildProgrammeWithRepair(
-          normalized,
-          seedExercises,
-          strategy,
-          provider,
-          strategyCtx,
-          { startDate: new Date().toISOString().slice(0, 10) },
-        );
+        let buildResult: Awaited<ReturnType<typeof buildProgrammeWithRepair>>;
+        try {
+          buildResult = await buildProgrammeWithRepair(
+            normalized,
+            seedExercises,
+            strategy,
+            provider,
+            strategyCtx,
+            { startDate: new Date().toISOString().slice(0, 10) },
+          );
+        } catch (err) {
+          if (err instanceof AppError) throw err;
+          throw odinError(
+            'PROGRAMME_BUILD_FAILED',
+            err instanceof Error ? err.message : 'Programme build failed.',
+            500,
+          );
+        }
+        const { programme, validation, repair_log } = buildResult;
 
         const rationale = buildRationaleSummary(strategy, programme);
         const repairAttempted = repair_log.length > 0;
@@ -437,7 +460,7 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
       }
 
       if (body.step === 'assemble') {
-        const strategy = AiStrategyOutputSchema.parse(stripNulls(body.strategy));
+        const strategy = parseStrategy(body.strategy);
         const phases = body.phases;
 
         const programme = assembleProgramme({
