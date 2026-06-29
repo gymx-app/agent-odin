@@ -7,6 +7,7 @@ import type {
 import type { ToolExecutor } from './agent-tool-executor.js';
 
 export const AI_GENERATION_PROMPT_VERSION = 'odin_ai_gen_v1';
+export const AI_GENERATION_PROMPT_VERSION_V2 = 'odin_ai_gen_v2';
 
 export type AiStrategyOutput = z.infer<typeof AiStrategyOutputSchema>;
 export type AiPhaseOutput = z.infer<typeof AiPhaseOutputSchema>;
@@ -23,6 +24,7 @@ export type AiGenerationProviderContext = {
   reasoningOutput?: string;
   toolConversation?: unknown[];
   toolsOnly?: boolean;
+  strategySystemPrompt?: string;
 };
 
 export type AiGenerationResult<T> = {

@@ -99,7 +99,7 @@ export class OpenAIAiProgrammeGenerationProvider
     providerCtx: AiGenerationProviderContext,
   ): Promise<AiStrategyGenerationResult> {
     return this.generateStructured(
-      aiStrategySystemPrompt,
+      providerCtx.strategySystemPrompt ?? aiStrategySystemPrompt,
       { strategy_context: context, retry_feedback: providerCtx.retryFeedback ?? null },
       AiStrategyOutputSchema,
       'ai_strategy_generation',
