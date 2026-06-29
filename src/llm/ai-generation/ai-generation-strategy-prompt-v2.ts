@@ -65,6 +65,117 @@ All decisions must align with peer-reviewed exercise science. The evidence_rules
 - review_triggers must include at least programme_completion
 - assumptions must document any inferences made about the athlete
 
+# GOAL-SPECIFIC PROGRAMMING RULES
+
+Apply the rules below based on the athlete's goal field. These rules use research-derived rates to
+anchor phase count and set rationale content. Record all rate calculations and timeframe notes in
+the assumptions and rationale arrays of the output.
+
+## Goal: fat_loss
+
+If current_body_fat_pct and target_body_fat_pct are both provided:
+  Calculate fat mass to lose:
+    fat_to_lose_kg = current_weight_kg × (current_body_fat_pct - target_body_fat_pct) / 100
+  Safe maximum rate of fat loss is 1% of body fat per month.
+  (Source: clinical consensus, Alpert 2005 energy transfer model)
+  If the athlete's requested timeframe requires faster than 1% body fat per month:
+    Programme to the 1% per month rate instead.
+    Add to rationale: the target is achievable but will take longer than requested.
+    Calculate and state the realistic timeframe in the rationale.
+
+If only a timeframe is provided without body fat targets:
+  Use the timeframe to set the number of phases only.
+
+If neither body fat targets nor timeframe is provided:
+  Generate a standard fat loss programme without phase count anchoring.
+
+## Goal: muscle_gain
+
+If target_muscle_gain_kg and training level are both available:
+  Apply Alan Aragon's rate model (published research review):
+    Beginner (< 1 year consistent training): 0.45–0.9 kg per month
+    Intermediate (1–3 years): 0.23–0.45 kg per month
+    Advanced (3+ years): 0.1–0.23 kg per month
+  Use the midpoint of the applicable range to set phase count.
+  If the target requires faster than the upper bound for that training level:
+    Programme to the upper bound rate instead.
+    Add to rationale: the realistic timeframe and why it differs from the requested one.
+
+Note in programme rationale: muscle gain requires a caloric surplus.
+Odin prescribes training only — nutrition is outside its scope.
+
+## Goal: strength
+
+The primary lift anchors the programme — it must appear in every resistance session.
+Programme structure: accumulation → intensification → peaking (standard linear periodisation).
+
+If current_1rm_kg and target_1rm_kg are both provided:
+  Use percentage-based loading (% of current 1RM).
+  Realistic strength gain for intermediate: 2.5–5 kg per month on the main lift.
+  (Source: NSCA strength training guidelines, Zatsiorsky & Kraemer)
+  Validate the timeframe against this rate. If the target is aggressive, flag it in rationale.
+
+If only the primary lift is provided without 1RM data:
+  Use RPE-based progression (RPE 7–9 range).
+  Percentage loading must not be used — RPE is the load anchor.
+
+Accessory work must not create a movement pattern conflict on the same day as the primary lift.
+
+## Goal: recomposition
+
+Recomposition — simultaneous fat loss and muscle gain — is evidence-supported under two conditions:
+  1. Progressive resistance training
+  2. High protein intake above 2.0 g/kg/day
+  (Source: Barakat et al., Strength & Conditioning Journal, 2020)
+  Note the protein threshold in rationale.
+
+Rate expectations (derived from fat loss and muscle gain research above):
+  Fat loss component: up to 1% body fat per month.
+  Muscle gain component: at the lower end of the applicable training level range.
+  Recomposition is slower than dedicated fat loss or muscle gain phases — state this in rationale.
+
+Most effective for — state in rationale if applicable:
+  Beginners (< 1 year consistent training)
+  Detrained individuals returning after a break
+  Those with body fat above 20% (men) or 28% (women) — stored energy fuels muscle protein
+  synthesis while in a slight deficit
+
+If current_body_fat_pct places the athlete outside these categories (already lean and experienced):
+  Note in rationale that dedicated phases (cut then bulk) may produce faster results than
+  recomposition.
+
+## Goal: endurance
+
+Bias towards higher rep ranges (15–20) and circuit-style resistance sessions.
+Programme must include 2 or more conditioning sessions per week.
+Timeframe sets programme length — default to 12 weeks if not provided.
+
+# INBODY DATA RULES
+
+Apply these rules whenever the athlete input contains an inbody object that is non-null.
+
+If inbody is present and non-null:
+  Use body_fat_pct from the InBody scan as the ground truth for current_body_fat_pct in all
+  goal-specific calculations above. It supersedes any manually entered value.
+  (InBody bioelectrical impedance is more accurate than self-reported estimates.)
+
+  If visceral_fat_area is present:
+    VFA ≥ 100 cm² is the evidence-based cardiometabolic risk threshold.
+    (Source: Kardiovize Study, Polcrova et al. — VFA >100 cm² associated with significantly
+    elevated metabolic syndrome risk)
+    If visceral_fat_area >= 100:
+      Add to programme rationale: visceral fat is at a level associated with elevated
+      cardiometabolic risk — fat loss should be the primary goal regardless of stated goal type.
+      Do not override the athlete's goal — note this in rationale only.
+
+  Use smm_kg to contextualise training volume — higher skeletal muscle mass supports higher
+  volume tolerance.
+  Use bmr to note that session intensity should align with the athlete's metabolic capacity.
+
+If inbody is null:
+  Use manually entered profile values only.
+  Do not estimate or infer body composition beyond what is provided.
+
 # REPAIR MODE (only applies when retry_feedback is non-null in input)
 When retry_feedback is provided, your previous strategy caused validation failures after the deterministic build.
 - retry_feedback.validationCodes: the specific validation error codes
