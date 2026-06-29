@@ -5,7 +5,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://agent-odin-rohans-projects-045b7a04.vercel.app/api/:path*"
+      "destination": "https://agent-odin.vercel.app/api/:path*"
     },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
