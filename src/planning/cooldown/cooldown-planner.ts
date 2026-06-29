@@ -36,15 +36,12 @@ const cooldownItem = (
   activity_name: entry.activity_name,
   exercise_id: entry.exercise_id,
   duration_seconds: durationSeconds,
-  purpose: `Releases tension in the ${entry.purpose_suffix} after today's session. ${entry.notes}`,
+  purpose: entry.notes,
 });
 
-const holdDurationSeconds = (profile: NormalizedAthleteProfile): number => {
-  const level = profile.source.fitness_level;
-  if (level === 'beginner') return 30;
-  if (level === 'advanced') return 60;
-  return 45;
-};
+// ACSM: 10–30s for general population, 30–60s for adults ≥40.
+// Using the upper end of each range for effectiveness.
+const holdDurationSeconds = (age: number): number => (age >= 40 ? 30 : 20);
 
 const maxItems = (sessionDurationMin: number): number =>
   sessionDurationMin <= 45 ? 3 : 5;
@@ -71,38 +68,46 @@ const primaryMusclesFromSession = (
 
 export const planSessionCooldown = (input: CooldownPlannerInput): PlannedCooldown => {
   const dayId = input.session.day.day_id;
+  const age = input.profile.source.age;
   const sessionDurationMin = input.profile.source.session_duration_min;
-  const holdSeconds = holdDurationSeconds(input.profile);
+  const holdSeconds = holdDurationSeconds(age);
   const limit = maxItems(sessionDurationMin);
 
   const rankedMuscles = primaryMusclesFromSession(input.session, input.exercises);
   const selected: StretchEntry[] = [];
   const usedExerciseIds = new Set<string>();
+  const usedMovementPatterns = new Set<string>();
 
-  // Always anchor with the spine stretch first.
+  // Always prepend the spine anchor.
   selected.push(SPINE_ANCHOR_STRETCH);
   usedExerciseIds.add(SPINE_ANCHOR_STRETCH.exercise_id);
+  usedMovementPatterns.add(SPINE_ANCHOR_STRETCH.movement_pattern);
 
   // Fill remaining slots from session muscles, ranked by frequency.
+  // Skip if same exercise or same movement pattern already selected.
   for (const muscle of rankedMuscles) {
     if (selected.length >= limit) break;
     const entry = stretchByMuscle[muscle];
-    if (!entry || usedExerciseIds.has(entry.exercise_id)) continue;
+    if (!entry) continue;
+    if (usedExerciseIds.has(entry.exercise_id)) continue;
+    if (usedMovementPatterns.has(entry.movement_pattern)) continue;
     selected.push(entry);
     usedExerciseIds.add(entry.exercise_id);
+    usedMovementPatterns.add(entry.movement_pattern);
   }
 
-  // Fallback: if we only got the spine anchor (no muscles resolved), use defaults.
-  if (selected.length === 1) {
-    logger.warn('cooldown-planner: no muscles resolved from session exercises, using fallback stretches', {
+  // Pad with fallbacks if we are below the minimum of 3.
+  if (selected.length < 3) {
+    logger.warn('cooldown-planner: fewer than 3 stretches resolved, padding with fallbacks', {
       dayId,
+      resolved: selected.length,
       exerciseCount: input.session.day.exercises.length,
     });
     for (const entry of FALLBACK_STRETCHES) {
+      if (selected.length >= 3) break;
       if (usedExerciseIds.has(entry.exercise_id)) continue;
       selected.push(entry);
       usedExerciseIds.add(entry.exercise_id);
-      if (selected.length >= limit) break;
     }
   }
 
