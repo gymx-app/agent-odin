@@ -101,7 +101,7 @@ const searchExercises = (exercises: Exercise[], args: SearchExercisesArgs) => {
 
   return results.map((ex) => ({
     exercise_id: ex.id,
-    exercise_name: ex.name,
+    exercise_name: ex.display_name ?? ex.name,
     movement_patterns: ex.movement_patterns,
     primary_muscles: ex.primary_muscles,
     secondary_muscles: ex.secondary_muscles,

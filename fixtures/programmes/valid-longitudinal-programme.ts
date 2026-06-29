@@ -124,7 +124,34 @@ const programmeDays = (weekNumber: number) =>
         : [],
       exercises: resistance ? [{ ...exercise }] : [],
       conditioning: conditioningDay ? [{ ...conditioning }] : [],
-      cooldown: [],
+      cooldown: resistance
+        ? [
+            {
+              cooldown_id: `week-${weekNumber}-day-${index + 1}-cooldown-1`,
+              display_order: 1,
+              activity_name: "Child's Pose",
+              exercise_id: 'child_pose',
+              duration_seconds: 20,
+              purpose: 'Kneel and reach arms forward on the floor, lower hips toward heels.',
+            },
+            {
+              cooldown_id: `week-${weekNumber}-day-${index + 1}-cooldown-2`,
+              display_order: 2,
+              activity_name: 'Standing Quad Stretch',
+              exercise_id: 'standing_quad_stretch',
+              duration_seconds: 20,
+              purpose: 'Balance on one leg, pull heel toward glute until you feel the front of your thigh pull.',
+            },
+            {
+              cooldown_id: `week-${weekNumber}-day-${index + 1}-cooldown-3`,
+              display_order: 3,
+              activity_name: 'Pigeon Stretch',
+              exercise_id: 'pigeon_stretch',
+              duration_seconds: 20,
+              purpose: 'Place front shin across the mat, lower hips toward the floor.',
+            },
+          ]
+        : [],
       ...(resistance
         ? {
             session_metadata: {

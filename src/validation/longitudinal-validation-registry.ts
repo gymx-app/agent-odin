@@ -5,6 +5,7 @@ import { validateLongitudinalPhases } from './phase-validator.js';
 import { validateProgrammeCoherence } from './programme-coherence-validator.js';
 import { validateLongitudinalSessions } from './session-validator.js';
 import { validateLongitudinalStrategy } from './strategy-validator.js';
+import { validateLongitudinalCooldowns } from './cooldown-validator.js';
 import { validateLongitudinalWarmups } from './warmup-validator.js';
 import { validateLongitudinalWeeks } from './week-validator.js';
 import type { LongitudinalValidationRule } from './validation.types.js';
@@ -38,6 +39,11 @@ export const longitudinalValidationRules: readonly LongitudinalValidationRule[] 
     { id: 'weeks', version: 2, validate: validateLongitudinalWeeks },
     { id: 'sessions', version: 2, validate: validateLongitudinalSessions },
     { id: 'warmups', version: 2, validate: validateLongitudinalWarmups },
+    {
+      id: 'cooldowns',
+      version: 2,
+      validate: validateLongitudinalCooldowns,
+    },
     {
       id: 'exercise-sequencing',
       version: 2,

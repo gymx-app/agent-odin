@@ -32,6 +32,7 @@ describe('end-to-end longitudinal validation and repair', () => {
         'weeks',
         'sessions',
         'warmups',
+        'cooldowns',
         'exercise-sequencing',
         'conditioning',
         'programme-coherence',

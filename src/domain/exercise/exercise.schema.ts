@@ -52,6 +52,7 @@ export const ExerciseSchema = z
   .object({
     id: z.string().regex(/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/),
     name: z.string().trim().min(1),
+    display_name: z.string().trim().min(1).optional(),
     status: z.enum(['active', 'deprecated', 'experimental']),
     exercise_type: z.enum(['compound', 'isolation', 'cardio', 'mobility']),
     movement_patterns: uniqueNonEmptyArray(MovementPatternSchema),

@@ -908,6 +908,7 @@ export const seedExercises: Exercise[] = [
   createExercise({
     id: 'pallof_press',
     name: 'Pallof Press',
+    display_name: 'Cable Core Rotation Hold',
     exercise_type: 'isolation',
     movement_patterns: ['core_anti_rotation'],
     primary_muscles: ['obliques', 'abdominals'],
@@ -2694,6 +2695,7 @@ export const seedExercises: Exercise[] = [
   createExercise({
     id: 'thoracic_spine_rotation',
     name: 'Thoracic Spine Rotation',
+    display_name: 'Upper Back Rotation',
     exercise_type: 'mobility',
     movement_patterns: ['mobility'],
     primary_muscles: ['spinal_erectors', 'obliques'],
@@ -2818,6 +2820,7 @@ export const seedExercises: Exercise[] = [
   createExercise({
     id: 'rower_liss',
     name: 'Rower LISS',
+    display_name: 'Rowing Machine',
     exercise_type: 'cardio',
     movement_patterns: ['liss'],
     primary_muscles: ['upper_back', 'quadriceps'],
@@ -2839,6 +2842,7 @@ export const seedExercises: Exercise[] = [
   createExercise({
     id: 'elliptical_liss',
     name: 'Elliptical LISS',
+    display_name: 'Elliptical',
     exercise_type: 'cardio',
     movement_patterns: ['liss'],
     primary_muscles: ['quadriceps', 'glutes'],
@@ -2983,6 +2987,7 @@ export const seedExercises: Exercise[] = [
   createExercise({
     id: 'wall_slide',
     name: 'Wall Slide',
+    display_name: 'Wall Shoulder Slide',
     exercise_type: 'mobility',
     movement_patterns: ['mobility'],
     primary_muscles: ['front_delts', 'upper_back'],
@@ -3872,6 +3877,7 @@ export const seedExercises: Exercise[] = [
   createExercise({
     id: 'dumbbell_prone_row',
     name: 'Dumbbell Prone Row',
+    display_name: 'Dumbbell Face-Down Row',
     exercise_type: 'compound',
     movement_patterns: ['horizontal_pull'],
     primary_muscles: ['upper_back', 'lats'],
@@ -4457,6 +4463,7 @@ export const seedExercises: Exercise[] = [
   createExercise({
     id: 'cable_pallof_rotation',
     name: 'Cable Pallof Rotation',
+    display_name: 'Cable Rotation Press',
     exercise_type: 'isolation',
     movement_patterns: ['core_anti_rotation'],
     primary_muscles: ['obliques', 'abdominals'],
@@ -4491,6 +4498,7 @@ export const seedExercises: Exercise[] = [
   createExercise({
     id: 'copenhagen_plank',
     name: 'Copenhagen Plank',
+    display_name: 'Side Plank Hip Squeeze',
     exercise_type: 'isolation',
     movement_patterns: ['core_anti_rotation', 'hip_adduction'],
     primary_muscles: ['obliques', 'adductors'],
@@ -4929,6 +4937,7 @@ export const seedExercises: Exercise[] = [
   createExercise({
     id: 'foam_roller_thoracic_extension',
     name: 'Foam Roller Thoracic Extension',
+    display_name: 'Upper Back Foam Roll',
     exercise_type: 'mobility',
     movement_patterns: ['mobility'],
     primary_muscles: ['spinal_erectors'],
@@ -4991,6 +5000,7 @@ export const seedExercises: Exercise[] = [
   createExercise({
     id: 'kettlebell_single_leg_rdl',
     name: 'Kettlebell Single-Leg RDL',
+    display_name: 'Kettlebell Single-Leg Deadlift',
     exercise_type: 'compound',
     movement_patterns: ['hinge'],
     primary_muscles: ['hamstrings', 'glutes'],
@@ -5011,6 +5021,7 @@ export const seedExercises: Exercise[] = [
   createExercise({
     id: 'barbell_snatch_grip_rdl',
     name: 'Barbell Snatch-Grip RDL',
+    display_name: 'Barbell Wide-Grip Deadlift',
     exercise_type: 'compound',
     movement_patterns: ['hinge'],
     primary_muscles: ['hamstrings', 'upper_back'],
@@ -5490,6 +5501,7 @@ export const seedExercises: Exercise[] = [
   createExercise({
     id: 'prone_y_raise',
     name: 'Prone Y Raise',
+    display_name: 'Face-Down Y Raise',
     exercise_type: 'isolation',
     movement_patterns: ['shoulder_abduction'],
     primary_muscles: ['upper_back', 'rear_delts'],
@@ -5507,6 +5519,7 @@ export const seedExercises: Exercise[] = [
   createExercise({
     id: 'prone_t_raise',
     name: 'Prone T Raise',
+    display_name: 'Face-Down T Raise',
     exercise_type: 'isolation',
     movement_patterns: ['shoulder_abduction'],
     primary_muscles: ['upper_back', 'rear_delts'],
@@ -6065,6 +6078,7 @@ export const seedExercises: Exercise[] = [
   createExercise({
     id: 'prone_scorpion',
     name: 'Prone Scorpion',
+    display_name: 'Face-Down Scorpion',
     exercise_type: 'mobility',
     movement_patterns: ['mobility'],
     primary_muscles: ['glutes', 'obliques'],
@@ -6083,6 +6097,7 @@ export const seedExercises: Exercise[] = [
   createExercise({
     id: 'foam_roll_thoracic',
     name: 'Foam Roll Thoracic Spine',
+    display_name: 'Upper Back Foam Roll',
     exercise_type: 'mobility',
     movement_patterns: ['mobility'],
     primary_muscles: ['upper_back'],
@@ -6137,6 +6152,7 @@ export const seedExercises: Exercise[] = [
   createExercise({
     id: 'copenhagen_adduction',
     name: 'Copenhagen Adduction',
+    display_name: 'Side Plank Hip Adduction',
     exercise_type: 'isolation',
     movement_patterns: ['hip_adduction'],
     primary_muscles: ['adductors'],

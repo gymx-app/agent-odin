@@ -108,7 +108,7 @@ export const buildExactPrescription = (
   return {
     prescription_id: `${input.calendar_day.day_id}-${slot.slot_id}`,
     exercise_id: candidate.exercise.id,
-    exercise_name: candidate.exercise.name,
+    exercise_name: candidate.exercise.display_name ?? candidate.exercise.name,
     display_order: displayOrder,
     sequence_role: slot.sequence_role,
     priority: slot.priority,
