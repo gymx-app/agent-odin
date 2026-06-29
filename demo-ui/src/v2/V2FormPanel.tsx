@@ -57,6 +57,20 @@ const Btn = ({
 // ── Types ───────────────────────────────────────────────────────────────────────
 
 type GoalKey = 'fat_loss' | 'muscle_gain' | 'strength' | 'recomposition' | 'endurance';
+type BaselinePath = 'self_reported' | 'day_one_test' | 'skipped';
+type LiftEntry = { weight: string; reps: string };
+type KnownLiftsState = Record<string, LiftEntry>;
+
+const COMPOUND_LIFTS = [
+  { id: 'squat', label: 'Squat' },
+  { id: 'bench_press', label: 'Bench Press' },
+  { id: 'deadlift', label: 'Deadlift' },
+  { id: 'overhead_press', label: 'Overhead Press' },
+  { id: 'barbell_row', label: 'Barbell Row' },
+] as const;
+
+const emptyLifts = (): KnownLiftsState =>
+  Object.fromEntries(COMPOUND_LIFTS.map((l) => [l.id, { weight: '', reps: '' }]));
 
 const GOAL_LABELS: Record<GoalKey, string> = {
   fat_loss: 'Fat Loss',
@@ -114,6 +128,7 @@ export function V2FormPanel({
 }: V2FormPanelProps) {
   // ── Base athlete fields ──
   const [name, setName] = useState('Alex Morgan');
+  const [workoutTime, setWorkoutTime] = useState<'morning' | 'afternoon' | 'evening' | 'night' | ''>('');
   const [age, setAge] = useState(32);
   const [sex, setSex] = useState<'male' | 'female'>('male');
   const [currentWeight, setCurrentWeight] = useState(84);
@@ -158,6 +173,13 @@ export function V2FormPanel({
   const [manual, setManual] = useState<InBodyFields>(emptyInBody());
   const [parseError, setParseError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Strength baseline state ──
+  const [baselinePath, setBaselinePath] = useState<BaselinePath>('skipped');
+  const [knownLifts, setKnownLifts] = useState<KnownLiftsState>(emptyLifts());
+
+  const setLift = (id: string, field: 'weight' | 'reps', val: string) =>
+    setKnownLifts((prev) => ({ ...prev, [id]: { ...prev[id]!, [field]: val } }));
 
   // ── Generating state ──
   const [generating, setGenerating] = useState(false);
@@ -228,6 +250,21 @@ export function V2FormPanel({
   const handleGenerate = async () => {
     if (!token) return;
 
+    // Collect filled lift rows
+    const filledLifts = COMPOUND_LIFTS
+      .filter(({ id }) => knownLifts[id]?.weight && knownLifts[id]?.reps)
+      .map(({ id }) => ({
+        exercise_id: id,
+        weight_kg: Number(knownLifts[id]!.weight),
+        reps: Number(knownLifts[id]!.reps),
+      }));
+
+    // Guard: self_reported requires at least one lift
+    if (baselinePath === 'self_reported' && filledLifts.length === 0) {
+      onError(new Error('Enter at least one working weight to use Self-reported baseline, or choose a different option.'));
+      return;
+    }
+
     const inbody = effectiveInBody();
     const cleanGoalParams: GoalParametersV2 = { ...goalParams };
 
@@ -256,14 +293,15 @@ export function V2FormPanel({
         ? [{ area: injuryArea.trim(), severity: injurySeverity, notes: '' }]
         : [],
       inbody,
+      baseline_path: baselinePath,
+      known_lifts: baselinePath === 'self_reported' ? filledLifts : [],
       ...(hasGoalParams ? { goal_parameters: cleanGoalParams } : {}),
-      ...(selectedDays.length
-        ? {
-            schedule: {
-              available_days: selectedDays as AthleteInputV2['schedule'] extends { available_days?: (infer D)[] | undefined } ? D[] : never,
-            },
-          }
-        : {}),
+      schedule: {
+        ...(selectedDays.length
+          ? { available_days: selectedDays as AthleteInputV2['schedule'] extends { available_days?: (infer D)[] | undefined } ? D[] : never }
+          : {}),
+        ...(workoutTime ? { preferred_workout_time: workoutTime } : {}),
+      },
     };
 
     setGenerating(true);
@@ -408,6 +446,100 @@ export function V2FormPanel({
           />
         </Field>
       </div>
+
+      {/* ── Strength Baseline ── */}
+      <div className="v2-section-label">Strength Baseline</div>
+      <div className="v2-baseline-cards">
+        <label className={`v2-baseline-card ${baselinePath === 'self_reported' ? 'selected' : ''}`}>
+          <input
+            type="radio"
+            name="baseline_path"
+            value="self_reported"
+            checked={baselinePath === 'self_reported'}
+            onChange={() => setBaselinePath('self_reported')}
+            disabled={disabled || generating}
+          />
+          <span className="v2-baseline-card-mark" />
+          <strong>I know my working weights</strong>
+          <span>Self-reported</span>
+        </label>
+        <label className={`v2-baseline-card ${baselinePath === 'day_one_test' ? 'selected' : ''}`}>
+          <input
+            type="radio"
+            name="baseline_path"
+            value="day_one_test"
+            checked={baselinePath === 'day_one_test'}
+            onChange={() => setBaselinePath('day_one_test')}
+            disabled={disabled || generating}
+          />
+          <span className="v2-baseline-card-mark" />
+          <strong>I'll do a test on Day 1</strong>
+          <span>Day 1 baseline test</span>
+        </label>
+        <label className={`v2-baseline-card ${baselinePath === 'skipped' ? 'selected' : ''}`}>
+          <input
+            type="radio"
+            name="baseline_path"
+            value="skipped"
+            checked={baselinePath === 'skipped'}
+            onChange={() => setBaselinePath('skipped')}
+            disabled={disabled || generating}
+          />
+          <span className="v2-baseline-card-mark" />
+          <strong>Skip — use RPE only</strong>
+          <span>RPE only</span>
+        </label>
+      </div>
+
+      {baselinePath === 'self_reported' && (
+        <div className="v2-baseline-lifts">
+          <div className="v2-baseline-lifts-header">
+            <span>Exercise</span><span>Weight (kg)</span><span>Reps (1–12)</span>
+          </div>
+          {COMPOUND_LIFTS.map(({ id, label }) => (
+            <div className="v2-lift-row" key={id}>
+              <span className="v2-lift-label">{label}</span>
+              <input
+                type="number"
+                min={0}
+                max={500}
+                step={2.5}
+                placeholder="e.g. 80"
+                value={knownLifts[id]?.weight ?? ''}
+                onChange={(e) => setLift(id, 'weight', e.target.value)}
+                disabled={disabled || generating}
+                aria-label={`${label} working weight in kg`}
+              />
+              <input
+                type="number"
+                min={1}
+                max={12}
+                step={1}
+                placeholder="e.g. 5"
+                value={knownLifts[id]?.reps ?? ''}
+                onChange={(e) => setLift(id, 'reps', e.target.value)}
+                disabled={disabled || generating}
+                aria-label={`${label} reps`}
+              />
+            </div>
+          ))}
+          <span className="field-hint">Leave any lift blank if you don't know it — we'll use RPE for that movement.</span>
+        </div>
+      )}
+
+      {baselinePath === 'day_one_test' && (
+        <p className="v2-baseline-description">
+          Your programme will start with a baseline session to find your working weights.
+          From Day 2 onwards, we'll prescribe weights for you.
+        </p>
+      )}
+
+      {baselinePath === 'skipped' && (
+        <p className="v2-baseline-description">
+          Your programme will use RPE targets instead of specific weights.
+          You choose the weight that feels right for each set.
+        </p>
+      )}
 
       {/* ── InBody upload ── */}
       <div className="v2-section-label">InBody scan</div>
@@ -640,6 +772,19 @@ export function V2FormPanel({
             <option value="dumbbells_only">Dumbbells Only</option>
             <option value="bodyweight">Bodyweight</option>
             <option value="home_gym">Home Gym</option>
+          </select>
+        </Field>
+        <Field label="Workout time" hint="When do you train?">
+          <select
+            value={workoutTime}
+            onChange={(e) => setWorkoutTime(e.target.value as typeof workoutTime)}
+            disabled={disabled || generating}
+          >
+            <option value="">Not specified</option>
+            <option value="morning">Morning</option>
+            <option value="afternoon">Afternoon</option>
+            <option value="evening">Evening</option>
+            <option value="night">Night</option>
           </select>
         </Field>
         <div className="field span-2">

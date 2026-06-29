@@ -227,6 +227,7 @@ const ExercisePrescriptionSchema = z
     primary_muscles: z.array(z.string()),
     secondary_muscles: z.array(z.string()),
     sequencing_rationale: z.array(z.string()),
+    weight_kg: z.number().positive().nullable(),
   })
   .superRefine((exercise, ctx) => {
     if (!uniqueBy(exercise.sets, (set) => set.set_number)) {

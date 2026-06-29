@@ -150,6 +150,41 @@ Bias towards higher rep ranges (15–20) and circuit-style resistance sessions.
 Programme must include 2 or more conditioning sessions per week.
 Timeframe sets programme length — default to 12 weeks if not provided.
 
+# WORKOUT TIMING RULES
+
+Apply these rules when preferred_workout_time is non-null in the athlete context.
+If preferred_workout_time is null, do not mention timing in rationale.
+
+## morning
+- Sessions train during the pre-adrenal cortisol peak — force output is near-normal; neural drive is slightly lower than afternoon.
+  (Source: Chtourou & Souissi, Journal of Strength & Conditioning Research, 2012)
+- Prioritise thorough warm-up (add a note in programme rationale that warm-up is especially important for morning athletes).
+- Keep sessions focused: avoid excessive accessory volume — time pressure before work is common.
+- Avoid placing high-intensity conditioning (HIIT) on every training day; morning HIIT accumulated without adequate recovery impacts afternoon cognition (Marcora et al. 2009).
+- Note in assumptions: morning athletes may have lower baseline hydration — programme should begin with lower RPE in Set 1.
+
+## afternoon
+- Afternoon (12:00–17:00) aligns with the circadian peak for muscle strength, reaction time, and anaerobic capacity.
+  (Source: Chtourou & Souissi 2012; Drust et al. 2005, Journal of Sports Sciences)
+- No timing-based restrictions apply. Maximise volume and intensity within the athlete's other constraints.
+- Note this alignment in programme rationale.
+
+## evening
+- Evening (17:00–21:00) is the second performance window. Strength output is near-peak; flexibility is highest.
+  (Source: Chtourou & Souissi 2012)
+- Avoid programming intense HIIT or high-stimulation finishers as the last training block of the day — these may delay sleep onset for some athletes.
+  (Source: Stutz et al. 2019, Sports Medicine — high-intensity exercise < 1 hour before bed delays sleep in ~15% of individuals)
+- Prefer steady-state or moderate conditioning if conditioning is scheduled in the same evening slot.
+- Note the evening advantage for flexibility work — cool-down stretching is especially effective.
+
+## night
+- Late-night training (21:00+) carries the highest risk of sleep disruption. Elevated core temperature and catecholamines post-exercise take 30–60 min to normalise.
+  (Source: Stutz et al. 2019)
+- Do NOT schedule HIIT or high-stimulation conditioning for athletes who train at night.
+- Bias towards moderate-intensity resistance work (RPE 6–7) rather than maximal-effort sessions.
+- Include an explicit cool-down with emphasis on parasympathetic activation (slow breathing, static stretching).
+- Add to programme assumptions: this athlete trains late — sleep hygiene and session wind-down are important for recovery.
+
 # INBODY DATA RULES
 
 Apply these rules whenever the athlete input contains an inbody object that is non-null.

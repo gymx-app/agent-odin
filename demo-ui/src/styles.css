@@ -692,6 +692,129 @@ footer p { margin-left: auto; font-size: 9px; }
   .v2-goal-fields { grid-template-columns: 1fr; }
 }
 
+/* ── V2 form: strength baseline cards ────────────────────────────────────── */
+.v2-baseline-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.v2-baseline-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 13px 14px 13px 38px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: white;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.v2-baseline-card:hover { border-color: #82c5a0; background: #fafcf9; }
+.v2-baseline-card.selected { border-color: var(--green); background: var(--green-soft); }
+.v2-baseline-card input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+.v2-baseline-card-mark {
+  position: absolute;
+  left: 13px;
+  top: 16px;
+  width: 15px;
+  height: 15px;
+  border: 1px solid #c0c8c1;
+  border-radius: 50%;
+  background: white;
+  transition: border .15s;
+}
+.v2-baseline-card.selected .v2-baseline-card-mark { border: 5px solid var(--green); }
+.v2-baseline-card strong { font-size: 11px; }
+.v2-baseline-card span { color: var(--muted); font-size: 9px; }
+
+.v2-baseline-description {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f5f6f2;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* ── V2 form: known lifts table ───────────────────────────────────────────── */
+.v2-baseline-lifts {
+  border: 1px solid #b9dfca;
+  border-radius: 10px;
+  background: var(--green-soft);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.v2-baseline-lifts-header {
+  display: grid;
+  grid-template-columns: 1fr 120px 100px;
+  gap: 8px;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .045em;
+  color: var(--muted);
+  padding: 0 2px;
+}
+.v2-lift-row {
+  display: grid;
+  grid-template-columns: 1fr 120px 100px;
+  gap: 8px;
+  align-items: center;
+}
+.v2-lift-label { font-size: 11px; font-weight: 600; }
+.v2-lift-row input {
+  height: 36px;
+  border: 1px solid #c3dccb;
+  border-radius: 8px;
+  background: white;
+  color: var(--ink);
+  padding: 0 9px;
+  outline: none;
+  font-size: 12px;
+  transition: border .15s, box-shadow .15s;
+}
+.v2-lift-row input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(29,154,98,.1); }
+
+@media (max-width: 760px) {
+  .v2-baseline-cards { grid-template-columns: 1fr; }
+  .v2-baseline-lifts-header,
+  .v2-lift-row { grid-template-columns: 1fr 90px 80px; }
+}
+
+/* ── Result: weight badge ─────────────────────────────────────────────────── */
+.v2-weight-badge {
+  display: inline-flex;
+  align-items: center;
+  background: var(--ink);
+  color: white;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font: 600 9px 'DM Mono';
+  margin-right: 4px;
+}
+.v2-find-weight { color: var(--muted); font-size: 9px; font-style: italic; }
+
+/* ── Result: baseline day card ────────────────────────────────────────────── */
+.v2-baseline-day { border-color: #b9dfca; }
+.v2-baseline-day > summary.v2-day-header { background: var(--green-soft); }
+.v2-baseline-code { background: var(--green); color: white; font-weight: 700; }
+.v2-baseline-callout {
+  background: #f0faf4;
+  border: 1px solid #b9dfca;
+  border-radius: 8px;
+  padding: 10px 13px;
+  font-size: 11px;
+  color: var(--green-dark);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after {

@@ -41,6 +41,7 @@ const buildAthleteContext = (profile: NormalizedAthleteProfile) => ({
   equipment: profile.source.equipment,
   current_weight_kg: profile.source.current_weight_kg,
   target_weight_kg: profile.source.target_weight_kg,
+  preferred_workout_time: profile.source.schedule?.preferred_workout_time ?? null,
   recovery_capacity: profile.recovery_capacity,
   athlete_state: {
     training_status: profile.athlete_state.training_status.value,
@@ -90,6 +91,7 @@ export const buildAiStrategyContext = (
     available_days_per_week: profile.source.available_days_per_week,
     equipment: profile.source.equipment,
     goal: profile.source.goal,
+    preferred_workout_time: profile.source.schedule?.preferred_workout_time ?? null,
   },
 });
 

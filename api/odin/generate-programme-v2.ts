@@ -34,6 +34,7 @@ import { LONGITUDINAL_VALIDATION_RULE_VERSION } from '../../src/validation/longi
 import { AiStrategyOutputSchema } from '../../src/llm/ai-generation/ai-generation.schema.js';
 import type { AiStrategyOutput } from '../../src/llm/ai-generation/ai-generation.types.js';
 import { buildProgrammeWithRepair } from '../../src/planning/longitudinal-programme-planner.js';
+import { applyWeightPrescription } from '../../src/planning/weight-prescription.js';
 import { buildRationaleSummary } from '../../src/planning/rationale-summary.js';
 import { interpretUnknownInjuries } from '../../src/normalization/injury-interpreter.js';
 import { createSupabaseAdminClient } from '../../src/infrastructure/supabase/admin-client.js';
@@ -439,7 +440,15 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
             500,
           );
         }
-        const { programme, validation, repair_log } = buildResult;
+        const { validation, repair_log } = buildResult;
+        const programme = {
+          ...buildResult.programme,
+          phases: applyWeightPrescription(buildResult.programme.phases, {
+            baseline_path: body.athlete.baseline_path,
+            known_lifts: body.athlete.known_lifts,
+            goal: body.athlete.goal,
+          }),
+        };
 
         const rationale = buildRationaleSummary(strategy, programme);
         const repairAttempted = repair_log.length > 0;

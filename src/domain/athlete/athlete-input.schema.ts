@@ -77,7 +77,7 @@ const ScheduleSchema = z
     available_days: uniqueArray(DayOfWeekSchema).optional(),
     preferred_days: uniqueArray(DayOfWeekSchema).optional(),
     unavailable_days: uniqueArray(DayOfWeekSchema).optional(),
-    preferred_workout_time: z.string().trim().min(1).max(100).optional(),
+    preferred_workout_time: z.enum(['morning', 'afternoon', 'evening', 'night']).optional(),
     rolling_schedule_acceptable: z.boolean().optional(),
   })
   .strict();

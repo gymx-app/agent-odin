@@ -324,11 +324,15 @@ const V2DayCard = ({ day, calendarType }: { day: V2Day; calendarType: 'weekly' |
   }
 
   return (
-    <details className="v2-day-card">
+    <details className={`v2-day-card${day.is_baseline ? ' v2-baseline-day' : ''}`} open={day.is_baseline || undefined}>
       <summary className="v2-day-header">
-        <div className="day-code">{dayLabel}</div>
+        {day.is_baseline ? (
+          <div className="day-code v2-baseline-code">B1</div>
+        ) : (
+          <div className="day-code">{dayLabel}</div>
+        )}
         <div className="day-heading">
-          <strong>{day.title}</strong>
+          <strong>{day.is_baseline ? 'START HERE — Strength Baseline Session' : day.title}</strong>
           <span>
             {day.subtitle || (day.session_metadata?.session_kind
               ? labelize(day.session_metadata.session_kind)
@@ -344,14 +348,24 @@ const V2DayCard = ({ day, calendarType }: { day: V2Day; calendarType: 'weekly' |
               {labelize(day.fatigue_classification)} fatigue
             </StatusPill>
           ) : null}
-          <StatusPill tone={dayTypeTone(day.day_type)}>
-            {dayTypeLabel(day.day_type)}
-          </StatusPill>
+          {day.is_baseline ? (
+            <StatusPill tone="purple">Baseline</StatusPill>
+          ) : (
+            <StatusPill tone={dayTypeTone(day.day_type)}>
+              {dayTypeLabel(day.day_type)}
+            </StatusPill>
+          )}
           <ChevronDown size={18} className="chevron" />
         </div>
       </summary>
 
       <div className="day-content">
+        {day.is_baseline ? (
+          <div className="v2-baseline-callout">
+            Log the weight you use in Set 3 for each exercise. Your training weights will be calculated from these.
+          </div>
+        ) : null}
+
         {day.movement_emphasis.length > 0 ? (
           <div className="v2-emphasis">
             {day.movement_emphasis.map((e) => (
@@ -408,12 +422,22 @@ const V2DayCard = ({ day, calendarType }: { day: V2Day; calendarType: 'weekly' |
                 <div className="v2-sets">
                   {setsAreIdentical(ex.sets) ? (
                     <div className="v2-set-compact">
-                      {ex.sets.length} &times; {ex.sets[0]!.target_reps} &middot; RPE {ex.sets[0]!.target_rpe} &middot; Rest {ex.sets[0]!.rest_seconds}s
+                      {ex.weight_kg != null ? (
+                        <span className="v2-weight-badge">{ex.weight_kg}kg</span>
+                      ) : null}
+                      {ex.sets.length} &times; {ex.sets[0]!.target_reps}
+                      {ex.sets[0]!.target_rpe > 0 ? <> &middot; RPE {ex.sets[0]!.target_rpe}</> : null}
+                      {ex.weight_kg == null && ex.sets[0]!.target_rpe > 0 ? <span className="v2-find-weight"> (find your weight)</span> : null}
+                      &middot; Rest {ex.sets[0]!.rest_seconds}s
                     </div>
                   ) : (
                     ex.sets.map((set) => (
                       <div className="v2-set-row" key={set.set_number}>
-                        Set {set.set_number} &middot; {set.target_reps} reps &middot; RPE {set.target_rpe} &middot; Rest {set.rest_seconds}s
+                        Set {set.set_number}
+                        {ex.weight_kg != null ? <> &middot; <span className="v2-weight-badge">{ex.weight_kg}kg</span></> : null}
+                        &middot; {set.target_reps} reps
+                        {set.target_rpe > 0 ? <> &middot; RPE {set.target_rpe}</> : null}
+                        &middot; Rest {set.rest_seconds}s
                         {set.set_type !== 'working' ? (
                           <StatusPill>{labelize(set.set_type)}</StatusPill>
                         ) : null}
@@ -2092,19 +2116,24 @@ function App() {
                       Selecting days auto-syncs the training days count above.
                     </span>
                   </div>
-                  <Field label="Preferred time">
-                    <input
+                  <Field label="Workout time" hint="When do you train?">
+                    <select
                       aria-label="Preferred workout time"
                       value={profile.schedule?.preferred_workout_time ?? ''}
                       onChange={(event) =>
                         updateNestedProfile(
                           'schedule',
                           'preferred_workout_time',
-                          event.target.value || undefined,
+                          (event.target.value || undefined) as 'morning' | 'afternoon' | 'evening' | 'night' | undefined,
                         )
                       }
-                      placeholder="e.g. morning, evening"
-                    />
+                    >
+                      <option value="">Not specified</option>
+                      <option value="morning">Morning</option>
+                      <option value="afternoon">Afternoon</option>
+                      <option value="evening">Evening</option>
+                      <option value="night">Night</option>
+                    </select>
                   </Field>
                 </div>
               </details>

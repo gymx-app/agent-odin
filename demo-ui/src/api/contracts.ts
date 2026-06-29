@@ -76,7 +76,7 @@ export type AthleteInput = {
   };
   schedule?: {
     available_days?: DayOfWeek[];
-    preferred_workout_time?: string;
+    preferred_workout_time?: 'morning' | 'afternoon' | 'evening' | 'night';
   };
 };
 
@@ -170,6 +170,7 @@ export type V2ExercisePrescription = {
   primary_muscles: string[];
   secondary_muscles: string[];
   sequencing_rationale: string[];
+  weight_kg?: number | null;
 };
 
 export type V2ConditioningPrescription = {
@@ -224,6 +225,7 @@ export type V2Day = {
     session_kind: string;
     objective: string;
   };
+  is_baseline?: boolean;
 };
 
 export type V2Week = {
@@ -415,6 +417,8 @@ export type InBodyV2 = {
 export type AthleteInputV2 = Omit<AthleteInput, 'inbody'> & {
   inbody: InBodyV2 | null;
   goal_parameters?: GoalParametersV2;
+  baseline_path?: 'self_reported' | 'day_one_test' | 'skipped';
+  known_lifts?: Array<{ exercise_id: string; weight_kg: number; reps: number }> | null;
 };
 
 export type InBodyParseResult = {

@@ -151,5 +151,6 @@ export const buildExactPrescription = (
     primary_muscles: candidate.exercise.primary_muscles,
     secondary_muscles: candidate.exercise.secondary_muscles,
     sequencing_rationale: candidate.rationale_codes,
+    weight_kg: null,
   };
 };

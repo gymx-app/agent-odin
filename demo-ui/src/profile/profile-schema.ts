@@ -73,7 +73,7 @@ const scheduleSchema = z
         ]),
       )
       .optional(),
-    preferred_workout_time: z.string().trim().min(1).max(100).optional(),
+    preferred_workout_time: z.enum(['morning', 'afternoon', 'evening', 'night']).optional(),
   })
   .optional();
 
