@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import type OpenAI from 'openai';
 import { z } from 'zod';
 import { odinError } from '../../shared/errors/odin-errors.js';
 
@@ -13,7 +13,7 @@ export type ParsedInBodyData = {
   total_body_water_l: number | null;
 };
 
-const INBODY_PARSE_MODEL = 'claude-sonnet-4-6';
+const INBODY_PARSE_MODEL = 'gpt-4o';
 const MAX_TOKENS = 512;
 
 const SYSTEM_PROMPT = `You are an InBody scan data extractor.
@@ -45,74 +45,102 @@ const parsedInBodySchema = z.object({
   total_body_water_l: z.number().nullable(),
 });
 
-const buildContentBlock = (
+const parseImageWithVision = async (
   file: string,
-  mediaType: InBodyMediaType,
-): Anthropic.Messages.ContentBlockParam => {
-  if (mediaType === 'application/pdf') {
-    return {
-      type: 'document',
-      source: {
-        type: 'base64',
-        media_type: 'application/pdf',
-        data: file,
+  mediaType: 'image/jpeg' | 'image/png',
+  client: OpenAI,
+): Promise<string> => {
+  const response = await client.chat.completions.create({
+    model: INBODY_PARSE_MODEL,
+    max_tokens: MAX_TOKENS,
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image_url',
+            image_url: { url: `data:${mediaType};base64,${file}` },
+          },
+          { type: 'text', text: 'Extract the InBody data from this scan.' },
+        ],
       },
-    } as Anthropic.Messages.ContentBlockParam;
-  }
+    ],
+  });
 
-  return {
-    type: 'image',
-    source: {
-      type: 'base64',
-      media_type: mediaType,
-      data: file,
-    },
-  };
+  const text = response.choices[0]?.message?.content?.trim();
+  if (!text) throw odinError('INBODY_PARSE_FAILED', 'Model returned no text content.', 422);
+  return text;
 };
 
-export const parseInBodyFile = async (
+const parsePdfWithFilesApi = async (
   file: string,
-  mediaType: InBodyMediaType,
-  client: Anthropic,
-): Promise<ParsedInBodyData> => {
-  let responseText: string;
+  client: OpenAI,
+): Promise<string> => {
+  const buffer = Buffer.from(file, 'base64');
+  const blob = new Blob([buffer], { type: 'application/pdf' });
+  const uploadedFile = await client.files.create({
+    file: new File([blob], 'inbody.pdf', { type: 'application/pdf' }),
+    purpose: 'user_data',
+  });
 
   try {
-    const message = await client.messages.create({
+    const response = await client.responses.create({
       model: INBODY_PARSE_MODEL,
-      max_tokens: MAX_TOKENS,
-      system: SYSTEM_PROMPT,
-      messages: [
+      max_output_tokens: MAX_TOKENS,
+      input: [
         {
           role: 'user',
           content: [
-            buildContentBlock(file, mediaType),
-            { type: 'text', text: 'Extract the InBody data from this scan.' },
+            {
+              type: 'input_file',
+              file_id: uploadedFile.id,
+            } as never,
+            {
+              type: 'input_text',
+              text: `${SYSTEM_PROMPT}\n\nExtract the InBody data from this scan.`,
+            },
           ],
         },
       ],
     });
 
-    const firstBlock = message.content[0];
-    if (!firstBlock || firstBlock.type !== 'text') {
-      throw odinError('INBODY_PARSE_FAILED', 'Model returned no text content.', 422);
-    }
+    const text = response.output
+      .filter((b) => b.type === 'message')
+      .flatMap((b) => (b as { type: 'message'; content: { type: string; text?: string }[] }).content)
+      .filter((c) => c.type === 'output_text')
+      .map((c) => c.text ?? '')
+      .join('')
+      .trim();
 
-    responseText = firstBlock.text.trim();
-  } catch (error) {
-    if (error instanceof Anthropic.APIError) {
-      throw odinError(
-        'INBODY_API_ERROR',
-        `Anthropic API error: ${error.message}`,
-        502,
-        { status: error.status },
-        error,
-      );
+    if (!text) throw odinError('INBODY_PARSE_FAILED', 'Model returned no text content.', 422);
+    return text;
+  } finally {
+    await client.files.delete(uploadedFile.id).catch(() => undefined);
+  }
+};
+
+export const parseInBodyFile = async (
+  file: string,
+  mediaType: InBodyMediaType,
+  client: OpenAI,
+): Promise<ParsedInBodyData> => {
+  let responseText: string;
+
+  try {
+    if (mediaType === 'application/pdf') {
+      responseText = await parsePdfWithFilesApi(file, client);
+    } else {
+      responseText = await parseImageWithVision(file, mediaType, client);
     }
-    throw error;
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'INBODY_PARSE_FAILED') {
+      throw error;
+    }
+    const msg = error instanceof Error ? error.message : String(error);
+    throw odinError('INBODY_API_ERROR', `OpenAI API error: ${msg}`, 502, {}, error instanceof Error ? error : undefined);
   }
 
-  // Strip optional markdown code fences before parsing
   const json = responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
 
   let parsed: unknown;

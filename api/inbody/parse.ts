@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { z } from 'zod';
 import { config } from '../../src/infrastructure/config/env.js';
 import type { AppConfig } from '../../src/infrastructure/config/env.schema.js';
@@ -30,17 +30,17 @@ export const createParseInBodyHandler = (appConfig: AppConfig = config) => {
 
       const body = await readJsonBody(request, requestSchema, REQUEST_BODY_LIMITS.inbodyParse);
 
-      if (!appConfig.anthropicApiKey) {
+      if (!appConfig.openaiApiKey) {
         throw odinError(
           'INBODY_API_ERROR',
-          'Anthropic API key is not configured.',
+          'OpenAI API key is not configured.',
           503,
         );
       }
 
-      const client = new Anthropic({
-        apiKey: appConfig.anthropicApiKey,
-        timeout: appConfig.anthropicTimeoutMs,
+      const client = new OpenAI({
+        apiKey: appConfig.openaiApiKey,
+        timeout: appConfig.openaiTimeoutMs,
         maxRetries: 0,
       });
 
