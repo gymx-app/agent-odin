@@ -229,6 +229,14 @@ If absent, do not infer lifestyle or occupation constraints.
 ## high_stress_low_sleep
 - Cap all sets at RPE 7 maximum across the programme — chronic elevated cortisol impairs recovery and increases injury risk. State this cap and its rationale in the programme rationale.
 
+## lightly_active
+- Baseline recovery capacity — no volume adjustment needed. Standard programme structure applies.
+- Note: this is the assumed default if no lifestyle tag is provided.
+
+## moderately_active
+- Slightly elevated NEAT (non-exercise activity thermogenesis) compared to sedentary — marginally better recovery baseline. No volume adjustment needed.
+- Note in rationale if goal is fat_loss: daily activity contributes meaningfully to caloric expenditure — conditioning volume can be conservative.
+
 ## healthcare / field_worker occupation
 - Note in assumptions: likely lower-limb fatigue from daily work — reduce leg session frequency or volume in phase 1.
 
@@ -237,6 +245,25 @@ If absent, do not infer lifestyle or occupation constraints.
 
 ## athlete_coach occupation
 - Note in assumptions: baseline fitness is likely higher than the stated fitness_level — the programme may be more aggressive from phase 2 onward.
+
+## homemaker occupation
+- Moderate daily physical activity — on feet, varied movement. Treat as moderately_active for recovery purposes.
+- Schedule flexibility likely high — session timing is not a constraint.
+
+## business_owner / creative_freelancer occupation
+- High cognitive load, variable schedule, potential high stress.
+- If high_stress_low_sleep is also present in lifestyle_tags: compound effect — apply RPE 7 cap and conservative volume.
+- If not: treat as desk_job for recovery purposes.
+- Note: schedule unpredictability may affect session consistency — prioritise programme adherence over maximum volume.
+
+## retired occupation
+- Lower time pressure — schedule flexibility is high. Recovery capacity depends heavily on age and lifestyle_tags.
+- If age >= 60: apply conservative volume progression in phase 1, increase only if phase 1 response is positive.
+- If age < 60 and moderately_active or very_active: standard structure.
+
+## other occupation
+- No specific rule. Apply standard programme structure.
+- Use fitness_level and lifestyle_tags as primary calibration inputs.
 
 # MEDICAL CONDITIONS — PROGRAMME FRAMING
 

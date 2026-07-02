@@ -11,6 +11,7 @@ export type ParsedInBodyData = {
   bmr: number | null;
   visceral_fat_area: number | null;
   total_body_water_l: number | null;
+  weight_kg: number | null;
   // Convenience conversion (1L water ≈ 1kg) so callers can submit this
   // value directly as inbody.total_body_water_kg without a manual unit
   // conversion step.
@@ -23,13 +24,14 @@ const MAX_TOKENS = 512;
 const SYSTEM_PROMPT = `You are an InBody scan data extractor.
 You will receive an InBody body composition scan as a document or image.
 
-Extract ONLY the following six values and return them as a single JSON object:
+Extract ONLY the following seven values and return them as a single JSON object:
   body_fat_pct       — body fat percentage (e.g. 23.5)
   smm_kg             — skeletal muscle mass in kilograms
   body_fat_mass_kg   — body fat mass in kilograms
   bmr                — basal metabolic rate in kcal/day
   visceral_fat_area  — visceral fat area in cm²
   total_body_water_l — total body water in litres
+  weight_kg          — total body weight in kilograms
 
 Rules:
 - Return ONLY the JSON object. No explanation, no prose, no markdown.
@@ -38,7 +40,7 @@ Rules:
 - Do not infer units — use the exact units specified above. If the scan shows a different unit, convert accurately or return null if conversion is ambiguous.
 
 Example output:
-{"body_fat_pct":23.5,"smm_kg":31.2,"body_fat_mass_kg":15.1,"bmr":1420,"visceral_fat_area":85,"total_body_water_l":32.4}`.trim();
+{"body_fat_pct":23.5,"smm_kg":31.2,"body_fat_mass_kg":15.1,"bmr":1420,"visceral_fat_area":85,"total_body_water_l":32.4,"weight_kg":78.3}`.trim();
 
 const parsedInBodySchema = z.object({
   body_fat_pct: z.number().nullable(),
@@ -47,6 +49,7 @@ const parsedInBodySchema = z.object({
   bmr: z.number().nullable(),
   visceral_fat_area: z.number().nullable(),
   total_body_water_l: z.number().nullable(),
+  weight_kg: z.number().nullable(),
 });
 
 const parseImageWithVision = async (

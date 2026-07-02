@@ -7,3 +7,4 @@ coverage/
 .vercel
 .env*
 supabase/functions/_bundles/
+supabase/.temp/
