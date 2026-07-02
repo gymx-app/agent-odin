@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { assembleProgramme } from '../../../src/llm/ai-generation/ai-programme-assembler.js';
-import type { AiStrategyOutput } from '../../../src/llm/ai-generation/ai-generation.types.js';
+import { applyWeightPrescription } from '../../../src/planning/weight-prescription.js';
+import type { AiStrategyOutput, AiPhaseOutput } from '../../../src/llm/ai-generation/ai-generation.types.js';
 
 const mockStrategy: AiStrategyOutput = {
   programme: {
@@ -151,5 +152,87 @@ describe('assembleProgramme', () => {
 
     expect(result.validation_summary.passed).toBe(false);
     expect(result.validation_summary.status).toBe('invalid');
+  });
+});
+
+describe('assemble step weight prescription (regression: known_lifts must populate weight_kg on the assemble path, not only build)', () => {
+  const phasesWithCompoundLift = [
+    {
+      phase_id: 'phase-1',
+      phase_number: 1,
+      name: 'Foundation',
+      phase_type: 'foundation',
+      objective: 'Build base strength',
+      start_week: 1,
+      end_week: 1,
+      weeks_count: 1,
+      volume_direction: 'increase',
+      intensity_direction: 'increase',
+      effort_direction: 'increase',
+      progression_model: 'double_progression',
+      rationale: [],
+      weeks: [
+        {
+          week_id: 'week-1',
+          week_number: 1,
+          days: [
+            {
+              day_id: 'day-1',
+              cycle_day: 1,
+              day_type: 'resistance',
+              exercises: [
+                {
+                  prescription_id: 'rx-squat',
+                  exercise_id: 'barbell_back_squat',
+                  exercise_name: 'Barbell Back Squat',
+                  display_order: 1,
+                  sequence_role: 'primary',
+                  weight_kg: null,
+                },
+                {
+                  prescription_id: 'rx-accessory',
+                  exercise_id: 'leg_press',
+                  exercise_name: 'Leg Press',
+                  display_order: 2,
+                  sequence_role: 'accessory',
+                  weight_kg: null,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ] as unknown as AiPhaseOutput[];
+
+  const assemble = () =>
+    assembleProgramme({
+      strategy: mockStrategy,
+      phases: phasesWithCompoundLift,
+      startDate: '2026-06-22',
+      startWeightKg: 82,
+      targetWeightKg: 74,
+      exerciseLibraryVersion: 'test-v1',
+      validationRuleVersion: 'programme-validation/v2',
+    });
+
+  it('leaves weight_kg null when applyWeightPrescription is not applied (pre-fix behaviour)', () => {
+    const assembled = assemble();
+    const exercise = assembled.phases[0]!.weeks[0]!.days[0]!.exercises[0]!;
+    expect(exercise.weight_kg).toBeNull();
+  });
+
+  it('populates weight_kg on matching compound exercises when applyWeightPrescription is applied to the assembled phases', () => {
+    const assembled = assemble();
+    const phases = applyWeightPrescription(assembled.phases, {
+      baseline_path: 'self_reported',
+      known_lifts: [{ exercise_id: 'squat', weight_kg: 100, reps: 5 }],
+      goal: 'strength',
+    });
+
+    const [squat, accessory] = phases[0]!.weeks[0]!.days[0]!.exercises;
+    // Epley: 100 * (1 + 5/30) = 116.67 estimated 1RM; strength working % = 0.825 → 97.5 (nearest 2.5kg)
+    expect(squat!.weight_kg).toBe(97.5);
+    expect(accessory!.weight_kg).toBeNull();
   });
 });
