@@ -84,7 +84,8 @@ export type DeterministicRepairOperation = {
     | 'move_conditioning_to_separate_day'
     | 'remove_duplicate_sport_conditioning'
     | 'adjust_rpe_ceiling'
-    | 'shorten_nonessential_warmup';
+    | 'shorten_nonessential_warmup'
+    | 'correct_phase_direction';
   target_id: string;
   reason_code: string;
   affected_finding_codes: ValidationCode[];

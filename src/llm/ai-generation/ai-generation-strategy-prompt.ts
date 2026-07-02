@@ -50,6 +50,9 @@ All decisions must align with peer-reviewed exercise science. The evidence_rules
 - Phase numbering starts at 1
 - phase_type 'realization' is ONLY permitted when primary_objective is 'strength' or 'sport_support' — it represents competition peaking and is invalid for hypertrophy, fat loss, or general fitness goals
 - For muscle_gain / fat_loss / recomposition / endurance goals, use foundation, accumulation, intensification, recovery, or maintenance phases only
+- phase_type must cohere with its direction fields — a mismatch fails validation:
+  - phase_type 'recovery' REQUIRES volume_direction = 'decrease' AND effort_direction = 'decrease'
+  - phase_type 'intensification' REQUIRES intensity_direction = 'increase'
 
 ## Policies
 - progression_policy.policy_id must be referenced by all exercise progression_rule_ids in later phases

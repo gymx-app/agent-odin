@@ -14,6 +14,7 @@ const repairable = new Set<ValidationCode>([
   'COMBINED_SESSION_DURATION_EXCEEDED',
   'SESSION_DURATION_EXCEEDED_AFTER_WARMUP',
   'RPE_CEILING_BELOW_TARGET',
+  'PHASE_DIRECTION_INCOHERENT',
 ]);
 
 const conditional = new Set<ValidationCode>([

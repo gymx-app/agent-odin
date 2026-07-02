@@ -60,6 +60,26 @@ export const repairProgramme = (
   };
   const codes = new Set(errorFindings.map((finding) => finding.code));
 
+  if (codes.has('PHASE_DIRECTION_INCOHERENT')) {
+    programme.phases.forEach((phase) => {
+      if (operations.length >= MAX_PROGRAMME_REPAIR_OPERATIONS) return;
+      if (
+        phase.phase_type === 'recovery' &&
+        (phase.volume_direction !== 'decrease' ||
+          phase.effort_direction !== 'decrease') &&
+        add({
+          operation_type: 'correct_phase_direction',
+          target_id: phase.phase_id,
+          reason_code: 'RECOVERY_PHASE_DIRECTION_NORMALIZED',
+          affected_finding_codes: ['PHASE_DIRECTION_INCOHERENT'],
+        })
+      ) {
+        phase.volume_direction = 'decrease';
+        phase.effort_direction = 'decrease';
+      }
+    });
+  }
+
   programme.phases.forEach((phase) =>
     phase.weeks.forEach((week) =>
       week.days.forEach((day) => {
