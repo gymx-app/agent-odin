@@ -7,6 +7,7 @@ const exercise = {
   display_order: 1,
   sequence_role: 'primary' as const,
   priority: 1,
+  weight_kg: null,
   tags: ['squat'],
   coaching_cues: ['Keep the whole foot planted.'],
   warnings: [],
