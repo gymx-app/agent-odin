@@ -112,6 +112,24 @@ export const classifyRecoveryCapacity = (
     score -= 1;
     reasons.push('AGE_MINOR_RECOVERY_SIGNAL');
   }
+  if (input.inbody?.smm_kg !== undefined) {
+    sourceFields.push('inbody.smm_kg');
+    const smmRatio = input.inbody.smm_kg / input.current_weight_kg;
+    // Every other signal in this function is +/-1 or +/-2, and the
+    // low/high thresholds below (-3 / +4) are deliberately set so that no
+    // single signal can decide the outcome alone — classification only
+    // moves out of 'moderate' when multiple signals agree. +/-2 puts
+    // smm_kg ratio on par with the strongest existing individual signals
+    // (sleep_hours, recovery_rating, shift_work, sport intensity) without
+    // letting it unilaterally cross either threshold by itself.
+    if (smmRatio > 0.4) {
+      score += 2;
+      reasons.push('HIGH_SKELETAL_MUSCLE_RATIO');
+    } else if (smmRatio < 0.3) {
+      score -= 2;
+      reasons.push('LOW_SKELETAL_MUSCLE_RATIO');
+    }
+  }
 
   const signalCount = sourceFields.length;
   const value: RecoveryCapacity =

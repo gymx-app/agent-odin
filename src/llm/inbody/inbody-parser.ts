@@ -11,6 +11,10 @@ export type ParsedInBodyData = {
   bmr: number | null;
   visceral_fat_area: number | null;
   total_body_water_l: number | null;
+  // Convenience conversion (1L water ≈ 1kg) so callers can submit this
+  // value directly as inbody.total_body_water_kg without a manual unit
+  // conversion step.
+  total_body_water_kg: number | null;
 };
 
 const INBODY_PARSE_MODEL = 'gpt-4o';
@@ -165,5 +169,8 @@ export const parseInBodyFile = async (
     );
   }
 
-  return result.data;
+  return {
+    ...result.data,
+    total_body_water_kg: result.data.total_body_water_l,
+  };
 };

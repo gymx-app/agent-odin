@@ -27,6 +27,23 @@ const MOVEMENT_PATTERNS: MovementPattern[] = [
 ];
 
 type PushupNormBracket = keyof typeof PUSHUP_NORMS.male;
+type AthleteSex = 'male' | 'female' | 'other';
+
+// No population-normed data exists for 'other'. Average the male/female
+// tables as a neutral, evidence-agnostic fallback rather than defaulting
+// to either sex's standard. Widened to plain Record<string, number> —
+// the male/female source tables are distinct `as const` literal types
+// that a shared literal-preserving generic cannot unify.
+const averageBySex = (
+  male: Record<string, number>,
+  female: Record<string, number>,
+): Record<string, number> => {
+  const result: Record<string, number> = {};
+  for (const key of Object.keys(male)) {
+    result[key] = (male[key]! + female[key]!) / 2;
+  }
+  return result;
+};
 
 const ageBracket = (age: number): PushupNormBracket => {
   if (age < 20) return '16-19';
@@ -45,11 +62,14 @@ const ageDeclineFactor = (age: number): number => {
 
 const classifyPushups = (
   reps: number,
-  sex: 'male' | 'female',
+  sex: AthleteSex,
   age: number,
 ): FitnessTier => {
   const bracket = ageBracket(age);
-  const norms = PUSHUP_NORMS[sex][bracket];
+  const norms =
+    sex === 'other'
+      ? averageBySex(PUSHUP_NORMS.male[bracket], PUSHUP_NORMS.female[bracket])
+      : PUSHUP_NORMS[sex][bracket];
   if (reps >= norms.excellent) return 'excellent';
   if (reps >= norms.above_average) return 'above_average';
   if (reps >= norms.average) return 'average';
@@ -65,10 +85,10 @@ const classifySquats60s = (reps: number): FitnessTier => {
   return 'poor';
 };
 
-const classifyDeadHang = (seconds: number, sex: 'male' | 'female'): FitnessTier => {
-  const thresholds = sex === 'male'
-    ? { excellent: 60, above_average: 40, average: 25, below_average: 10 }
-    : { excellent: 40, above_average: 25, average: 15, below_average: 5 };
+const classifyDeadHang = (seconds: number, sex: AthleteSex): FitnessTier => {
+  const male = { excellent: 60, above_average: 40, average: 25, below_average: 10 };
+  const female = { excellent: 40, above_average: 25, average: 15, below_average: 5 };
+  const thresholds = sex === 'male' ? male : sex === 'female' ? female : averageBySex(male, female);
   if (seconds >= thresholds.excellent) return 'excellent';
   if (seconds >= thresholds.above_average) return 'above_average';
   if (seconds >= thresholds.average) return 'average';
@@ -183,7 +203,10 @@ export const estimateBaselineStrength = (
     }
 
     // Field-test-adjusted ratio estimate
-    const baseRatio = ratios[input.sex][pattern];
+    const baseRatio =
+      input.sex === 'other'
+        ? averageBySex(ratios.male, ratios.female)[pattern]!
+        : ratios[input.sex][pattern];
     const adjusted = baseRatio * tierAdjustment * ageFactor;
     const estimated1RM = Math.round(input.bodyweight_kg * adjusted * 10) / 10;
 

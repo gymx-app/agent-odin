@@ -8,6 +8,7 @@ export const programmeNameForGoal = (goal: AthleteInput['goal']): string => {
     recomposition: 'Recomposition Base',
     strength: 'Strength Base',
     endurance: 'Endurance Base',
+    general_fitness: 'General Fitness Base',
   };
 
   return names[goal];

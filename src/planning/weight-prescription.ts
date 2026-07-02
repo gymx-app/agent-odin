@@ -42,7 +42,7 @@ export const calculateWorkingWeight = (
 // Variants with significantly different biomechanics (e.g. front squat, sumo
 // deadlift) are intentionally excluded — they receive weight_kg: null and
 // use RPE anchoring like all other exercises.
-const COMPOUND_TO_LIBRARY_IDS: Record<CompoundExerciseId, readonly string[]> = {
+export const COMPOUND_TO_LIBRARY_IDS: Record<CompoundExerciseId, readonly string[]> = {
   squat:          ['barbell_back_squat'],
   bench_press:    ['barbell_bench_press'],
   deadlift:       ['barbell_deadlift', 'trap_bar_deadlift'],

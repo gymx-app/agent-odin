@@ -45,6 +45,11 @@ const InBodySchema = z
     smm_kg: z.number().nonnegative(),
     visceral_fat_area: z.number().nonnegative(),
     bmr: z.number().positive(),
+    // Optional so that a v2 InBody payload (which allows these two fields)
+    // re-validates cleanly when normalizeAthlete() re-checks profile.source
+    // against this v1 schema.
+    body_fat_mass_kg: z.number().nonnegative().optional(),
+    total_body_water_kg: z.number().nonnegative().optional(),
     segmental_balance: SegmentalBalanceSchema,
   })
   .strict();
@@ -201,6 +206,10 @@ export const AthleteInputBaseSchema = z.object({
     current_weight_kg: z.number().positive(),
     target_weight_kg: z.number().positive(),
     height_cm: z.number().positive(),
+    // Manually entered body fat % (distinct from inbody.body_fat_pct, which
+    // takes priority when present — see athlete-normalizer.ts's
+    // resolveBodyFatPct).
+    body_fat_pct: z.number().min(0).max(100).optional(),
     goal: AthleteGoalSchema,
     available_days_per_week: z.number().int().min(2).max(7),
     session_duration_min: z.number().int().min(20).max(180),
@@ -220,6 +229,8 @@ export const AthleteInputBaseSchema = z.object({
     waist_circumference_cm: z.number().positive().max(300).optional(),
     lean_mass_kg: z.number().positive().max(500).optional(),
     origin_metadata: OriginMetadataSchema.optional(),
+    // Low-priority AI context field — no deterministic pipeline logic.
+    nationality: z.string().trim().min(1).max(100).optional(),
   });
 
 export const AthleteInputSchema = AthleteInputBaseSchema

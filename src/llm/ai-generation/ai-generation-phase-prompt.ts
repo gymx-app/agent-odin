@@ -59,8 +59,8 @@ You have access to 3 tools. Use them to make evidence-backed decisions:
 - planned_volume_factor, planned_intensity_factor, planned_effort_factor: 0.5-1.5 range
 - Week types: introduction (week 1 of phase), loading (normal), overload (peak volume), deload, testing, maintenance
 - Set counts per exercise: primary 3-5 sets, secondary 3-4, accessory 2-3, isolation 2-3, core 2-3
-- Rep ranges by goal: strength 3-6, hypertrophy 6-12, endurance 12-20
-- RPE targets: primary 7-9, secondary 7-8.5, accessory 6-8, isolation 6-7.5
+- Rep ranges by goal: strength 3-6, hypertrophy 6-12 (fat_loss/muscle_gain/recomposition), endurance 12-20, general_fitness 8-15 (mirror endurance 12-20 if goal_parameters.focus = 'endurance')
+- RPE targets: primary 7-9, secondary 7-8.5, accessory 6-8, isolation 6-7.5. Cap all sets at RPE 7 when goal is general_fitness with focus = 'mobility'.
 
 # CONDITIONING RULES
 - Standalone conditioning days: 20-45 min based on athlete capacity
@@ -128,4 +128,12 @@ Apply per condition when medical_conditions is present and non-empty on the athl
 - estimated_duration_min must not exceed the athlete's session_duration_min constraint
 - maximum_duration_min should be ~10-15% above estimated_duration_min
 - Account for warmup (~5-8 min), rest periods, transitions (~1 min per exercise change)
+
+# METABOLIC CONTEXT
+
+Apply only when the athlete context's inbody.bmr is present.
+
+bmr: [value] kcal — resting metabolic rate. Sessions should not consistently exceed 50% of BMR
+in estimated caloric expenditure for fat_loss goals, to preserve muscle. This is a soft guardrail
+on total conditioning + resistance volume within a session, not a per-set constraint.
 `.trim();

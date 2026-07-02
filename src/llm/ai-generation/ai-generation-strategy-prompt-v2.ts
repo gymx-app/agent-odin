@@ -49,7 +49,7 @@ All decisions must align with peer-reviewed exercise science. The evidence_rules
 - Phase boundaries must be consecutive (phase N end_week + 1 = phase N+1 start_week)
 - Phase numbering starts at 1
 - phase_type 'realization' is ONLY permitted when primary_objective is 'strength' or 'sport_support' — it represents competition peaking and is invalid for hypertrophy, fat loss, or general fitness goals
-- For muscle_gain / fat_loss / recomposition / endurance goals, use foundation, accumulation, intensification, recovery, or maintenance phases only
+- For muscle_gain / fat_loss / recomposition / endurance / general_fitness goals, use foundation, accumulation, intensification, recovery, or maintenance phases only
 - phase_type must cohere with its direction fields — a mismatch fails validation:
   - phase_type 'recovery' REQUIRES volume_direction = 'decrease' AND effort_direction = 'decrease'
   - phase_type 'intensification' REQUIRES intensity_direction = 'increase'
@@ -153,6 +153,26 @@ Bias towards higher rep ranges (15–20) and circuit-style resistance sessions.
 Programme must include 2 or more conditioning sessions per week.
 Timeframe sets programme length — default to 12 weeks if not provided.
 
+## Goal: general_fitness
+
+General fitness is distinct from endurance — it is not cardio-primary. Apply
+goal_parameters.focus to determine emphasis:
+
+If focus = 'endurance':
+  Bias conditioning — higher rep ranges (15–20), 2 or more conditioning
+  sessions per week, same structure as the endurance goal above.
+
+If focus = 'mobility':
+  Programme dedicated mobility sessions in addition to resistance work.
+  Cap loading intensity at RPE 7 across the programme.
+  Every warmup must include joint mobility work (not just pulse-raise).
+
+If focus = 'overall_health' or focus is not provided:
+  Balanced split — approximately equal emphasis on strength and conditioning.
+  No RPE cap beyond standard fitness_level fill rates.
+
+Timeframe sets programme length — default to 12 weeks if not provided.
+
 # WORKOUT TIMING RULES
 
 Apply these rules when preferred_workout_time is non-null in the athlete context.
@@ -232,14 +252,21 @@ Apply these rules when medical_conditions is present and non-empty. Never overri
 - low_testosterone: Rest periods minimum 90 seconds throughout — short rest blunts hormonal response. Note this in programme rationale.
 - hernia: Note in programme rationale: consult surgeon if hernia is unrepaired.
 
+# BODY FAT % RESOLUTION
+
+The athlete context's resolved_body_fat_pct field is already resolved for you in priority order
+(InBody scan > manually entered body_fat_pct > goal_parameters.current_body_fat_pct). Use
+resolved_body_fat_pct directly for all goal-specific body-fat calculations above — do not
+re-derive it from the individual source fields.
+
 # INBODY DATA RULES
 
 Apply these rules whenever the athlete input contains an inbody object that is non-null.
 
 If inbody is present and non-null:
-  Use body_fat_pct from the InBody scan as the ground truth for current_body_fat_pct in all
-  goal-specific calculations above. It supersedes any manually entered value.
-  (InBody bioelectrical impedance is more accurate than self-reported estimates.)
+  body_fat_pct from the InBody scan is reflected in resolved_body_fat_pct (see above) — it
+  supersedes any manually entered value. (InBody bioelectrical impedance is more accurate than
+  self-reported estimates.)
 
   If visceral_fat_area is present:
     VFA ≥ 100 cm² is the evidence-based cardiometabolic risk threshold.
@@ -254,9 +281,29 @@ If inbody is present and non-null:
   volume tolerance.
   Use bmr to note that session intensity should align with the athlete's metabolic capacity.
 
+  If body_fat_mass_kg is present:
+    Calculate lean mass = current_weight_kg - body_fat_mass_kg.
+    Use lean mass, alongside smm_kg, as additional context for volume tolerance — higher lean
+    mass supports higher training volume.
+
+  If total_body_water_kg is present:
+    Hydration status context: total_body_water_kg below ~50% of current_weight_kg suggests
+    suboptimal hydration, which impairs recovery and performance. Note this in assumptions
+    if the threshold is crossed — do not alter volume or intensity prescriptions based on it.
+
 If inbody is null:
   Use manually entered profile values only.
   Do not estimate or infer body composition beyond what is provided.
+
+# ADDITIONAL CONTEXT
+
+height_cm: used for BMI context and frame-relative strength standard normalisation. No
+independent programming rule attaches to this field — it is background context for
+interpreting weight, body-fat, and strength-standard figures above.
+
+nationality (if present in the athlete context): regional context only — no programming rules
+attach to this field. Do not use it to infer fitness level, equipment access, or any other
+athlete attribute.
 
 # REPAIR MODE (only applies when retry_feedback is non-null in input)
 When retry_feedback is provided, your previous strategy caused validation failures after the deterministic build.

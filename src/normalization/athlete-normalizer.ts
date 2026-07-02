@@ -19,6 +19,24 @@ import { calculateProgrammeConfidence } from './programme-confidence.js';
 import { deriveAthleteState } from './athlete-state.js';
 import { normalizeEquipmentCapabilities } from './equipment-capabilities.js';
 
+// goal_parameters is a v2-only field not present on the v1-shaped
+// AthleteInput type that this module is typed against — the v2 route casts
+// its request body to AthleteInput before calling normalizeAthlete, so the
+// field is present at runtime even though the type doesn't know about it.
+type InputWithV2BodyFatSources = AthleteInput & {
+  goal_parameters?: { current_body_fat_pct?: number };
+};
+
+const resolveBodyFatPct = (input: AthleteInput): number | null => {
+  const v2Input = input as InputWithV2BodyFatSources;
+  return (
+    input.inbody?.body_fat_pct ??
+    v2Input.body_fat_pct ??
+    v2Input.goal_parameters?.current_body_fat_pct ??
+    null
+  );
+};
+
 export const normalizeAthlete = (
   input: AthleteInput,
 ): NormalizedAthleteProfile => {
@@ -71,6 +89,7 @@ export const normalizeAthlete = (
       assumptions,
       missingInputs,
     ),
+    resolved_body_fat_pct: resolveBodyFatPct(input),
   };
 
   const result = NormalizedAthleteProfileSchema.safeParse(profile);

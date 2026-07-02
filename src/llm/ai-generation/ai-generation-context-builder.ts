@@ -41,6 +41,9 @@ const buildAthleteContext = (profile: NormalizedAthleteProfile) => ({
   equipment: profile.source.equipment,
   current_weight_kg: profile.source.current_weight_kg,
   target_weight_kg: profile.source.target_weight_kg,
+  height_cm: profile.source.height_cm,
+  resolved_body_fat_pct: profile.resolved_body_fat_pct,
+  nationality: profile.source.nationality ?? null,
   preferred_workout_time: profile.source.schedule?.preferred_workout_time ?? null,
   recovery_capacity: profile.recovery_capacity,
   athlete_state: {
@@ -59,6 +62,19 @@ const buildAthleteContext = (profile: NormalizedAthleteProfile) => ({
     severity,
     summary: message,
   })),
+  // The strategy/phase prompts' INBODY DATA RULES sections instruct the
+  // model to read these values directly — they must actually be present
+  // in the context object, not just implied by derived health_flags.
+  inbody: profile.source.inbody
+    ? {
+        body_fat_pct: profile.source.inbody.body_fat_pct,
+        smm_kg: profile.source.inbody.smm_kg,
+        visceral_fat_area: profile.source.inbody.visceral_fat_area,
+        bmr: profile.source.inbody.bmr,
+        body_fat_mass_kg: profile.source.inbody.body_fat_mass_kg ?? null,
+        total_body_water_kg: profile.source.inbody.total_body_water_kg ?? null,
+      }
+    : null,
 });
 
 const summariseExerciseLibrary = (exercises: Exercise[]) => {

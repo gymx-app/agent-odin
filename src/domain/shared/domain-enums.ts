@@ -1,20 +1,19 @@
 import { z } from 'zod';
 
-export const SexSchema = z.enum(['male', 'female']);
+export const SexSchema = z.enum(['male', 'female', 'other']);
 export const AthleteGoalSchema = z.enum([
   'fat_loss',
   'muscle_gain',
   'recomposition',
   'strength',
   'endurance',
+  'general_fitness',
 ]);
-export const EquipmentAvailabilitySchema = z.enum([
-  'full_gym',
-  'dumbbells_only',
-  'bodyweight',
-  'home_gym',
-  'hotel_gym',
-]);
+// Accepts the PWA's 'bodyweight_only' as an input alias for 'bodyweight' —
+// every downstream consumer only ever checks for 'bodyweight'.
+export const EquipmentAvailabilitySchema = z
+  .enum(['full_gym', 'dumbbells_only', 'bodyweight', 'home_gym', 'hotel_gym', 'bodyweight_only'])
+  .transform((value) => (value === 'bodyweight_only' ? 'bodyweight' : value));
 export const FitnessLevelSchema = z.enum([
   'beginner',
   'intermediate',

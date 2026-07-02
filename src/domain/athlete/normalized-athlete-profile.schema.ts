@@ -99,4 +99,8 @@ export const NormalizedAthleteProfileSchema = z.object({
   athlete_state: AthleteStateSchema,
   equipment_capabilities: EquipmentCapabilitiesSchema,
   programme_confidence: ProgrammeConfidenceSchema,
+  // Priority-resolved body fat %: inbody.body_fat_pct > body_fat_pct (manual)
+  // > goal_parameters.current_body_fat_pct > null. Computed once here so AI
+  // context builders and downstream consumers don't each re-derive it.
+  resolved_body_fat_pct: z.number().min(0).max(100).nullable(),
 });

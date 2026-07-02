@@ -36,6 +36,7 @@ import { AiStrategyOutputSchema } from '../../src/llm/ai-generation/ai-generatio
 import type { AiStrategyOutput } from '../../src/llm/ai-generation/ai-generation.types.js';
 import { buildProgrammeWithRepair } from '../../src/planning/longitudinal-programme-planner.js';
 import { applyWeightPrescription } from '../../src/planning/weight-prescription.js';
+import { buildDayZeroBaselineSession } from '../../src/planning/baseline/baseline-session-builder.js';
 import { buildRationaleSummary } from '../../src/planning/rationale-summary.js';
 import { interpretUnknownInjuries } from '../../src/normalization/injury-interpreter.js';
 import { createSupabaseAdminClient } from '../../src/infrastructure/supabase/admin-client.js';
@@ -500,6 +501,10 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
           planner_version: PLANNER_VERSION,
           schema_version: '2.0' as const,
           programme,
+          baseline_session:
+            body.athlete.baseline_path === 'day_one_test'
+              ? buildDayZeroBaselineSession(programme)
+              : null,
           validation,
           rationale,
           refinement: {
@@ -548,6 +553,10 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
           planner_version: PLANNER_VERSION,
           schema_version: '2.0' as const,
           programme: fullValidation.programme,
+          baseline_session:
+            body.athlete.baseline_path === 'day_one_test'
+              ? buildDayZeroBaselineSession(fullValidation.programme)
+              : null,
           validation: fullValidation.validation,
           refinement: {
             requested: false,
