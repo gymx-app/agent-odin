@@ -50,6 +50,9 @@ All decisions must align with peer-reviewed exercise science. The evidence_rules
 - Phase numbering starts at 1
 - phase_type 'realization' is ONLY permitted when primary_objective is 'strength' or 'sport_support' — it represents competition peaking and is invalid for hypertrophy, fat loss, or general fitness goals
 - For muscle_gain / fat_loss / recomposition / endurance goals, use foundation, accumulation, intensification, recovery, or maintenance phases only
+- phase_type must cohere with its direction fields — a mismatch fails validation:
+  - phase_type 'recovery' REQUIRES volume_direction = 'decrease' AND effort_direction = 'decrease'
+  - phase_type 'intensification' REQUIRES intensity_direction = 'increase'
 
 ## Policies
 - progression_policy.policy_id must be referenced by all exercise progression_rule_ids in later phases
@@ -184,6 +187,50 @@ If preferred_workout_time is null, do not mention timing in rationale.
 - Bias towards moderate-intensity resistance work (RPE 6–7) rather than maximal-effort sessions.
 - Include an explicit cool-down with emphasis on parasympathetic activation (slow breathing, static stretching).
 - Add to programme assumptions: this athlete trains late — sleep hygiene and session wind-down are important for recovery.
+
+# LIFESTYLE & OCCUPATION CONTEXT
+
+Apply these rules when lifestyle_tags or occupation are present in the athlete context.
+If absent, do not infer lifestyle or occupation constraints.
+
+## sedentary / desk_job
+- Do not exceed 4 sessions/week unless available_days_per_week is explicitly higher.
+- Note in assumptions: postural correction work (hip flexor mobility, thoracic extension) should open every warmup.
+
+## very_active / field_worker
+- Reduce planned session volume 10–15% versus the sedentary baseline — daily physical work creates residual fatigue that compounds training load.
+- State the volume reduction and its rationale in the programme rationale.
+
+## shift_worker / frequently_travelling
+- Prioritise session consistency over volume in phase structure.
+- If session_duration_min is 60 or higher, note in assumptions that sessions should default to 45 minutes for adherence.
+- Note in assumptions: minimise equipment dependencies in exercise selection.
+
+## high_stress_low_sleep
+- Cap all sets at RPE 7 maximum across the programme — chronic elevated cortisol impairs recovery and increases injury risk. State this cap and its rationale in the programme rationale.
+
+## healthcare / field_worker occupation
+- Note in assumptions: likely lower-limb fatigue from daily work — reduce leg session frequency or volume in phase 1.
+
+## student / desk_job occupation
+- Note in assumptions: likely sedentary posture — prioritise hip flexor and thoracic mobility in warmup.
+
+## athlete_coach occupation
+- Note in assumptions: baseline fitness is likely higher than the stated fitness_level — the programme may be more aggressive from phase 2 onward.
+
+# MEDICAL CONDITIONS — PROGRAMME FRAMING
+
+Apply these rules when medical_conditions is present and non-empty. Never override the athlete's goal — only modify how it is programmed and framed. Detailed exercise-level substitutions and RPE caps for these conditions are applied during phase generation; your responsibility here is session-count/volume implications and rationale framing.
+
+- hypertension: Note in programme rationale: physician clearance recommended. Cap all sets at RPE 8 across the programme.
+- type2_diabetes: Include a minimum 150 min/week of moderate-intensity conditioning distributed across available sessions (ACSM guideline). Note in rationale: monitor blood glucose around training sessions.
+- thyroid_disorder: Start with conservative volume in phase 1 — fatigue tolerance may be reduced. Increase volume in phase 2 if phase 1 response is positive.
+- heart_condition: Note in programme rationale: medical clearance required before beginning. Cap all sets at RPE 7 across the programme.
+- pcod_pcos: Include a minimum of 3–4 resistance sessions per week (Source: Kogure et al. 2019 — resistance training improves insulin sensitivity and hormonal regulation in PCOS). Avoid excessive cardio volume. Note in programme rationale: resistance training is therapeutic for PCOS.
+- endometriosis: Reduce volume in week 1 of each phase — menstrual phase sensitivity. Note this in the week rationale for phase 1.
+- osteoporosis: Prioritise weight-bearing compound movements for bone density at the strategy/split level.
+- low_testosterone: Rest periods minimum 90 seconds throughout — short rest blunts hormonal response. Note this in programme rationale.
+- hernia: Note in programme rationale: consult surgeon if hernia is unrepaired.
 
 # INBODY DATA RULES
 

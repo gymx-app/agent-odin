@@ -60,14 +60,75 @@ export const BaselinePathSchema = z.enum(['self_reported', 'day_one_test', 'skip
 export type BaselinePath = z.infer<typeof BaselinePathSchema>;
 export type KnownLift = z.infer<typeof KnownLiftSchema>;
 
+// ── Injuries (v2 — `modification` replaces `severity`, notes optional) ───────
+
+const InjuryV2Schema = z
+  .object({
+    area: z.string().trim().min(1),
+    modification: z.enum(['avoid', 'modify']),
+    notes: z.string().trim().optional(),
+  })
+  .strict();
+
+export type InjuryV2 = z.infer<typeof InjuryV2Schema>;
+
+// ── Lifestyle tags / occupation / medical conditions ──────────────────────────
+
+export const LifestyleTagSchema = z.enum([
+  'sedentary',
+  'lightly_active',
+  'moderately_active',
+  'very_active',
+  'shift_worker',
+  'frequently_travelling',
+  'high_stress_low_sleep',
+]);
+
+export const OccupationSchema = z.enum([
+  'student',
+  'desk_job',
+  'field_worker',
+  'healthcare',
+  'athlete_coach',
+  'homemaker',
+  'business_owner',
+  'creative_freelancer',
+  'retired',
+  'other',
+]);
+
+export const MedicalConditionSchema = z.enum([
+  'hypertension',
+  'type2_diabetes',
+  'thyroid_disorder',
+  'asthma',
+  'chronic_lower_back_pain',
+  'chronic_knee_pain',
+  'heart_condition',
+  'arthritis',
+  'pcod_pcos',
+  'endometriosis',
+  'osteoporosis',
+  'pregnancy_postpartum',
+  'low_testosterone',
+  'hernia',
+]);
+
 // ── v2 athlete input ──────────────────────────────────────────────────────────
 
-export const AthleteInputV2Schema = AthleteInputBaseSchema.omit({ inbody: true })
+export const AthleteInputV2Schema = AthleteInputBaseSchema.omit({
+  inbody: true,
+  injuries: true,
+})
   .extend({
     inbody: InBodyV2Schema.nullable().default(null),
+    injuries: z.array(InjuryV2Schema),
     goal_parameters: GoalParametersV2Schema.optional(),
     known_lifts: z.array(KnownLiftSchema).nullable().default(null),
     baseline_path: BaselinePathSchema.default('skipped'),
+    lifestyle_tags: z.array(LifestyleTagSchema).optional(),
+    occupation: OccupationSchema.optional(),
+    medical_conditions: z.array(MedicalConditionSchema).optional(),
   })
   .superRefine((input, ctx) => {
     const lifts = input.known_lifts ?? [];
@@ -95,6 +156,24 @@ export const AthleteInputV2Schema = AthleteInputBaseSchema.omit({ inbody: true }
         path: ['known_lifts'],
         message: 'known_lifts must be empty or null when baseline_path is "skipped"',
       });
+    }
+
+    if (input.equipment === 'bodyweight') {
+      if (input.baseline_path !== 'skipped') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['baseline_path'],
+          message: 'baseline_path must be "skipped" when equipment is "bodyweight"',
+        });
+      }
+
+      if (hasLifts) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['known_lifts'],
+          message: 'known_lifts must be empty or null when equipment is "bodyweight"',
+        });
+      }
     }
   });
 

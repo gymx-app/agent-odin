@@ -95,16 +95,37 @@ export const buildAiStrategyContext = (
   },
 });
 
+export type AiAthleteContextExtrasV2 = {
+  lifestyle_tags?: string[];
+  occupation?: string;
+  medical_conditions?: string[];
+};
+
+const buildAthleteExtrasOverlay = (
+  extras?: AiAthleteContextExtrasV2,
+): Record<string, unknown> => {
+  const overlay: Record<string, unknown> = {};
+  if (extras?.lifestyle_tags?.length) overlay.lifestyle_tags = extras.lifestyle_tags;
+  if (extras?.occupation) overlay.occupation = extras.occupation;
+  if (extras?.medical_conditions?.length) overlay.medical_conditions = extras.medical_conditions;
+  return overlay;
+};
+
 export const buildAiStrategyContextV2 = (
   profile: NormalizedAthleteProfile,
   exercises: Exercise[],
   goalParameters?: Record<string, unknown>,
+  athleteExtras?: AiAthleteContextExtrasV2,
 ): AiStrategyContext => {
   const ctx = buildAiStrategyContext(profile, exercises);
-  if (!goalParameters || Object.keys(goalParameters).length === 0) return ctx;
+  const overlay = buildAthleteExtrasOverlay(athleteExtras);
+  if (goalParameters && Object.keys(goalParameters).length > 0) {
+    overlay.goal_parameters = goalParameters;
+  }
+  if (Object.keys(overlay).length === 0) return ctx;
   return {
     ...ctx,
-    athlete: { ...ctx.athlete, goal_parameters: goalParameters },
+    athlete: { ...ctx.athlete, ...overlay },
   };
 };
 
@@ -132,6 +153,20 @@ export const buildAiPhaseContext = (
     equipment: profile.source.equipment,
   },
 });
+
+export const buildAiPhaseContextV2 = (
+  profile: NormalizedAthleteProfile,
+  strategy: AiStrategyOutput,
+  phaseSkeleton: AiStrategyOutput['phase_skeletons'][number],
+  exercises: Exercise[],
+  priorPhaseSummaries: PhaseSummary[],
+  athleteExtras?: AiAthleteContextExtrasV2,
+): AiPhaseContext => {
+  const ctx = buildAiPhaseContext(profile, strategy, phaseSkeleton, exercises, priorPhaseSummaries);
+  const overlay = buildAthleteExtrasOverlay(athleteExtras);
+  if (Object.keys(overlay).length === 0) return ctx;
+  return { ...ctx, athlete: { ...ctx.athlete, ...overlay } };
+};
 
 export const summarisePhase = (
   phase: AiStrategyOutput['phase_skeletons'][number] & { weeks: unknown[] },

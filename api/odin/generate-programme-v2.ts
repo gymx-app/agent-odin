@@ -25,7 +25,8 @@ import { OpenAIAiProgrammeGenerationProvider } from '../../src/llm/ai-generation
 import { AnthropicAiProgrammeGenerationProvider } from '../../src/llm/ai-generation/anthropic-ai-programme-generation-provider.js';
 import {
   buildAiStrategyContextV2,
-  buildAiPhaseContext,
+  buildAiPhaseContextV2,
+  type AiAthleteContextExtrasV2,
 } from '../../src/llm/ai-generation/ai-generation-context-builder.js';
 import { createToolExecutor } from '../../src/llm/ai-generation/agent-tool-executor.js';
 import { assembleProgramme } from '../../src/llm/ai-generation/ai-programme-assembler.js';
@@ -190,13 +191,34 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
     handle: async (request, context) => {
       const user = await requireAuthenticatedUser(request, authClient);
       const body = await readJsonBody(request, stepRequestSchema, REQUEST_BODY_LIMITS.preview);
+
+      if (body.athlete.medical_conditions?.includes('pregnancy_postpartum')) {
+        throw odinError(
+          'PREGNANCY_POSTPARTUM_BLOCKED',
+          'Programme generation is not available during pregnancy or postpartum. Please consult a certified pre/postnatal trainer or your physician before beginning structured training.',
+          400,
+        );
+      }
+
       const provider = getProvider(appConfig);
       const athleteInput = {
         ...body.athlete,
-        injuries: await interpretUnknownInjuries(body.athlete.injuries, appConfig),
+        injuries: await interpretUnknownInjuries(
+          body.athlete.injuries.map((injury) => ({
+            area: injury.area,
+            severity: injury.modification,
+            notes: injury.notes ?? '',
+          })),
+          appConfig,
+        ),
       };
       const normalized = normalizeAthlete(athleteInput as unknown as AthleteInput);
       const toolExecutor = createToolExecutor(seedExercises, normalized);
+      const athleteExtras: AiAthleteContextExtrasV2 = {
+        lifestyle_tags: body.athlete.lifestyle_tags,
+        occupation: body.athlete.occupation,
+        medical_conditions: body.athlete.medical_conditions,
+      };
 
       if (body.step === 'strategy') {
         await checkRateLimit(user.id, 'strategy', adminClient, appConfig.rateLimitStrategyPerDay);
@@ -205,6 +227,7 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
           normalized,
           seedExercises,
           body.athlete.goal_parameters as Record<string, unknown> | undefined,
+          athleteExtras,
         );
         const result = await provider.generateStrategy(strategyCtx, {
           requestId: context.requestId,
@@ -234,12 +257,13 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
           throw odinError('INVALID_PHASE_INDEX', `Phase index ${body.phase_index} out of range.`, 400);
         }
 
-        const phaseCtx = buildAiPhaseContext(
+        const phaseCtx = buildAiPhaseContextV2(
           normalized,
           strategy,
           skeleton,
           seedExercises,
           body.prior_phase_summaries,
+          athleteExtras,
         );
 
         let reasoning: string | null = null;
@@ -284,12 +308,13 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
           throw odinError('INVALID_PHASE_INDEX', `Phase index ${body.phase_index} out of range.`, 400);
         }
 
-        const phaseCtx = buildAiPhaseContext(
+        const phaseCtx = buildAiPhaseContextV2(
           normalized,
           strategy,
           skeleton,
           seedExercises,
           body.prior_phase_summaries,
+          athleteExtras,
         );
 
         if (!provider.generateReasoning) {
@@ -324,12 +349,13 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
           throw odinError('INVALID_PHASE_INDEX', `Phase index ${body.phase_index} out of range.`, 400);
         }
 
-        const phaseCtx = buildAiPhaseContext(
+        const phaseCtx = buildAiPhaseContextV2(
           normalized,
           strategy,
           skeleton,
           seedExercises,
           body.prior_phase_summaries,
+          athleteExtras,
         );
 
         const result = await provider.generatePhase(phaseCtx, {
@@ -389,12 +415,13 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
         } else {
           const fullStrategy = parseStrategy(stripped);
           const fullSkeleton = fullStrategy.phase_skeletons[body.phase_index]!;
-          const phaseCtx = buildAiPhaseContext(
+          const phaseCtx = buildAiPhaseContextV2(
             normalized,
             fullStrategy,
             fullSkeleton,
             seedExercises,
             body.prior_phase_summaries,
+            athleteExtras,
           );
           weekGenCtx.phaseContext = phaseCtx;
           if (body.reasoning) weekGenCtx.reasoning = body.reasoning;
@@ -421,7 +448,12 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
 
       if (body.step === 'build') {
         const strategy = coerceStrategy(body.strategy);
-        const strategyCtx = buildAiStrategyContextV2(normalized, seedExercises);
+        const strategyCtx = buildAiStrategyContextV2(
+          normalized,
+          seedExercises,
+          undefined,
+          athleteExtras,
+        );
         let buildResult: Awaited<ReturnType<typeof buildProgrammeWithRepair>>;
         try {
           buildResult = await buildProgrammeWithRepair(
