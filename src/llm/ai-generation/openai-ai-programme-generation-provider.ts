@@ -80,7 +80,7 @@ export class OpenAIAiProgrammeGenerationProvider
     private readonly client: OpenAI,
     private readonly config: Pick<
       AppConfig,
-      'openaiGenerationModel' | 'openaiGenerationTimeoutMs'
+      'openaiGenerationModel' | 'openaiStrategyModel' | 'openaiGenerationTimeoutMs'
     >,
   ) {}
 
@@ -105,6 +105,7 @@ export class OpenAIAiProgrammeGenerationProvider
       'ai_strategy_generation',
       8000,
       OpenAIStrategySchema,
+      this.config.openaiStrategyModel,
     );
   }
 
@@ -499,8 +500,9 @@ export class OpenAIAiProgrammeGenerationProvider
     schemaName: string,
     maxOutputTokens: number,
     openaiSchema?: import('zod').ZodTypeAny,
+    modelOverride?: string,
   ): Promise<AiGenerationResult<T>> {
-    const model = this.model;
+    const model = modelOverride ?? this.model;
 
     try {
       const response = await withRateLimitRetry(() => this.client.responses.parse({

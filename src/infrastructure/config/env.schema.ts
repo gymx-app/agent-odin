@@ -82,6 +82,7 @@ export const envSchema = z
       .transform((value) => value === 'true'),
     ODIN_ALLOWED_PLANNER_VERSIONS: plannerVersionsSchema,
     OPENAI_GENERATION_MODEL: optionalSecretSchema,
+    OPENAI_STRATEGY_MODEL: z.string().trim().min(1).default('gpt-4o-mini'),
     OPENAI_GENERATION_TIMEOUT_MS: z.coerce
       .number()
       .int()
@@ -159,6 +160,7 @@ export type AppConfig = {
   aiAgentPlannerEnabled: boolean;
   allowedPlannerVersions: PlannerVersion[];
   openaiGenerationModel: string | null;
+  openaiStrategyModel: string;
   openaiGenerationTimeoutMs: number;
   aiGenerationProvider: 'openai' | 'anthropic';
   anthropicApiKey: string | null;
@@ -206,6 +208,7 @@ export const parseEnv = (rawEnv: RawEnv): AppConfig => {
     aiAgentPlannerEnabled: parsed.data.ODIN_AI_AGENT_PLANNER_ENABLED,
     allowedPlannerVersions: parsed.data.ODIN_ALLOWED_PLANNER_VERSIONS,
     openaiGenerationModel: parsed.data.OPENAI_GENERATION_MODEL ?? parsed.data.OPENAI_MODEL ?? null,
+    openaiStrategyModel: parsed.data.OPENAI_STRATEGY_MODEL,
     openaiGenerationTimeoutMs: parsed.data.OPENAI_GENERATION_TIMEOUT_MS,
     aiGenerationProvider: parsed.data.AI_GENERATION_PROVIDER,
     anthropicApiKey: parsed.data.ANTHROPIC_API_KEY ?? null,

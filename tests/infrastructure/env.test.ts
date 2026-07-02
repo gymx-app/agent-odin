@@ -21,6 +21,7 @@ describe('environment configuration', () => {
       longitudinalPlannerEnabled: false,
       aiAgentPlannerEnabled: true,
       openaiGenerationModel: null,
+      openaiStrategyModel: 'gpt-4o-mini',
       openaiGenerationTimeoutMs: 55000,
       aiGenerationProvider: 'openai',
       anthropicApiKey: null,
