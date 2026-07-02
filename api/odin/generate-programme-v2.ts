@@ -526,7 +526,7 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
         const strategy = parseStrategy(body.strategy);
         const phases = body.phases;
 
-        const programme = assembleProgramme({
+        const assembled = assembleProgramme({
           strategy,
           phases,
           startDate: new Date().toISOString().slice(0, 10),
@@ -535,6 +535,14 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
           exerciseLibraryVersion: 'approved-library-v1',
           validationRuleVersion: LONGITUDINAL_VALIDATION_RULE_VERSION,
         });
+        const programme = {
+          ...assembled,
+          phases: applyWeightPrescription(assembled.phases, {
+            baseline_path: body.athlete.baseline_path,
+            known_lifts: body.athlete.known_lifts,
+            goal: body.athlete.goal,
+          }),
+        };
 
         const fullValidation = programmeValidationService.validateAndRepairVersioned({
           programme,
