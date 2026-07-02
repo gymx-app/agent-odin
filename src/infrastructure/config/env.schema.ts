@@ -87,7 +87,7 @@ export const envSchema = z
       .int()
       .min(5000)
       .max(300000)
-      .default(45000),
+      .default(55000),
     AI_GENERATION_PROVIDER: z
       .enum(['openai', 'anthropic'])
       .optional()
@@ -99,7 +99,7 @@ export const envSchema = z
       .int()
       .min(5000)
       .max(300000)
-      .default(45000),
+      .default(55000),
     ODIN_RATE_LIMIT_STRATEGY_PER_DAY: z.coerce
       .number()
       .int()

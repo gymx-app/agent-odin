@@ -21,11 +21,11 @@ describe('environment configuration', () => {
       longitudinalPlannerEnabled: false,
       aiAgentPlannerEnabled: true,
       openaiGenerationModel: null,
-      openaiGenerationTimeoutMs: 45000,
+      openaiGenerationTimeoutMs: 55000,
       aiGenerationProvider: 'openai',
       anthropicApiKey: null,
       anthropicModel: null,
-      anthropicTimeoutMs: 45000,
+      anthropicTimeoutMs: 55000,
       allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1', 'ai_agent_v1'],
       rateLimitStrategyPerDay: 10,
     });
@@ -150,7 +150,7 @@ describe('environment configuration', () => {
       longitudinalPlannerEnabled: true,
       aiAgentPlannerEnabled: true,
       openaiGenerationModel: null,
-      openaiGenerationTimeoutMs: 45000,
+      openaiGenerationTimeoutMs: 55000,
       allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1'],
     });
     expect(() =>

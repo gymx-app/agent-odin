@@ -270,10 +270,10 @@ Copy `.env.example` and configure:
 | `AI_GENERATION_PROVIDER` | `openai` | LLM provider: `openai` or `anthropic` |
 | `OPENAI_API_KEY` | — | OpenAI API key |
 | `OPENAI_GENERATION_MODEL` | — | Model for programme generation |
-| `OPENAI_GENERATION_TIMEOUT_MS` | `45000` | Generation request timeout |
+| `OPENAI_GENERATION_TIMEOUT_MS` | `55000` | Generation request timeout |
 | `ANTHROPIC_API_KEY` | — | Anthropic API key |
 | `ANTHROPIC_MODEL` | — | Anthropic model ID |
-| `ANTHROPIC_TIMEOUT_MS` | `45000` | Anthropic request timeout |
+| `ANTHROPIC_TIMEOUT_MS` | `55000` | Anthropic request timeout |
 
 ### LLM Refinement (optional, for `legacy_v1` / `longitudinal_v1`)
 
