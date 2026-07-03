@@ -16,6 +16,7 @@ export const healthDataSchema = z.object({
   service: z.literal('agent-odin'),
   status: z.literal('ok'),
   timestamp: z.string().datetime(),
+  model: z.string(),
 });
 
 export const healthResponseSchema =
@@ -26,12 +27,19 @@ export const createHealthHandler = (appConfig: AppConfig = config) =>
     allowedMethods: ['GET'],
     config: appConfig,
     logger: createLogger(appConfig),
-    handle: () =>
-      successResponse({
+    handle: () => {
+      const model =
+        appConfig.aiGenerationProvider === 'anthropic'
+          ? (appConfig.anthropicModel ?? 'unknown')
+          : (appConfig.openaiGenerationModel ?? 'unknown');
+
+      return successResponse({
         service: 'agent-odin' as const,
         status: 'ok' as const,
         timestamp: new Date().toISOString(),
-      }),
+        model,
+      });
+    },
   });
 
 export default async function health(
