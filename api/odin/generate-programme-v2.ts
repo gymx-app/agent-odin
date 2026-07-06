@@ -463,7 +463,10 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
             strategy,
             provider,
             strategyCtx,
-            { startDate: new Date().toISOString().slice(0, 10) },
+            {
+              startDate: new Date().toISOString().slice(0, 10),
+              deadline: Date.now() + appConfig.generationTimeoutMs,
+            },
           );
         } catch (err) {
           if (err instanceof AppError) throw err;

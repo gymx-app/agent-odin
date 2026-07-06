@@ -15,6 +15,7 @@ import { buildProgrammeResistanceSessions } from './sessions/session-builder.js'
 import { selectProgrammeStrategyV2 } from './strategy/strategy-selector.js';
 import type { TrainingStrategyV2 } from './strategy/strategy.types.js';
 import { planProgrammeWeeks } from './weeks/week-progression-planner.js';
+import { odinError } from '../shared/errors/odin-errors.js';
 
 const MAX_REPAIR_ATTEMPTS = 2;
 
@@ -23,6 +24,10 @@ export type LongitudinalProgrammePlannerOptions = {
   generatedAt?: string;
   exerciseLibraryVersion?: string;
   stageRunner?: <T>(stage: string, operation: () => T) => T;
+  // Wall-clock deadline (ms since epoch) for the AI repair loop in
+  // buildProgrammeWithRepair. Unused by the deterministic (sync) builders.
+  deadline?: number;
+  now?: () => number;
 };
 
 const initialSchedule = (profile: NormalizedAthleteProfile) => {
@@ -508,8 +513,26 @@ export const buildProgrammeWithRepair = async (
 ): Promise<BuildWithRepairResult> => {
   const repairLog: RepairAttempt[] = [];
   let currentStrategy = aiStrategy;
+  const now = options.now ?? Date.now;
+  const { deadline } = options;
+
+  // Each repair round-trip re-calls the strategy LLM (~30-55s). Reaching
+  // MAX_REPAIR_ATTEMPTS bounds the count, but the "build" request is a single
+  // synchronous HTTP call — without a wall-clock check too, stacked repairs can
+  // still run past the client's own timeout, which silently cancels the request
+  // with no programme ever returned. Fail fast and cleanly instead.
+  const assertWithinDeadline = (): void => {
+    if (deadline !== undefined && now() > deadline) {
+      throw odinError(
+        'GENERATION_TIMEOUT',
+        'Programme build exceeded its deadline during strategy repair.',
+        504,
+      );
+    }
+  };
 
   for (let attempt = 0; attempt <= MAX_REPAIR_ATTEMPTS; attempt++) {
+    assertWithinDeadline();
     let result: ReturnType<typeof buildProgrammeFromAiStrategy>;
     try {
       result = buildProgrammeFromAiStrategy(profile, exercises, currentStrategy, options);
@@ -520,6 +543,7 @@ export const buildProgrammeWithRepair = async (
       if (err instanceof PlannerError && err.code === 'PROGRAMME_SCHEMA_VALIDATION_FAILED') {
         repairLog.push({ attempt, errorCodes: ['PROGRAMME_SCHEMA_VALIDATION_FAILED'], repaired: false });
         if (attempt === MAX_REPAIR_ATTEMPTS) throw err;
+        assertWithinDeadline();
         const repaired = await provider.generateStrategy(strategyContext, {
           requestId: `repair-schema-${attempt + 1}`,
           retryFeedback: {
@@ -577,6 +601,7 @@ export const buildProgrammeWithRepair = async (
       );
     }
 
+    assertWithinDeadline();
     const repaired = await provider.generateStrategy(strategyContext, {
       requestId: `repair-${attempt + 1}`,
       retryFeedback: {
