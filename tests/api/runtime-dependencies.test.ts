@@ -15,6 +15,7 @@ const config: AppConfig = {
   supabaseServiceRoleKey: 'service-role',
   openaiApiKey: null,
   openaiModel: null,
+  openaiStrategyModel: 'gpt-4o-mini',
   openaiTimeoutMs: 20000,
   openaiMaxRetries: 1,
   llmRefinementEnabled: false,

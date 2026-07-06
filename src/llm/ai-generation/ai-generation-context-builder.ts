@@ -112,9 +112,9 @@ export const buildAiStrategyContext = (
 });
 
 export type AiAthleteContextExtrasV2 = {
-  lifestyle_tags?: string[];
-  occupation?: string;
-  medical_conditions?: string[];
+  lifestyle_tags?: string[] | undefined;
+  occupation?: string | undefined;
+  medical_conditions?: string[] | undefined;
 };
 
 const buildAthleteExtrasOverlay = (

@@ -562,7 +562,8 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
           schema_version: '2.0' as const,
           programme: fullValidation.programme,
           baseline_session:
-            body.athlete.baseline_path === 'day_one_test'
+            body.athlete.baseline_path === 'day_one_test' &&
+            fullValidation.programme.schema_version === '2.0'
               ? buildDayZeroBaselineSession(fullValidation.programme)
               : null,
           validation: fullValidation.validation,
