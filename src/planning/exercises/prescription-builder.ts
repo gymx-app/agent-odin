@@ -108,7 +108,12 @@ export const buildExactPrescription = (
   return {
     prescription_id: `${input.calendar_day.day_id}-${slot.slot_id}`,
     exercise_id: candidate.exercise.id,
-    exercise_name: candidate.exercise.display_name ?? candidate.exercise.name,
+    // Validation (session-validator.ts, programme-validation.service.ts)
+    // requires exercise_name to equal the library's canonical `name`, not
+    // `display_name` — using display_name here failed validation for every
+    // exercise that has one set (e.g. dumbbell_prone_row), which reliably
+    // exhausted the repair loop for any programme that selected one.
+    exercise_name: candidate.exercise.name,
     display_order: displayOrder,
     sequence_role: slot.sequence_role,
     priority: slot.priority,

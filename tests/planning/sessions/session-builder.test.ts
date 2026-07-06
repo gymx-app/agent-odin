@@ -109,6 +109,37 @@ describe('Session Construction V2', () => {
     });
   });
 
+  it('always prescribes the exercise library canonical name, not display_name', () => {
+    // Regression: prescription-builder.ts used to prefer `display_name` when
+    // set (e.g. dumbbell_prone_row's display_name is "Dumbbell Face-Down
+    // Row" vs canonical name "Dumbbell Prone Row"), which fails validation
+    // since it only accepts the canonical `name`. This exercised reliably
+    // across a full dumbbells_only build (any single day may not select it).
+    const exerciseById = new Map(seedExercises.map((e) => [e.id, e]));
+    const context = setup(
+      { equipment: 'dumbbells_only', fitness_level: 'intermediate' },
+      12,
+      6,
+    );
+    const phases = buildProgrammeResistanceSessions({
+      profile: context.profile,
+      strategy: context.strategy,
+      phases: context.weekPlan.phases,
+      exercises: seedExercises,
+    });
+
+    const exercises = phases
+      .flatMap((phase) => phase.weeks)
+      .flatMap((week) => week.days)
+      .flatMap((day) => day.exercises ?? []);
+
+    expect(exercises.length).toBeGreaterThan(0);
+    exercises.forEach((exercise) => {
+      const approved = exerciseById.get(exercise.exercise_id)!;
+      expect(exercise.exercise_name).toBe(approved.name);
+    });
+  });
+
   it('builds Upper Body push, pull and accessory coverage', () => {
     const context = setup(
       { fitness_level: 'intermediate', available_days_per_week: 4 },
