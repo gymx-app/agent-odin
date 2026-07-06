@@ -23,6 +23,21 @@ export type LongitudinalProgrammePlannerOptions = {
   generatedAt?: string;
   exerciseLibraryVersion?: string;
   stageRunner?: <T>(stage: string, operation: () => T) => T;
+  // Absolute Date.now()-comparable deadline for the whole repair loop in
+  // buildProgrammeWithRepair. Each individual LLM call already has its own
+  // per-call timeout, but nothing previously capped the *sum* of retries —
+  // a validation failure could trigger a full strategy regeneration call
+  // (as slow as the original strategy call), up to MAX_REPAIR_ATTEMPTS
+  // times, with no aggregate budget. That let requests run past the
+  // platform's own function timeout and get killed uncleanly instead of
+  // failing with a clean 504.
+  deadline?: number;
+  onRepairAttempt?: (event: {
+    attempt: number;
+    outcome: 'schema_invalid' | 'validation_failed' | 'repaired' | 'succeeded' | 'deadline_exceeded';
+    errorCodes?: string[];
+    elapsedMs: number;
+  }) => void;
 };
 
 const initialSchedule = (profile: NormalizedAthleteProfile) => {
@@ -508,6 +523,23 @@ export const buildProgrammeWithRepair = async (
 ): Promise<BuildWithRepairResult> => {
   const repairLog: RepairAttempt[] = [];
   let currentStrategy = aiStrategy;
+  const startedAt = Date.now();
+
+  // Each provider.generateStrategy retry call has its own per-call timeout,
+  // but nothing previously capped how many of those could run back-to-back.
+  // A validation failure could trigger a full strategy regeneration (as
+  // slow as the original strategy call) up to MAX_REPAIR_ATTEMPTS times,
+  // blowing past the platform's own function timeout with no clean error.
+  const assertWithinDeadline = (attempt: number) => {
+    if (options.deadline === undefined || Date.now() < options.deadline) return;
+    const elapsedMs = Date.now() - startedAt;
+    options.onRepairAttempt?.({ attempt, outcome: 'deadline_exceeded', elapsedMs });
+    throw new PlannerError(
+      'PROGRAMME_GENERATION_DEADLINE_EXCEEDED',
+      `Programme generation exceeded its time budget after ${attempt + 1} attempt(s).`,
+      { attempt, repair_log: repairLog },
+    );
+  };
 
   for (let attempt = 0; attempt <= MAX_REPAIR_ATTEMPTS; attempt++) {
     let result: ReturnType<typeof buildProgrammeFromAiStrategy>;
@@ -519,7 +551,14 @@ export const buildProgrammeWithRepair = async (
       // repair loop can regenerate the strategy and try again.
       if (err instanceof PlannerError && err.code === 'PROGRAMME_SCHEMA_VALIDATION_FAILED') {
         repairLog.push({ attempt, errorCodes: ['PROGRAMME_SCHEMA_VALIDATION_FAILED'], repaired: false });
+        options.onRepairAttempt?.({
+          attempt,
+          outcome: 'schema_invalid',
+          errorCodes: ['PROGRAMME_SCHEMA_VALIDATION_FAILED'],
+          elapsedMs: Date.now() - startedAt,
+        });
         if (attempt === MAX_REPAIR_ATTEMPTS) throw err;
+        assertWithinDeadline(attempt);
         const repaired = await provider.generateStrategy(strategyContext, {
           requestId: `repair-schema-${attempt + 1}`,
           retryFeedback: {
@@ -535,6 +574,11 @@ export const buildProgrammeWithRepair = async (
     }
 
     if (result.programme) {
+      options.onRepairAttempt?.({
+        attempt,
+        outcome: attempt > 0 ? 'repaired' : 'succeeded',
+        elapsedMs: Date.now() - startedAt,
+      });
       if (attempt > 0) {
         repairLog.push({
           attempt,
@@ -559,6 +603,12 @@ export const buildProgrammeWithRepair = async (
       errorCodes,
       repaired: false,
     });
+    options.onRepairAttempt?.({
+      attempt,
+      outcome: 'validation_failed',
+      errorCodes,
+      elapsedMs: Date.now() - startedAt,
+    });
 
     if (attempt === MAX_REPAIR_ATTEMPTS) {
       throw new PlannerError(
@@ -576,6 +626,8 @@ export const buildProgrammeWithRepair = async (
         },
       );
     }
+
+    assertWithinDeadline(attempt);
 
     const repaired = await provider.generateStrategy(strategyContext, {
       requestId: `repair-${attempt + 1}`,
