@@ -222,7 +222,7 @@ export const createGenerateProgrammeV2Handler = (appConfig: AppConfig = config) 
       };
 
       if (body.step === 'strategy') {
-        await checkRateLimit(user.id, 'strategy', adminClient, appConfig.rateLimitStrategyPerDay);
+        await checkRateLimit(user.id, adminClient, appConfig.rateLimitStrategyPerDay);
 
         const strategyCtx = buildAiStrategyContextV2(
           normalized,
