@@ -15,7 +15,6 @@ import { buildProgrammeResistanceSessions } from './sessions/session-builder.js'
 import { selectProgrammeStrategyV2 } from './strategy/strategy-selector.js';
 import type { TrainingStrategyV2 } from './strategy/strategy.types.js';
 import { planProgrammeWeeks } from './weeks/week-progression-planner.js';
-import { odinError } from '../shared/errors/odin-errors.js';
 
 const MAX_REPAIR_ATTEMPTS = 2;
 
@@ -32,10 +31,27 @@ export type LongitudinalProgrammePlannerOptions = {
   generatedAt?: string;
   exerciseLibraryVersion?: string;
   stageRunner?: <T>(stage: string, operation: () => T) => T;
-  // Wall-clock deadline (ms since epoch) for the AI repair loop in
-  // buildProgrammeWithRepair. Unused by the deterministic (sync) builders.
+  // Absolute Date.now()-comparable deadline for the whole repair loop in
+  // buildProgrammeWithRepair. Each individual LLM call already has its own
+  // per-call timeout, but nothing previously capped the *sum* of retries —
+  // a validation failure could trigger a full strategy regeneration call
+  // (as slow as the original strategy call), up to MAX_REPAIR_ATTEMPTS
+  // times, with no aggregate budget. That let requests run past the
+  // platform's own function timeout and get killed uncleanly instead of
+  // failing with a clean 504.
   deadline?: number;
   now?: () => number;
+  onRepairAttempt?: (event: {
+    attempt: number;
+    outcome:
+      | 'schema_invalid'
+      | 'validation_failed'
+      | 'repaired'
+      | 'succeeded'
+      | 'deadline_exceeded';
+    errorCodes?: string[];
+    elapsedMs: number;
+  }) => void;
 };
 
 const initialSchedule = (profile: NormalizedAthleteProfile) => {
@@ -549,6 +565,7 @@ export const buildProgrammeWithRepair = async (
   const repairLog: RepairAttempt[] = [];
   let currentStrategy = aiStrategy;
   const now = options.now ?? Date.now;
+  const startedAt = now();
   const { deadline } = options;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
@@ -564,23 +581,26 @@ export const buildProgrammeWithRepair = async (
     validation: ValidationResult;
   } | null = null;
 
-  // Each repair round-trip re-calls the strategy LLM (~30-55s). Reaching
-  // MAX_REPAIR_ATTEMPTS bounds the count, but the "build" request is a single
-  // synchronous HTTP call — without a wall-clock check too, stacked repairs can
-  // still run past the client's own timeout, which silently cancels the request
-  // with no programme ever returned. Fail fast and cleanly instead.
-  const assertWithinDeadline = (): void => {
-    if (deadline !== undefined && now() > deadline) {
-      throw odinError(
-        'GENERATION_TIMEOUT',
-        'Programme build exceeded its deadline during strategy repair.',
-        504,
-      );
-    }
+  // Each provider.generateStrategy retry call has its own per-call timeout,
+  // but nothing previously capped how many of those could run back-to-back.
+  // A validation failure could trigger a full strategy regeneration (as
+  // slow as the original strategy call) up to MAX_REPAIR_ATTEMPTS times,
+  // blowing past the platform's own function timeout with no clean error.
+  // Throws a PlannerError (not an HTTP-layer odinError) — the caller maps
+  // PROGRAMME_GENERATION_DEADLINE_EXCEEDED to a 504 GENERATION_TIMEOUT.
+  const assertWithinDeadline = (attempt: number): void => {
+    if (deadline === undefined || now() < deadline) return;
+    const elapsedMs = now() - startedAt;
+    options.onRepairAttempt?.({ attempt, outcome: 'deadline_exceeded', elapsedMs });
+    throw new PlannerError(
+      'PROGRAMME_GENERATION_DEADLINE_EXCEEDED',
+      `Programme generation exceeded its time budget after ${attempt + 1} attempt(s).`,
+      { attempt, repair_log: repairLog },
+    );
   };
 
   for (let attempt = 0; attempt <= MAX_REPAIR_ATTEMPTS; attempt++) {
-    assertWithinDeadline();
+    assertWithinDeadline(attempt);
     let result: ReturnType<typeof buildProgrammeFromAiStrategy>;
     try {
       result = buildProgrammeFromAiStrategy(
@@ -602,8 +622,14 @@ export const buildProgrammeWithRepair = async (
           errorCodes: ['PROGRAMME_SCHEMA_VALIDATION_FAILED'],
           repaired: false,
         });
+        options.onRepairAttempt?.({
+          attempt,
+          outcome: 'schema_invalid',
+          errorCodes: ['PROGRAMME_SCHEMA_VALIDATION_FAILED'],
+          elapsedMs: now() - startedAt,
+        });
         if (attempt === MAX_REPAIR_ATTEMPTS) throw err;
-        assertWithinDeadline();
+        assertWithinDeadline(attempt);
         const repaired = await provider.generateStrategy(strategyContext, {
           requestId: `repair-schema-${attempt + 1}`,
           retryFeedback: {
@@ -628,6 +654,11 @@ export const buildProgrammeWithRepair = async (
       bestValidResult = { programme: result.programme, validation: result.validation };
 
       if (result.escalatedFindings.length === 0) {
+        options.onRepairAttempt?.({
+          attempt,
+          outcome: attempt > 0 ? 'repaired' : 'succeeded',
+          elapsedMs: now() - startedAt,
+        });
         if (attempt > 0) {
           repairLog.push({
             attempt,
@@ -668,7 +699,7 @@ export const buildProgrammeWithRepair = async (
       }
 
       repairLog.push({ attempt, errorCodes: escalatedCodes, repaired: false });
-      assertWithinDeadline();
+      assertWithinDeadline(attempt);
       const repairedStrategy = await provider.generateStrategy(strategyContext, {
         requestId: `repair-warning-${attempt + 1}`,
         retryFeedback: {
@@ -695,6 +726,12 @@ export const buildProgrammeWithRepair = async (
       attempt,
       errorCodes,
       repaired: false,
+    });
+    options.onRepairAttempt?.({
+      attempt,
+      outcome: 'validation_failed',
+      errorCodes,
+      elapsedMs: now() - startedAt,
     });
 
     if (attempt === MAX_REPAIR_ATTEMPTS) {
@@ -727,7 +764,7 @@ export const buildProgrammeWithRepair = async (
       );
     }
 
-    assertWithinDeadline();
+    assertWithinDeadline(attempt);
     const repaired = await provider.generateStrategy(strategyContext, {
       requestId: `repair-${attempt + 1}`,
       retryFeedback: {

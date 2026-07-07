@@ -29,17 +29,19 @@ type GenerationLogRow = {
 
 export const checkRateLimit = async (
   userId: string,
-  step: GenerationLogStep,
   adminClient: SupabaseClientLike,
   limitPerDay: number,
 ): Promise<void> => {
   const windowStart = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
+  // Counts completed 'build' steps only — a 'strategy' call that never
+  // reaches a successful build (e.g. a build-step timeout) is not a
+  // generation the user received, so it must not count against the quota.
   const { data, error } = await adminClient
     .from('odin_generation_log')
     .select('id')
     .eq('user_id', userId)
-    .eq('step', step)
+    .eq('step', 'build')
     .gte('created_at', windowStart);
 
   if (error) {
@@ -52,8 +54,8 @@ export const checkRateLimit = async (
   if (count >= limitPerDay) {
     throw new TooManyRequestsError({
       code: 'RATE_LIMIT_EXCEEDED',
-      message: `You have reached the limit of ${limitPerDay} strategy generations per day. Try again tomorrow.`,
-      details: { limit: limitPerDay, window: '24h', step },
+      message: `You have reached the limit of ${limitPerDay} programme generations per day. Try again tomorrow.`,
+      details: { limit: limitPerDay, window: '24h', step: 'build' },
     });
   }
 };

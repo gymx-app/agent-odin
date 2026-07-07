@@ -98,7 +98,7 @@ const fakeProvider = (generateStrategy: AiProgrammeGenerationProvider['generateS
 });
 
 describe('buildProgrammeWithRepair deadline enforcement', () => {
-  it('fails fast with GENERATION_TIMEOUT instead of starting another repair call once the deadline has passed', async () => {
+  it('fails fast with PROGRAMME_GENERATION_DEADLINE_EXCEEDED instead of starting another repair call once the deadline has passed', async () => {
     const profile = createProfile({ available_days_per_week: 4, session_duration_min: 60 });
     const generateStrategy = vi.fn();
 
@@ -111,7 +111,7 @@ describe('buildProgrammeWithRepair deadline enforcement', () => {
         strategyContext,
         { startDate: '2026-06-22', deadline: Date.now() - 1000 },
       ),
-    ).rejects.toMatchObject({ code: 'GENERATION_TIMEOUT', httpStatus: 504 });
+    ).rejects.toMatchObject({ code: 'PROGRAMME_GENERATION_DEADLINE_EXCEEDED' });
 
     expect(generateStrategy).not.toHaveBeenCalled();
   });

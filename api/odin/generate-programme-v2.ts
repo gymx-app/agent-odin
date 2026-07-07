@@ -29,6 +29,7 @@ import { programmeValidationService } from '../../src/validation/programme-valid
 import { LONGITUDINAL_VALIDATION_RULE_VERSION } from '../../src/validation/longitudinal-validation-registry.js';
 import { AiStrategyOutputSchema } from '../../src/llm/ai-generation/ai-generation.schema.js';
 import { buildProgrammeWithRepair } from '../../src/planning/longitudinal-programme-planner.js';
+import { PlannerError } from '../../src/planning/planner-errors.js';
 import { applyWeightPrescription } from '../../src/planning/weight-prescription.js';
 import { buildDayZeroBaselineSession } from '../../src/planning/baseline/baseline-session-builder.js';
 import { buildRationaleSummary } from '../../src/planning/rationale-summary.js';
@@ -111,11 +112,12 @@ export const createGenerateProgrammeV2Handler = (
 ) => {
   const authClient = createSupabaseAuthClient(appConfig);
   const adminClient = createSupabaseAdminClient(appConfig);
+  const logger = createLogger(appConfig);
 
   return createEndpointHandler({
     allowedMethods: ['POST'],
     config: appConfig,
-    logger: createLogger(appConfig),
+    logger,
     handle: async (request, context) => {
       const user = await requireAuthenticatedUser(request, authClient);
       const body = await readJsonBody(
@@ -123,6 +125,7 @@ export const createGenerateProgrammeV2Handler = (
         stepRequestSchema,
         REQUEST_BODY_LIMITS.preview,
       );
+      logger.info('generation step started', { userId: user.id, step: body.step });
       // Tracks wall-clock time for this step so both success and failure
       // paths can log it — previously stage_durations_ms was computed
       // downstream but only ever returned to the client, never persisted,
@@ -159,15 +162,20 @@ export const createGenerateProgrammeV2Handler = (
         );
         const toolExecutor = createToolExecutor(seedExercises, normalized);
         const athleteExtras: AiAthleteContextExtrasV2 = {
-          lifestyle_tags: body.athlete.lifestyle_tags,
-          occupation: body.athlete.occupation,
-          medical_conditions: body.athlete.medical_conditions,
+          ...(body.athlete.lifestyle_tags
+            ? { lifestyle_tags: body.athlete.lifestyle_tags }
+            : {}),
+          ...(body.athlete.occupation
+            ? { occupation: body.athlete.occupation }
+            : {}),
+          ...(body.athlete.medical_conditions
+            ? { medical_conditions: body.athlete.medical_conditions }
+            : {}),
         };
 
         if (body.step === 'strategy') {
           await checkRateLimit(
             user.id,
-            'strategy',
             adminClient,
             appConfig.rateLimitStrategyPerDay,
           );
@@ -178,9 +186,16 @@ export const createGenerateProgrammeV2Handler = (
             body.athlete.goal_parameters as Record<string, unknown> | undefined,
             athleteExtras,
           );
+          const strategyStartedAt = Date.now();
           const result = await provider.generateStrategy(strategyCtx, {
             requestId: context.requestId,
             strategySystemPrompt: aiStrategySystemPromptV2,
+          });
+          logger.info('strategy call completed', {
+            userId: user.id,
+            durationMs: Date.now() - strategyStartedAt,
+            inputTokens: result.usage.inputTokens ?? 0,
+            outputTokens: result.usage.outputTokens ?? 0,
           });
 
           void logGeneration(adminClient, {
@@ -448,6 +463,7 @@ export const createGenerateProgrammeV2Handler = (
             undefined,
             athleteExtras,
           );
+          const buildStartedAt = Date.now();
           let buildResult: Awaited<ReturnType<typeof buildProgrammeWithRepair>>;
           try {
             buildResult = await buildProgrammeWithRepair(
@@ -458,11 +474,33 @@ export const createGenerateProgrammeV2Handler = (
               strategyCtx,
               {
                 startDate: new Date().toISOString().slice(0, 10),
-                deadline: Date.now() + appConfig.generationTimeoutMs,
+                deadline: buildStartedAt + appConfig.generationTimeoutMs,
+                onRepairAttempt: (event) =>
+                  logger.info('build step attempt', { userId: user.id, ...event }),
               },
             );
+            logger.info('build step completed', {
+              userId: user.id,
+              durationMs: Date.now() - buildStartedAt,
+            });
           } catch (err) {
+            if (
+              err instanceof PlannerError &&
+              err.code === 'PROGRAMME_GENERATION_DEADLINE_EXCEEDED'
+            ) {
+              logger.error('build step exceeded deadline', {
+                userId: user.id,
+                durationMs: Date.now() - buildStartedAt,
+                message: err.message,
+              });
+              throw odinError('GENERATION_TIMEOUT', err.message, 504, err.details);
+            }
             if (err instanceof AppError) throw err;
+            logger.error('build step failed', {
+              userId: user.id,
+              durationMs: Date.now() - buildStartedAt,
+              message: err instanceof Error ? err.message : String(err),
+            });
             throw odinError(
               'PROGRAMME_BUILD_FAILED',
               err instanceof Error ? err.message : 'Programme build failed.',
