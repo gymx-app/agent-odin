@@ -19,6 +19,14 @@ import { odinError } from '../shared/errors/odin-errors.js';
 
 const MAX_REPAIR_ATTEMPTS = 2;
 
+// Warning-severity codes that still trigger a bounded repair attempt even
+// though the programme is already schema-valid and shippable as-is. Kept
+// deliberately small — these are the ones worth spending an extra strategy
+// call on, not every warning (most are legitimate, accepted trade-offs like
+// EXCESSIVE_CONSECUTIVE_TRAINING_DAYS, which only fires when the density was
+// already an explicit, documented exception).
+const ESCALATED_WARNING_CODES = new Set(['HIGH_FATIGUE_MOVEMENT_OVERLAP']);
+
 export type LongitudinalProgrammePlannerOptions = {
   startDate?: string;
   generatedAt?: string;
@@ -289,18 +297,24 @@ const mapAiStrategyToTrainingStrategy = (
   rationale: ai.rationale,
 });
 
-type ValidationResult = ReturnType<typeof programmeValidationService.validateVersioned>;
+type ValidationResult = ReturnType<
+  typeof programmeValidationService.validateVersioned
+>;
 type ValidationFinding = ValidationResult['findings'][number];
 
-type BuildResult = {
-  programme: LongitudinalOdinProgramme;
-  validation: ValidationResult;
-  errorFindings: ValidationFinding[];
-} | {
-  programme: null;
-  validation: ValidationResult;
-  errorFindings: ValidationFinding[];
-};
+type BuildResult =
+  | {
+      programme: LongitudinalOdinProgramme;
+      validation: ValidationResult;
+      errorFindings: ValidationFinding[];
+      escalatedFindings: ValidationFinding[];
+    }
+  | {
+      programme: null;
+      validation: ValidationResult;
+      errorFindings: ValidationFinding[];
+      escalatedFindings: ValidationFinding[];
+    };
 
 export const buildProgrammeFromAiStrategy = (
   profile: NormalizedAthleteProfile,
@@ -318,12 +332,14 @@ export const buildProgrammeFromAiStrategy = (
     mapAiStrategyToTrainingStrategy(aiStrategy.strategy),
   );
 
-  const calendar = run('calendar', () =>
-    planTrainingCalendar({
-      profile,
-      strategy,
-      cycleAnchorDate: startDate,
-    }).calendar,
+  const calendar = run(
+    'calendar',
+    () =>
+      planTrainingCalendar({
+        profile,
+        strategy,
+        cycleAnchorDate: startDate,
+      }).calendar,
   );
 
   const phases = aiStrategy.phase_skeletons.map((sk) => ({
@@ -423,8 +439,10 @@ export const buildProgrammeFromAiStrategy = (
     fatigue_management_policy: {
       strategy: aiStrategy.fatigue_management_policy.strategy,
       planned_deload_weeks,
-      deload_adjustments: aiStrategy.fatigue_management_policy.deload_adjustments,
-      readiness_triggers: aiStrategy.fatigue_management_policy.readiness_triggers,
+      deload_adjustments:
+        aiStrategy.fatigue_management_policy.deload_adjustments,
+      readiness_triggers:
+        aiStrategy.fatigue_management_policy.readiness_triggers,
       rationale: aiStrategy.fatigue_management_policy.rationale,
     },
     substitution_policy: aiStrategy.substitution_policy,
@@ -478,6 +496,7 @@ export const buildProgrammeFromAiStrategy = (
       programme: null,
       validation: result.validation,
       errorFindings,
+      escalatedFindings: [],
     };
   }
 
@@ -488,7 +507,16 @@ export const buildProgrammeFromAiStrategy = (
     }),
   );
 
-  return { programme, validation: result.validation, errorFindings: [] };
+  const escalatedFindings = result.validation.findings.filter(
+    (f) => f.severity === 'warning' && ESCALATED_WARNING_CODES.has(f.code),
+  );
+
+  return {
+    programme,
+    validation: result.validation,
+    errorFindings: [],
+    escalatedFindings,
+  };
 };
 
 export type RepairAttempt = {
@@ -501,6 +529,13 @@ export type BuildWithRepairResult = {
   programme: LongitudinalOdinProgramme;
   validation: ReturnType<typeof programmeValidationService.validateVersioned>;
   repair_log: RepairAttempt[];
+  // 0/null when the strategy passed on the first attempt — no repair call
+  // means no LLM call in this function at all (the strategy itself was
+  // already generated in a prior step).
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  provider: 'openai' | 'anthropic' | null;
+  model: string | null;
 };
 
 export const buildProgrammeWithRepair = async (
@@ -515,6 +550,19 @@ export const buildProgrammeWithRepair = async (
   let currentStrategy = aiStrategy;
   const now = options.now ?? Date.now;
   const { deadline } = options;
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let lastProvider: 'openai' | 'anthropic' | null = null;
+  let lastModel: string | null = null;
+  // A schema-valid programme is always shippable, even if it still carries an
+  // escalated warning. Track the best one seen so a repair attempt aimed at
+  // clearing that warning can never regress into a hard failure — if the
+  // retry produces something worse (or invalid), we fall back to this
+  // instead of throwing.
+  let bestValidResult: {
+    programme: LongitudinalOdinProgramme;
+    validation: ValidationResult;
+  } | null = null;
 
   // Each repair round-trip re-calls the strategy LLM (~30-55s). Reaching
   // MAX_REPAIR_ATTEMPTS bounds the count, but the "build" request is a single
@@ -535,23 +583,41 @@ export const buildProgrammeWithRepair = async (
     assertWithinDeadline();
     let result: ReturnType<typeof buildProgrammeFromAiStrategy>;
     try {
-      result = buildProgrammeFromAiStrategy(profile, exercises, currentStrategy, options);
+      result = buildProgrammeFromAiStrategy(
+        profile,
+        exercises,
+        currentStrategy,
+        options,
+      );
     } catch (err) {
       // Schema-level failure: the assembled candidate didn't match
       // LongitudinalOdinProgrammeSchema. Treat as a retryable attempt so the
       // repair loop can regenerate the strategy and try again.
-      if (err instanceof PlannerError && err.code === 'PROGRAMME_SCHEMA_VALIDATION_FAILED') {
-        repairLog.push({ attempt, errorCodes: ['PROGRAMME_SCHEMA_VALIDATION_FAILED'], repaired: false });
+      if (
+        err instanceof PlannerError &&
+        err.code === 'PROGRAMME_SCHEMA_VALIDATION_FAILED'
+      ) {
+        repairLog.push({
+          attempt,
+          errorCodes: ['PROGRAMME_SCHEMA_VALIDATION_FAILED'],
+          repaired: false,
+        });
         if (attempt === MAX_REPAIR_ATTEMPTS) throw err;
         assertWithinDeadline();
         const repaired = await provider.generateStrategy(strategyContext, {
           requestId: `repair-schema-${attempt + 1}`,
           retryFeedback: {
             validationCodes: ['PROGRAMME_SCHEMA_VALIDATION_FAILED'],
-            messages: ['Generated programme failed schema validation. Revise the strategy to produce a structurally valid programme.'],
+            messages: [
+              'Generated programme failed schema validation. Revise the strategy to produce a structurally valid programme.',
+            ],
             previousStrategy: currentStrategy,
           },
         });
+        totalInputTokens += repaired.usage.inputTokens ?? 0;
+        totalOutputTokens += repaired.usage.outputTokens ?? 0;
+        lastProvider = repaired.provider;
+        lastModel = repaired.model;
         currentStrategy = repaired.output;
         continue;
       }
@@ -559,23 +625,70 @@ export const buildProgrammeWithRepair = async (
     }
 
     if (result.programme) {
-      if (attempt > 0) {
-        repairLog.push({
-          attempt,
-          errorCodes: [],
-          repaired: true,
-        });
+      bestValidResult = { programme: result.programme, validation: result.validation };
+
+      if (result.escalatedFindings.length === 0) {
+        if (attempt > 0) {
+          repairLog.push({
+            attempt,
+            errorCodes: [],
+            repaired: true,
+          });
+        }
+        return {
+          programme: result.programme,
+          validation: result.validation,
+          repair_log: repairLog,
+          totalInputTokens,
+          totalOutputTokens,
+          provider: lastProvider,
+          model: lastModel,
+        };
       }
-      return {
-        programme: result.programme,
-        validation: result.validation,
-        repair_log: repairLog,
-      };
+
+      // Schema-valid but carrying an escalated warning (e.g. overlapping
+      // high-fatigue sessions). Worth one more attempt to clear it, but it's
+      // already shippable — never let this branch throw.
+      const escalatedCodes = result.escalatedFindings.map((f) => f.code);
+      const escalatedMessages = result.escalatedFindings.map(
+        (f) => `[${f.code}] ${f.message}`,
+      );
+
+      if (attempt === MAX_REPAIR_ATTEMPTS) {
+        repairLog.push({ attempt, errorCodes: escalatedCodes, repaired: false });
+        return {
+          programme: bestValidResult.programme,
+          validation: bestValidResult.validation,
+          repair_log: repairLog,
+          totalInputTokens,
+          totalOutputTokens,
+          provider: lastProvider,
+          model: lastModel,
+        };
+      }
+
+      repairLog.push({ attempt, errorCodes: escalatedCodes, repaired: false });
+      assertWithinDeadline();
+      const repairedStrategy = await provider.generateStrategy(strategyContext, {
+        requestId: `repair-warning-${attempt + 1}`,
+        retryFeedback: {
+          validationCodes: escalatedCodes,
+          messages: escalatedMessages,
+          previousStrategy: currentStrategy,
+        },
+      });
+      totalInputTokens += repairedStrategy.usage.inputTokens ?? 0;
+      totalOutputTokens += repairedStrategy.usage.outputTokens ?? 0;
+      lastProvider = repairedStrategy.provider;
+      lastModel = repairedStrategy.model;
+      currentStrategy = repairedStrategy.output;
+      continue;
     }
 
     const errorCodes = result.errorFindings.map((f) => f.code);
     const errorMessages = result.errorFindings.map(
-      (f) => `[${f.code}] ${f.message}${f.phase_number != null ? ` (phase ${f.phase_number})` : ''}`,
+      (f) =>
+        `[${f.code}] ${f.message}${f.phase_number != null ? ` (phase ${f.phase_number})` : ''}`,
     );
 
     repairLog.push({
@@ -585,6 +698,19 @@ export const buildProgrammeWithRepair = async (
     });
 
     if (attempt === MAX_REPAIR_ATTEMPTS) {
+      if (bestValidResult) {
+        // A prior attempt was already shippable — prefer that over a hard
+        // failure caused by a later attempt regressing.
+        return {
+          programme: bestValidResult.programme,
+          validation: bestValidResult.validation,
+          repair_log: repairLog,
+          totalInputTokens,
+          totalOutputTokens,
+          provider: lastProvider,
+          model: lastModel,
+        };
+      }
       throw new PlannerError(
         'PROGRAMME_REPAIR_EXHAUSTED',
         `AI-strategy-driven programme remained invalid after ${MAX_REPAIR_ATTEMPTS} repair attempts: ${errorCodes.join(', ')}`,
@@ -610,6 +736,10 @@ export const buildProgrammeWithRepair = async (
         previousStrategy: currentStrategy,
       },
     });
+    totalInputTokens += repaired.usage.inputTokens ?? 0;
+    totalOutputTokens += repaired.usage.outputTokens ?? 0;
+    lastProvider = repaired.provider;
+    lastModel = repaired.model;
 
     currentStrategy = repaired.output;
   }
