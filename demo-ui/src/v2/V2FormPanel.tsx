@@ -1,12 +1,5 @@
 import { useRef, useState } from 'react';
-import {
-  AlertCircle,
-  Check,
-  FileUp,
-  Loader2,
-  Sparkles,
-  X,
-} from 'lucide-react';
+import { AlertCircle, Check, FileUp, Loader2, Sparkles, X } from 'lucide-react';
 import { odinApi } from '../api/client';
 import type {
   AthleteInputV2,
@@ -56,7 +49,12 @@ const Btn = ({
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
-type GoalKey = 'fat_loss' | 'muscle_gain' | 'strength' | 'recomposition' | 'endurance';
+type GoalKey =
+  | 'fat_loss'
+  | 'muscle_gain'
+  | 'strength'
+  | 'recomposition'
+  | 'endurance';
 type BaselinePath = 'self_reported' | 'day_one_test' | 'skipped';
 type LiftEntry = { weight: string; reps: string };
 type KnownLiftsState = Record<string, LiftEntry>;
@@ -70,7 +68,9 @@ const COMPOUND_LIFTS = [
 ] as const;
 
 const emptyLifts = (): KnownLiftsState =>
-  Object.fromEntries(COMPOUND_LIFTS.map((l) => [l.id, { weight: '', reps: '' }]));
+  Object.fromEntries(
+    COMPOUND_LIFTS.map((l) => [l.id, { weight: '', reps: '' }]),
+  );
 
 const GOAL_LABELS: Record<GoalKey, string> = {
   fat_loss: 'Fat Loss',
@@ -128,7 +128,9 @@ export function V2FormPanel({
 }: V2FormPanelProps) {
   // ── Base athlete fields ──
   const [name, setName] = useState('Alex Morgan');
-  const [workoutTime, setWorkoutTime] = useState<'morning' | 'afternoon' | 'evening' | 'night' | ''>('');
+  const [workoutTime, setWorkoutTime] = useState<
+    'morning' | 'afternoon' | 'evening' | 'night' | ''
+  >('');
   const [age, setAge] = useState(32);
   const [sex, setSex] = useState<'male' | 'female'>('male');
   const [currentWeight, setCurrentWeight] = useState(84);
@@ -136,21 +138,31 @@ export function V2FormPanel({
   const [heightCm, setHeightCm] = useState(180);
   const [daysPerWeek, setDaysPerWeek] = useState(4);
   const [sessionMin, setSessionMin] = useState(60);
-  const [equipment, setEquipment] = useState<AthleteInputV2['equipment']>('full_gym');
-  const [fitnessLevel, setFitnessLevel] = useState<AthleteInputV2['fitness_level']>('intermediate');
+  const [equipment, setEquipment] =
+    useState<AthleteInputV2['equipment']>('full_gym');
+  const [fitnessLevel, setFitnessLevel] =
+    useState<AthleteInputV2['fitness_level']>('intermediate');
   const [injuryArea, setInjuryArea] = useState('');
-  const [injurySeverity, setInjurySeverity] = useState<'modify' | 'avoid'>('modify');
+  const [injurySeverity, setInjurySeverity] = useState<'modify' | 'avoid'>(
+    'modify',
+  );
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
 
   // ── Goal + goal-specific params ──
   const [goal, setGoal] = useState<GoalKey>('fat_loss');
   const [goalParams, setGoalParams] = useState<GoalParametersV2>({});
 
-  const setParam = <K extends keyof GoalParametersV2>(key: K, val: GoalParametersV2[K]) =>
-    setGoalParams((prev) => ({ ...prev, [key]: val }));
+  const setParam = <K extends keyof GoalParametersV2>(
+    key: K,
+    val: GoalParametersV2[K],
+  ) => setGoalParams((prev) => ({ ...prev, [key]: val }));
 
   const clearParam = <K extends keyof GoalParametersV2>(key: K) =>
-    setGoalParams((prev) => { const next = { ...prev }; delete next[key]; return next; });
+    setGoalParams((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
 
   const numParam = (
     key: keyof GoalParametersV2,
@@ -158,7 +170,10 @@ export function V2FormPanel({
     min?: number,
     max?: number,
   ) => {
-    if (!raw) { clearParam(key); return; }
+    if (!raw) {
+      clearParam(key);
+      return;
+    }
     const n = Number(raw);
     if (isNaN(n)) return;
     if (min !== undefined && n < min) return;
@@ -179,7 +194,10 @@ export function V2FormPanel({
   const [knownLifts, setKnownLifts] = useState<KnownLiftsState>(emptyLifts());
 
   const setLift = (id: string, field: 'weight' | 'reps', val: string) =>
-    setKnownLifts((prev) => ({ ...prev, [id]: { ...prev[id]!, [field]: val } }));
+    setKnownLifts((prev) => ({
+      ...prev,
+      [id]: { ...prev[id]!, [field]: val },
+    }));
 
   // ── Generating state ──
   const [generating, setGenerating] = useState(false);
@@ -198,11 +216,12 @@ export function V2FormPanel({
     });
 
   const handleFile = async (file: File) => {
-    const mediaType = file.type === 'application/pdf'
-      ? 'application/pdf'
-      : file.type === 'image/png'
-        ? 'image/png'
-        : 'image/jpeg';
+    const mediaType =
+      file.type === 'application/pdf'
+        ? 'application/pdf'
+        : file.type === 'image/png'
+          ? 'image/png'
+          : 'image/jpeg';
 
     setInbodyStatus('parsing');
     setParseError(null);
@@ -251,17 +270,21 @@ export function V2FormPanel({
     if (!token) return;
 
     // Collect filled lift rows
-    const filledLifts = COMPOUND_LIFTS
-      .filter(({ id }) => knownLifts[id]?.weight && knownLifts[id]?.reps)
-      .map(({ id }) => ({
-        exercise_id: id,
-        weight_kg: Number(knownLifts[id]!.weight),
-        reps: Number(knownLifts[id]!.reps),
-      }));
+    const filledLifts = COMPOUND_LIFTS.filter(
+      ({ id }) => knownLifts[id]?.weight && knownLifts[id]?.reps,
+    ).map(({ id }) => ({
+      exercise_id: id,
+      weight_kg: Number(knownLifts[id]!.weight),
+      reps: Number(knownLifts[id]!.reps),
+    }));
 
     // Guard: self_reported requires at least one lift
     if (baselinePath === 'self_reported' && filledLifts.length === 0) {
-      onError(new Error('Enter at least one working weight to use Self-reported baseline, or choose a different option.'));
+      onError(
+        new Error(
+          'Enter at least one working weight to use Self-reported baseline, or choose a different option.',
+        ),
+      );
       return;
     }
 
@@ -290,7 +313,7 @@ export function V2FormPanel({
       equipment,
       fitness_level: fitnessLevel,
       injuries: injuryArea.trim()
-        ? [{ area: injuryArea.trim(), severity: injurySeverity, notes: '' }]
+        ? [{ area: injuryArea.trim(), modification: injurySeverity, notes: '' }]
         : [],
       inbody,
       baseline_path: baselinePath,
@@ -298,7 +321,14 @@ export function V2FormPanel({
       ...(hasGoalParams ? { goal_parameters: cleanGoalParams } : {}),
       schedule: {
         ...(selectedDays.length
-          ? { available_days: selectedDays as AthleteInputV2['schedule'] extends { available_days?: (infer D)[] | undefined } ? D[] : never }
+          ? {
+              available_days:
+                selectedDays as AthleteInputV2['schedule'] extends {
+                  available_days?: (infer D)[] | undefined;
+                }
+                  ? D[]
+                  : never,
+            }
           : {}),
         ...(workoutTime ? { preferred_workout_time: workoutTime } : {}),
       },
@@ -307,7 +337,11 @@ export function V2FormPanel({
     setGenerating(true);
     onBusyChange(true);
     try {
-      const result = await odinApi.generateProgrammeV2(token, athlete, onProgress);
+      const result = await odinApi.generateProgrammeV2(
+        token,
+        athlete,
+        onProgress,
+      );
       onResult(result);
     } catch (err) {
       onError(err);
@@ -327,41 +361,58 @@ export function V2FormPanel({
 
   return (
     <div className="v2-form">
-
       {/* ── Goal selector (first per spec) ── */}
       <div className="v2-section-label">Goal</div>
       <div className="v2-goal-tabs">
-        {(Object.entries(GOAL_LABELS) as [GoalKey, string][]).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            className={`v2-goal-tab ${goal === key ? 'active' : ''}`}
-            onClick={() => { setGoal(key); setGoalParams({}); }}
-            disabled={disabled || generating}
-          >
-            {label}
-          </button>
-        ))}
+        {(Object.entries(GOAL_LABELS) as [GoalKey, string][]).map(
+          ([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className={`v2-goal-tab ${goal === key ? 'active' : ''}`}
+              onClick={() => {
+                setGoal(key);
+                setGoalParams({});
+              }}
+              disabled={disabled || generating}
+            >
+              {label}
+            </button>
+          ),
+        )}
       </div>
 
       {/* ── Goal-specific optional fields ── */}
       <div className="v2-goal-fields">
         {(goal === 'fat_loss' || goal === 'recomposition') && (
           <>
-            <Field label="Current body fat %" hint="Optional — overridden by InBody scan if provided">
+            <Field
+              label="Current body fat %"
+              hint="Optional — overridden by InBody scan if provided"
+            >
               <input
-                type="number" min={1} max={60} step={0.1}
+                type="number"
+                min={1}
+                max={60}
+                step={0.1}
                 value={goalParams.current_body_fat_pct ?? ''}
-                onChange={(e) => numParam('current_body_fat_pct', e.target.value, 1, 60)}
+                onChange={(e) =>
+                  numParam('current_body_fat_pct', e.target.value, 1, 60)
+                }
                 placeholder="e.g. 24.5"
                 disabled={disabled || generating}
               />
             </Field>
             <Field label="Target body fat %" hint="Optional">
               <input
-                type="number" min={5} max={50} step={0.1}
+                type="number"
+                min={5}
+                max={50}
+                step={0.1}
                 value={goalParams.target_body_fat_pct ?? ''}
-                onChange={(e) => numParam('target_body_fat_pct', e.target.value, 5, 50)}
+                onChange={(e) =>
+                  numParam('target_body_fat_pct', e.target.value, 5, 50)
+                }
                 placeholder="e.g. 18.0"
                 disabled={disabled || generating}
               />
@@ -371,9 +422,14 @@ export function V2FormPanel({
         {(goal === 'muscle_gain' || goal === 'recomposition') && (
           <Field label="Target muscle gain" hint="Kilograms — optional">
             <input
-              type="number" min={0.5} max={20} step={0.5}
+              type="number"
+              min={0.5}
+              max={20}
+              step={0.5}
               value={goalParams.target_muscle_gain_kg ?? ''}
-              onChange={(e) => numParam('target_muscle_gain_kg', e.target.value, 0.5, 20)}
+              onChange={(e) =>
+                numParam('target_muscle_gain_kg', e.target.value, 0.5, 20)
+              }
               placeholder="e.g. 5"
               disabled={disabled || generating}
             />
@@ -386,31 +442,46 @@ export function V2FormPanel({
                 value={goalParams.primary_lift ?? ''}
                 onChange={(e) =>
                   e.target.value
-                    ? setParam('primary_lift', e.target.value as GoalParametersV2['primary_lift'])
+                    ? setParam(
+                        'primary_lift',
+                        e.target.value as GoalParametersV2['primary_lift'],
+                      )
                     : clearParam('primary_lift')
                 }
                 disabled={disabled || generating}
               >
                 <option value="">Not specified</option>
                 {PRIMARY_LIFTS.map((l) => (
-                  <option key={l.value} value={l.value}>{l.label}</option>
+                  <option key={l.value} value={l.value}>
+                    {l.label}
+                  </option>
                 ))}
               </select>
             </Field>
             <Field label="Current 1RM" hint="Kilograms — optional">
               <input
-                type="number" min={1} max={500} step={2.5}
+                type="number"
+                min={1}
+                max={500}
+                step={2.5}
                 value={goalParams.current_1rm_kg ?? ''}
-                onChange={(e) => numParam('current_1rm_kg', e.target.value, 1, 500)}
+                onChange={(e) =>
+                  numParam('current_1rm_kg', e.target.value, 1, 500)
+                }
                 placeholder="e.g. 120"
                 disabled={disabled || generating}
               />
             </Field>
             <Field label="Target 1RM" hint="Kilograms — optional">
               <input
-                type="number" min={1} max={500} step={2.5}
+                type="number"
+                min={1}
+                max={500}
+                step={2.5}
                 value={goalParams.target_1rm_kg ?? ''}
-                onChange={(e) => numParam('target_1rm_kg', e.target.value, 1, 500)}
+                onChange={(e) =>
+                  numParam('target_1rm_kg', e.target.value, 1, 500)
+                }
                 placeholder="e.g. 140"
                 disabled={disabled || generating}
               />
@@ -423,7 +494,10 @@ export function V2FormPanel({
               value={goalParams.endurance_focus ?? ''}
               onChange={(e) =>
                 e.target.value
-                  ? setParam('endurance_focus', e.target.value as GoalParametersV2['endurance_focus'])
+                  ? setParam(
+                      'endurance_focus',
+                      e.target.value as GoalParametersV2['endurance_focus'],
+                    )
                   : clearParam('endurance_focus')
               }
               disabled={disabled || generating}
@@ -438,7 +512,9 @@ export function V2FormPanel({
         {/* Timeframe shown for all goals */}
         <Field label="Timeframe" hint="Weeks — optional">
           <input
-            type="number" min={4} max={52}
+            type="number"
+            min={4}
+            max={52}
             value={goalParams.timeframe_weeks ?? ''}
             onChange={(e) => numParam('timeframe_weeks', e.target.value, 4, 52)}
             placeholder="e.g. 12"
@@ -450,7 +526,9 @@ export function V2FormPanel({
       {/* ── Strength Baseline ── */}
       <div className="v2-section-label">Strength Baseline</div>
       <div className="v2-baseline-cards">
-        <label className={`v2-baseline-card ${baselinePath === 'self_reported' ? 'selected' : ''}`}>
+        <label
+          className={`v2-baseline-card ${baselinePath === 'self_reported' ? 'selected' : ''}`}
+        >
           <input
             type="radio"
             name="baseline_path"
@@ -463,7 +541,9 @@ export function V2FormPanel({
           <strong>I know my working weights</strong>
           <span>Self-reported</span>
         </label>
-        <label className={`v2-baseline-card ${baselinePath === 'day_one_test' ? 'selected' : ''}`}>
+        <label
+          className={`v2-baseline-card ${baselinePath === 'day_one_test' ? 'selected' : ''}`}
+        >
           <input
             type="radio"
             name="baseline_path"
@@ -476,7 +556,9 @@ export function V2FormPanel({
           <strong>I'll do a test on Day 1</strong>
           <span>Day 1 baseline test</span>
         </label>
-        <label className={`v2-baseline-card ${baselinePath === 'skipped' ? 'selected' : ''}`}>
+        <label
+          className={`v2-baseline-card ${baselinePath === 'skipped' ? 'selected' : ''}`}
+        >
           <input
             type="radio"
             name="baseline_path"
@@ -494,7 +576,9 @@ export function V2FormPanel({
       {baselinePath === 'self_reported' && (
         <div className="v2-baseline-lifts">
           <div className="v2-baseline-lifts-header">
-            <span>Exercise</span><span>Weight (kg)</span><span>Reps (1–12)</span>
+            <span>Exercise</span>
+            <span>Weight (kg)</span>
+            <span>Reps (1–12)</span>
           </div>
           {COMPOUND_LIFTS.map(({ id, label }) => (
             <div className="v2-lift-row" key={id}>
@@ -523,28 +607,30 @@ export function V2FormPanel({
               />
             </div>
           ))}
-          <span className="field-hint">Leave any lift blank if you don't know it — we'll use RPE for that movement.</span>
+          <span className="field-hint">
+            Leave any lift blank if you don't know it — we'll use RPE for that
+            movement.
+          </span>
         </div>
       )}
 
       {baselinePath === 'day_one_test' && (
         <p className="v2-baseline-description">
-          Your programme will start with a baseline session to find your working weights.
-          From Day 2 onwards, we'll prescribe weights for you.
+          Your programme will start with a baseline session to find your working
+          weights. From Day 2 onwards, we'll prescribe weights for you.
         </p>
       )}
 
       {baselinePath === 'skipped' && (
         <p className="v2-baseline-description">
-          Your programme will use RPE targets instead of specific weights.
-          You choose the weight that feels right for each set.
+          Your programme will use RPE targets instead of specific weights. You
+          choose the weight that feels right for each set.
         </p>
       )}
 
       {/* ── InBody upload ── */}
       <div className="v2-section-label">InBody scan</div>
       <div className="v2-inbody-section">
-
         {inbodyStatus === 'idle' && (
           <div className="v2-inbody-idle">
             <input
@@ -573,7 +659,9 @@ export function V2FormPanel({
             >
               Skip — enter values manually
             </button>
-            <span className="field-hint">PDF, JPG or PNG · Sent to Claude for extraction</span>
+            <span className="field-hint">
+              PDF, JPG or PNG · Sent to Claude for extraction
+            </span>
           </div>
         )}
 
@@ -591,7 +679,11 @@ export function V2FormPanel({
               <button
                 type="button"
                 className="v2-inbody-clear"
-                onClick={() => { setInbodyStatus('idle'); setParsed(null); setOverrides(emptyInBody()); }}
+                onClick={() => {
+                  setInbodyStatus('idle');
+                  setParsed(null);
+                  setOverrides(emptyInBody());
+                }}
                 aria-label="Remove InBody data"
               >
                 <X size={14} />
@@ -600,33 +692,51 @@ export function V2FormPanel({
             <div className="form-grid">
               <Field label="Body fat %" hint="From scan">
                 <input
-                  type="number" step={0.1}
+                  type="number"
+                  step={0.1}
                   value={overrides.body_fat_pct}
-                  onChange={(e) => setOverrides((o) => ({ ...o, body_fat_pct: e.target.value }))}
+                  onChange={(e) =>
+                    setOverrides((o) => ({
+                      ...o,
+                      body_fat_pct: e.target.value,
+                    }))
+                  }
                   disabled={disabled || generating}
                 />
               </Field>
               <Field label="Skeletal muscle mass" hint="kg">
                 <input
-                  type="number" step={0.1}
+                  type="number"
+                  step={0.1}
                   value={overrides.smm_kg}
-                  onChange={(e) => setOverrides((o) => ({ ...o, smm_kg: e.target.value }))}
+                  onChange={(e) =>
+                    setOverrides((o) => ({ ...o, smm_kg: e.target.value }))
+                  }
                   disabled={disabled || generating}
                 />
               </Field>
               <Field label="Visceral fat area" hint="cm²">
                 <input
-                  type="number" step={1}
+                  type="number"
+                  step={1}
                   value={overrides.visceral_fat_area}
-                  onChange={(e) => setOverrides((o) => ({ ...o, visceral_fat_area: e.target.value }))}
+                  onChange={(e) =>
+                    setOverrides((o) => ({
+                      ...o,
+                      visceral_fat_area: e.target.value,
+                    }))
+                  }
                   disabled={disabled || generating}
                 />
               </Field>
               <Field label="BMR" hint="kcal/day">
                 <input
-                  type="number" step={1}
+                  type="number"
+                  step={1}
                   value={overrides.bmr}
-                  onChange={(e) => setOverrides((o) => ({ ...o, bmr: e.target.value }))}
+                  onChange={(e) =>
+                    setOverrides((o) => ({ ...o, bmr: e.target.value }))
+                  }
                   disabled={disabled || generating}
                 />
               </Field>
@@ -634,7 +744,9 @@ export function V2FormPanel({
             {parsed.body_fat_mass_kg != null && (
               <div className="v2-inbody-extra">
                 Body fat mass: {parsed.body_fat_mass_kg} kg
-                {parsed.total_body_water_l != null ? ` · TBW: ${parsed.total_body_water_l} L` : ''}
+                {parsed.total_body_water_l != null
+                  ? ` · TBW: ${parsed.total_body_water_l} L`
+                  : ''}
               </div>
             )}
           </div>
@@ -642,11 +754,15 @@ export function V2FormPanel({
 
         {inbodyStatus === 'error' && (
           <div className="v2-inbody-error">
-            <AlertCircle size={16} /> {parseError ?? 'Parse failed'} — enter values manually below
+            <AlertCircle size={16} /> {parseError ?? 'Parse failed'} — enter
+            values manually below
             <button
               type="button"
               className="v2-skip-link"
-              onClick={() => { setInbodyStatus('idle'); setParseError(null); }}
+              onClick={() => {
+                setInbodyStatus('idle');
+                setParseError(null);
+              }}
             >
               Try again
             </button>
@@ -661,7 +777,10 @@ export function V2FormPanel({
                 <button
                   type="button"
                   className="v2-inbody-clear"
-                  onClick={() => { setInbodyStatus('idle'); setManual(emptyInBody()); }}
+                  onClick={() => {
+                    setInbodyStatus('idle');
+                    setManual(emptyInBody());
+                  }}
                   aria-label="Dismiss InBody"
                 >
                   <X size={14} />
@@ -671,42 +790,67 @@ export function V2FormPanel({
             <div className="form-grid">
               <Field label="Body fat %" hint="Optional">
                 <input
-                  type="number" step={0.1} min={1} max={60}
+                  type="number"
+                  step={0.1}
+                  min={1}
+                  max={60}
                   value={manual.body_fat_pct}
-                  onChange={(e) => setManual((m) => ({ ...m, body_fat_pct: e.target.value }))}
+                  onChange={(e) =>
+                    setManual((m) => ({ ...m, body_fat_pct: e.target.value }))
+                  }
                   placeholder="e.g. 24.5"
                   disabled={disabled || generating}
                 />
               </Field>
               <Field label="Skeletal muscle mass" hint="kg — optional">
                 <input
-                  type="number" step={0.1} min={10} max={80}
+                  type="number"
+                  step={0.1}
+                  min={10}
+                  max={80}
                   value={manual.smm_kg}
-                  onChange={(e) => setManual((m) => ({ ...m, smm_kg: e.target.value }))}
+                  onChange={(e) =>
+                    setManual((m) => ({ ...m, smm_kg: e.target.value }))
+                  }
                   placeholder="e.g. 32.0"
                   disabled={disabled || generating}
                 />
               </Field>
               <Field label="Visceral fat area" hint="cm² — optional">
                 <input
-                  type="number" step={1} min={0} max={300}
+                  type="number"
+                  step={1}
+                  min={0}
+                  max={300}
                   value={manual.visceral_fat_area}
-                  onChange={(e) => setManual((m) => ({ ...m, visceral_fat_area: e.target.value }))}
+                  onChange={(e) =>
+                    setManual((m) => ({
+                      ...m,
+                      visceral_fat_area: e.target.value,
+                    }))
+                  }
                   placeholder="e.g. 85"
                   disabled={disabled || generating}
                 />
               </Field>
               <Field label="BMR" hint="kcal/day — optional">
                 <input
-                  type="number" step={1} min={500} max={5000}
+                  type="number"
+                  step={1}
+                  min={500}
+                  max={5000}
                   value={manual.bmr}
-                  onChange={(e) => setManual((m) => ({ ...m, bmr: e.target.value }))}
+                  onChange={(e) =>
+                    setManual((m) => ({ ...m, bmr: e.target.value }))
+                  }
                   placeholder="e.g. 1680"
                   disabled={disabled || generating}
                 />
               </Field>
             </div>
-            <span className="field-hint">Leave all blank to omit InBody data from the programme.</span>
+            <span className="field-hint">
+              Leave all blank to omit InBody data from the programme.
+            </span>
           </div>
         )}
       </div>
@@ -723,14 +867,20 @@ export function V2FormPanel({
         </Field>
         <Field label="Age">
           <input
-            type="number" min={16} max={100}
+            type="number"
+            min={16}
+            max={100}
             value={age}
             onChange={(e) => setAge(Number(e.target.value))}
             disabled={disabled || generating}
           />
         </Field>
         <Field label="Sex">
-          <select value={sex} onChange={(e) => setSex(e.target.value as 'male' | 'female')} disabled={disabled || generating}>
+          <select
+            value={sex}
+            onChange={(e) => setSex(e.target.value as 'male' | 'female')}
+            disabled={disabled || generating}
+          >
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>
@@ -738,7 +888,9 @@ export function V2FormPanel({
         <Field label="Fitness level">
           <select
             value={fitnessLevel}
-            onChange={(e) => setFitnessLevel(e.target.value as AthleteInputV2['fitness_level'])}
+            onChange={(e) =>
+              setFitnessLevel(e.target.value as AthleteInputV2['fitness_level'])
+            }
             disabled={disabled || generating}
           >
             <option value="beginner">Beginner</option>
@@ -747,27 +899,66 @@ export function V2FormPanel({
           </select>
         </Field>
         <Field label="Current weight" hint="kg">
-          <input type="number" step={0.1} min={30} value={currentWeight} onChange={(e) => setCurrentWeight(Number(e.target.value))} disabled={disabled || generating} />
+          <input
+            type="number"
+            step={0.1}
+            min={30}
+            value={currentWeight}
+            onChange={(e) => setCurrentWeight(Number(e.target.value))}
+            disabled={disabled || generating}
+          />
         </Field>
         <Field label="Target weight" hint="kg">
-          <input type="number" step={0.1} min={30} value={targetWeight} onChange={(e) => setTargetWeight(Number(e.target.value))} disabled={disabled || generating} />
+          <input
+            type="number"
+            step={0.1}
+            min={30}
+            value={targetWeight}
+            onChange={(e) => setTargetWeight(Number(e.target.value))}
+            disabled={disabled || generating}
+          />
         </Field>
         <Field label="Height" hint="cm">
-          <input type="number" min={100} max={250} value={heightCm} onChange={(e) => setHeightCm(Number(e.target.value))} disabled={disabled || generating} />
+          <input
+            type="number"
+            min={100}
+            max={250}
+            value={heightCm}
+            onChange={(e) => setHeightCm(Number(e.target.value))}
+            disabled={disabled || generating}
+          />
         </Field>
         <Field label="Training days" hint="2–7 days/week">
           <input
-            type="number" min={2} max={7}
+            type="number"
+            min={2}
+            max={7}
             value={selectedDays.length || daysPerWeek}
-            onChange={(e) => { setDaysPerWeek(Number(e.target.value)); setSelectedDays([]); }}
+            onChange={(e) => {
+              setDaysPerWeek(Number(e.target.value));
+              setSelectedDays([]);
+            }}
             disabled={disabled || generating}
           />
         </Field>
         <Field label="Session duration" hint="20–180 min">
-          <input type="number" min={20} max={180} value={sessionMin} onChange={(e) => setSessionMin(Number(e.target.value))} disabled={disabled || generating} />
+          <input
+            type="number"
+            min={20}
+            max={180}
+            value={sessionMin}
+            onChange={(e) => setSessionMin(Number(e.target.value))}
+            disabled={disabled || generating}
+          />
         </Field>
         <Field label="Equipment">
-          <select value={equipment} onChange={(e) => setEquipment(e.target.value as AthleteInputV2['equipment'])} disabled={disabled || generating}>
+          <select
+            value={equipment}
+            onChange={(e) =>
+              setEquipment(e.target.value as AthleteInputV2['equipment'])
+            }
+            disabled={disabled || generating}
+          >
             <option value="full_gym">Full Gym</option>
             <option value="dumbbells_only">Dumbbells Only</option>
             <option value="bodyweight">Bodyweight</option>
@@ -777,7 +968,9 @@ export function V2FormPanel({
         <Field label="Workout time" hint="When do you train?">
           <select
             value={workoutTime}
-            onChange={(e) => setWorkoutTime(e.target.value as typeof workoutTime)}
+            onChange={(e) =>
+              setWorkoutTime(e.target.value as typeof workoutTime)
+            }
             disabled={disabled || generating}
           >
             <option value="">Not specified</option>
@@ -802,7 +995,9 @@ export function V2FormPanel({
               </label>
             ))}
           </div>
-          <span className="field-hint">Selecting days auto-syncs the training days count.</span>
+          <span className="field-hint">
+            Selecting days auto-syncs the training days count.
+          </span>
         </div>
         <div className="field span-2">
           <span className="field-label">Injury / restriction</span>
@@ -815,7 +1010,9 @@ export function V2FormPanel({
             />
             <select
               value={injurySeverity}
-              onChange={(e) => setInjurySeverity(e.target.value as 'modify' | 'avoid')}
+              onChange={(e) =>
+                setInjurySeverity(e.target.value as 'modify' | 'avoid')
+              }
               disabled={!injuryArea || disabled || generating}
             >
               <option value="modify">Modify</option>
@@ -828,7 +1025,8 @@ export function V2FormPanel({
       {/* ── Generate button ── */}
       <div className="preview-actions" style={{ marginTop: '1.5rem' }}>
         <span className="field-hint">
-          Sends to <code>/api/v2/odin/generate-programme</code> · v2 prompt · goal parameters included
+          Sends to <code>/api/v2/odin/generate-programme</code> · v2 prompt ·
+          goal parameters included
         </span>
         <Btn
           onClick={() => void handleGenerate()}

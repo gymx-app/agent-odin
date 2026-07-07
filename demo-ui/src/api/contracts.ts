@@ -238,7 +238,11 @@ export type V2Week = {
   planned_effort_factor: number;
   days: V2Day[];
   progression_notes: string[];
-  review_triggers: Array<{ code: string; message: string; trigger_type: string }>;
+  review_triggers: Array<{
+    code: string;
+    message: string;
+    trigger_type: string;
+  }>;
 };
 
 export type V2Phase = {
@@ -414,11 +418,25 @@ export type InBodyV2 = {
   bmr: number;
 };
 
-export type AthleteInputV2 = Omit<AthleteInput, 'inbody'> & {
+// V2's InjuryV2Schema (src/domain/athlete/athlete-input-v2.schema.ts) is
+// .strict() and uses `modification`, not `severity` — a distinct shape from
+// v1's AthleteInput['injuries'], not a reuse of it.
+export type InjuryV2 = {
+  area: string;
+  modification: 'avoid' | 'modify';
+  notes?: string;
+};
+
+export type AthleteInputV2 = Omit<AthleteInput, 'inbody' | 'injuries'> & {
   inbody: InBodyV2 | null;
+  injuries: InjuryV2[];
   goal_parameters?: GoalParametersV2;
   baseline_path?: 'self_reported' | 'day_one_test' | 'skipped';
-  known_lifts?: Array<{ exercise_id: string; weight_kg: number; reps: number }> | null;
+  known_lifts?: Array<{
+    exercise_id: string;
+    weight_kg: number;
+    reps: number;
+  }> | null;
 };
 
 export type InBodyParseResult = {
