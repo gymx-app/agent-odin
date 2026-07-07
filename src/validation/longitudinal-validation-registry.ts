@@ -8,6 +8,7 @@ import { validateLongitudinalStrategy } from './strategy-validator.js';
 import { validateLongitudinalCooldowns } from './cooldown-validator.js';
 import { validateLongitudinalWarmups } from './warmup-validator.js';
 import { validateLongitudinalWeeks } from './week-validator.js';
+import { validateEvidenceCitations } from './evidence-citation-validator.js';
 import type { LongitudinalValidationRule } from './validation.types.js';
 
 export const LONGITUDINAL_VALIDATION_RULE_VERSION =
@@ -59,5 +60,10 @@ export const longitudinalValidationRules: readonly LongitudinalValidationRule[] 
       id: 'programme-coherence',
       version: 1,
       validate: validateProgrammeCoherence,
+    },
+    {
+      id: 'evidence-citations',
+      version: 1,
+      validate: validateEvidenceCitations,
     },
   ];

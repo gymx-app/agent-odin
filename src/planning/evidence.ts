@@ -191,9 +191,7 @@ export const HIIT_CYCLING_CITATIONS = [
 // <6 months training history, so HIIT is withheld until intermediate.
 export const BEGINNER_HIIT_EXCLUSION = true;
 
-export const BEGINNER_HIIT_CITATIONS = [
-  'ACSM_2021_GUIDELINES',
-] as const;
+export const BEGINNER_HIIT_CITATIONS = ['ACSM_2021_GUIDELINES'] as const;
 
 // ─── Baseline strength assessment ────────────────────────────────────
 //
@@ -326,26 +324,96 @@ export const STRENGTH_RATIO_CITATIONS = [
 // Source: ACSM Guidelines 11th ed., Table 4.10.
 export const PUSHUP_NORMS = {
   male: {
-    '16-19': { poor: 0, below_average: 18, average: 23, above_average: 28, excellent: 39 },
-    '20-29': { poor: 0, below_average: 17, average: 22, above_average: 29, excellent: 36 },
-    '30-39': { poor: 0, below_average: 12, average: 17, above_average: 24, excellent: 30 },
-    '40-49': { poor: 0, below_average: 10, average: 13, above_average: 20, excellent: 25 },
-    '50-59': { poor: 0, below_average: 7, average: 10, above_average: 15, excellent: 21 },
-    '60+':   { poor: 0, below_average: 5, average: 8,  above_average: 12, excellent: 18 },
+    '16-19': {
+      poor: 0,
+      below_average: 18,
+      average: 23,
+      above_average: 28,
+      excellent: 39,
+    },
+    '20-29': {
+      poor: 0,
+      below_average: 17,
+      average: 22,
+      above_average: 29,
+      excellent: 36,
+    },
+    '30-39': {
+      poor: 0,
+      below_average: 12,
+      average: 17,
+      above_average: 24,
+      excellent: 30,
+    },
+    '40-49': {
+      poor: 0,
+      below_average: 10,
+      average: 13,
+      above_average: 20,
+      excellent: 25,
+    },
+    '50-59': {
+      poor: 0,
+      below_average: 7,
+      average: 10,
+      above_average: 15,
+      excellent: 21,
+    },
+    '60+': {
+      poor: 0,
+      below_average: 5,
+      average: 8,
+      above_average: 12,
+      excellent: 18,
+    },
   },
   female: {
-    '16-19': { poor: 0, below_average: 11, average: 15, above_average: 20, excellent: 30 },
-    '20-29': { poor: 0, below_average: 10, average: 14, above_average: 21, excellent: 30 },
-    '30-39': { poor: 0, below_average: 8,  average: 11, above_average: 17, excellent: 27 },
-    '40-49': { poor: 0, below_average: 5,  average: 8,  above_average: 14, excellent: 24 },
-    '50-59': { poor: 0, below_average: 2,  average: 7,  above_average: 11, excellent: 21 },
-    '60+':   { poor: 0, below_average: 2,  average: 5,  above_average: 12, excellent: 17 },
+    '16-19': {
+      poor: 0,
+      below_average: 11,
+      average: 15,
+      above_average: 20,
+      excellent: 30,
+    },
+    '20-29': {
+      poor: 0,
+      below_average: 10,
+      average: 14,
+      above_average: 21,
+      excellent: 30,
+    },
+    '30-39': {
+      poor: 0,
+      below_average: 8,
+      average: 11,
+      above_average: 17,
+      excellent: 27,
+    },
+    '40-49': {
+      poor: 0,
+      below_average: 5,
+      average: 8,
+      above_average: 14,
+      excellent: 24,
+    },
+    '50-59': {
+      poor: 0,
+      below_average: 2,
+      average: 7,
+      above_average: 11,
+      excellent: 21,
+    },
+    '60+': {
+      poor: 0,
+      below_average: 2,
+      average: 5,
+      above_average: 12,
+      excellent: 17,
+    },
   },
 } as const;
 
-export const PUSHUP_NORM_CITATIONS = [
-  'ACSM_2021_PUSHUP_NORMS',
-] as const;
+export const PUSHUP_NORM_CITATIONS = ['ACSM_2021_PUSHUP_NORMS'] as const;
 
 // Field test → fitness tier adjustment multipliers.
 // Applied to the base strength ratios to account for individual
@@ -353,11 +421,11 @@ export const PUSHUP_NORM_CITATIONS = [
 // An "excellent" pushup score suggests the individual is stronger
 // than population average; a "poor" score suggests weaker.
 export const FITNESS_TIER_ADJUSTMENTS = {
-  poor: 0.80,
-  below_average: 0.90,
+  poor: 0.8,
+  below_average: 0.9,
   average: 1.0,
-  above_average: 1.10,
-  excellent: 1.20,
+  above_average: 1.1,
+  excellent: 1.2,
 } as const;
 
 // Age-based 1RM decline factor per decade after 40.
@@ -375,3 +443,17 @@ export const BASELINE_ASSESSMENT_CITATIONS = [
   'WOOD_2022_POPULATION_NORMS',
   'MCGUIGAN_2017_PUSHUP_BENCH',
 ] as const;
+
+// Merged registry of every real citation code, used to catch a hallucinated
+// (plausible-looking but fake) citation in LLM-authored rationale_codes.
+export const ALL_CITATION_CODES = new Set<string>([
+  ...VOLUME_FILL_RATE_CITATIONS,
+  ...MIN_SESSION_VOLUME_CITATIONS,
+  ...EQUIPMENT_PREFERENCE_CITATIONS,
+  ...FINISHER_DURATION_CITATIONS,
+  ...HIIT_CYCLING_CITATIONS,
+  ...BEGINNER_HIIT_CITATIONS,
+  ...STRENGTH_RATIO_CITATIONS,
+  ...PUSHUP_NORM_CITATIONS,
+  ...BASELINE_ASSESSMENT_CITATIONS,
+]);
