@@ -46,9 +46,7 @@ const anthropicTools: Anthropic.Messages.Tool[] = AGENT_TOOLS.map((tool) => ({
   },
 }));
 
-export class AnthropicAiProgrammeGenerationProvider
-  implements AiProgrammeGenerationProvider
-{
+export class AnthropicAiProgrammeGenerationProvider implements AiProgrammeGenerationProvider {
   constructor(
     private readonly client: Anthropic,
     private readonly config: Pick<AppConfig, 'anthropicModel'>,
@@ -238,9 +236,7 @@ export class AnthropicAiProgrammeGenerationProvider
       const response = await this.client.messages.create({
         model,
         system: aiReasoningPrompt,
-        messages: [
-          { role: 'user', content: JSON.stringify(userContent) },
-        ],
+        messages: [{ role: 'user', content: JSON.stringify(userContent) }],
         max_tokens: 1500,
       });
 
@@ -257,6 +253,8 @@ export class AnthropicAiProgrammeGenerationProvider
           inputTokens: response.usage?.input_tokens ?? null,
           outputTokens: response.usage?.output_tokens ?? null,
         },
+        provider: 'anthropic',
+        model,
       };
     } catch (error) {
       if (
@@ -285,16 +283,13 @@ export class AnthropicAiProgrammeGenerationProvider
     maxOutputTokens: number,
   ): Promise<AnthropicGenerationResult<T>> {
     const model = this.model;
-    const structuredPrompt =
-      `${systemPrompt}\n\n# OUTPUT FORMAT\nRespond with a single JSON object matching this schema:\n${JSON.stringify(jsonSchema, null, 2)}\n\nRespond ONLY with valid JSON. No markdown fences, no explanations.`;
+    const structuredPrompt = `${systemPrompt}\n\n# OUTPUT FORMAT\nRespond with a single JSON object matching this schema:\n${JSON.stringify(jsonSchema, null, 2)}\n\nRespond ONLY with valid JSON. No markdown fences, no explanations.`;
 
     try {
       const response = await this.client.messages.create({
         model,
         system: structuredPrompt,
-        messages: [
-          { role: 'user', content: JSON.stringify(userContent) },
-        ],
+        messages: [{ role: 'user', content: JSON.stringify(userContent) }],
         max_tokens: maxOutputTokens,
       });
 
@@ -351,7 +346,9 @@ export class AnthropicAiProgrammeGenerationProvider
   private parseJsonOutput<T>(text: string, schema: ZodType<T>): T | null {
     let jsonText = text.trim();
     if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+      jsonText = jsonText
+        .replace(/^```(?:json)?\s*\n?/, '')
+        .replace(/\n?```\s*$/, '');
     }
 
     try {

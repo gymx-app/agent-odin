@@ -25,7 +25,10 @@ import type {
 } from '../../../src/llm/ai-generation/ai-generation.types.js';
 import type { AiPhaseContext } from '../../../src/llm/ai-generation/ai-programme-generation-provider.js';
 import { buildLongitudinalProgramme } from '../../../src/planning/longitudinal-programme-planner.js';
-import { createToolExecutor, type ToolExecutor } from '../../../src/llm/ai-generation/agent-tool-executor.js';
+import {
+  createToolExecutor,
+  type ToolExecutor,
+} from '../../../src/llm/ai-generation/agent-tool-executor.js';
 import type { AthleteInput } from '../../../src/domain/athlete/athlete.types.js';
 
 // ─── Shared mock ─────────────────────────────────────────────────
@@ -41,9 +44,8 @@ let validationMock: Mock;
 
 const getValidationMock = async () => {
   if (!validationMock) {
-    const mod = await import(
-      '../../../src/llm/ai-generation/validate-phase-in-isolation.js'
-    );
+    const mod =
+      await import('../../../src/llm/ai-generation/validate-phase-in-isolation.js');
     validationMock = mod.validatePhaseInIsolation as unknown as Mock;
   }
   return validationMock;
@@ -131,6 +133,8 @@ const buildProviderFromAthlete = (
     provider.generateReasoning = vi.fn(async () => ({
       reasoning: overrides.generateReasoningResult!,
       usage: { inputTokens: 300, outputTokens: 200 },
+      provider: 'openai' as const,
+      model: 'test-model',
     }));
   }
 
@@ -194,7 +198,9 @@ describe('Tool executor — real world edge cases', () => {
         equipment: 'barbell',
       }) as Array<Record<string, unknown>>;
       expect(results.length).toBeGreaterThan(0);
-      expect(results.some((r) => r.exercise_id === 'barbell_back_squat')).toBe(true);
+      expect(results.some((r) => r.exercise_id === 'barbell_back_squat')).toBe(
+        true,
+      );
     });
 
     it('finds cable exercises', () => {
@@ -229,7 +235,9 @@ describe('Tool executor — real world edge cases', () => {
 
     it('all difficulty tiers have exercises', () => {
       for (const diff of ['beginner', 'intermediate', 'advanced']) {
-        const results = (executor('searchExercises', { difficulty: diff }) as unknown[]);
+        const results = executor('searchExercises', {
+          difficulty: diff,
+        }) as unknown[];
         expect(results.length).toBeGreaterThan(0);
       }
     });
@@ -238,38 +246,50 @@ describe('Tool executor — real world edge cases', () => {
   describe('checkVolumeCompliance — boundary conditions', () => {
     it('exactly at minimum is compliant', () => {
       const result = executor('checkVolumeCompliance', {
-        muscle_group: 'chest', weekly_sets: 4, fitness_level: 'beginner',
+        muscle_group: 'chest',
+        weekly_sets: 4,
+        fitness_level: 'beginner',
       }) as Record<string, unknown>;
       expect(result.compliant).toBe(true);
     });
 
     it('exactly at maximum is compliant', () => {
       const result = executor('checkVolumeCompliance', {
-        muscle_group: 'chest', weekly_sets: 12, fitness_level: 'beginner',
+        muscle_group: 'chest',
+        weekly_sets: 12,
+        fitness_level: 'beginner',
       }) as Record<string, unknown>;
       expect(result.compliant).toBe(true);
     });
 
     it('one below minimum is non-compliant', () => {
       const result = executor('checkVolumeCompliance', {
-        muscle_group: 'chest', weekly_sets: 3, fitness_level: 'beginner',
+        muscle_group: 'chest',
+        weekly_sets: 3,
+        fitness_level: 'beginner',
       }) as Record<string, unknown>;
       expect(result.compliant).toBe(false);
     });
 
     it('one above maximum is non-compliant', () => {
       const result = executor('checkVolumeCompliance', {
-        muscle_group: 'chest', weekly_sets: 13, fitness_level: 'beginner',
+        muscle_group: 'chest',
+        weekly_sets: 13,
+        fitness_level: 'beginner',
       }) as Record<string, unknown>;
       expect(result.compliant).toBe(false);
     });
 
     it('advanced trainees have wider volume range than beginners', () => {
       const begResult = executor('checkVolumeCompliance', {
-        muscle_group: 'quadriceps', weekly_sets: 20, fitness_level: 'beginner',
+        muscle_group: 'quadriceps',
+        weekly_sets: 20,
+        fitness_level: 'beginner',
       }) as Record<string, unknown>;
       const advResult = executor('checkVolumeCompliance', {
-        muscle_group: 'quadriceps', weekly_sets: 20, fitness_level: 'advanced',
+        muscle_group: 'quadriceps',
+        weekly_sets: 20,
+        fitness_level: 'advanced',
       }) as Record<string, unknown>;
       expect(begResult.compliant).toBe(false);
       expect(advResult.compliant).toBe(true);
@@ -277,21 +297,27 @@ describe('Tool executor — real world edge cases', () => {
 
     it('zero sets is non-compliant', () => {
       const result = executor('checkVolumeCompliance', {
-        muscle_group: 'chest', weekly_sets: 0, fitness_level: 'beginner',
+        muscle_group: 'chest',
+        weekly_sets: 0,
+        fitness_level: 'beginner',
       }) as Record<string, unknown>;
       expect(result.compliant).toBe(false);
     });
 
     it('negative sets is non-compliant', () => {
       const result = executor('checkVolumeCompliance', {
-        muscle_group: 'chest', weekly_sets: -5, fitness_level: 'beginner',
+        muscle_group: 'chest',
+        weekly_sets: -5,
+        fitness_level: 'beginner',
       }) as Record<string, unknown>;
       expect(result.compliant).toBe(false);
     });
 
     it('returns error for unknown fitness level', () => {
       const result = executor('checkVolumeCompliance', {
-        muscle_group: 'chest', weekly_sets: 10, fitness_level: 'elite',
+        muscle_group: 'chest',
+        weekly_sets: 10,
+        fitness_level: 'elite',
       }) as Record<string, unknown>;
       expect(result.error).toBeDefined();
     });
@@ -300,13 +326,22 @@ describe('Tool executor — real world edge cases', () => {
   describe('getEvidenceRule — citation integrity', () => {
     it('every rule has at least one citation', () => {
       const keys = [
-        'volume_fill_rates', 'min_session_volume_fraction', 'equipment_preference',
-        'finisher_duration', 'hiit_cycling', 'beginner_hiit_exclusion',
-        'untrained_strength_ratios', 'novice_strength_ratios',
-        'intermediate_strength_ratios', 'pushup_norms',
+        'volume_fill_rates',
+        'min_session_volume_fraction',
+        'equipment_preference',
+        'finisher_duration',
+        'hiit_cycling',
+        'beginner_hiit_exclusion',
+        'untrained_strength_ratios',
+        'novice_strength_ratios',
+        'intermediate_strength_ratios',
+        'pushup_norms',
       ];
       for (const key of keys) {
-        const result = executor('getEvidenceRule', { rule_key: key }) as Record<string, unknown>;
+        const result = executor('getEvidenceRule', { rule_key: key }) as Record<
+          string,
+          unknown
+        >;
         expect((result.citations as string[]).length).toBeGreaterThan(0);
       }
     });
@@ -333,7 +368,7 @@ describe('Tool executor — real world edge cases', () => {
         rule_key: 'nonexistent_rule',
       }) as Record<string, unknown>;
       expect(result.error).toBeDefined();
-      expect((result.error as string)).toContain('Unknown evidence rule');
+      expect(result.error as string).toContain('Unknown evidence rule');
     });
   });
 
@@ -361,7 +396,9 @@ describe('Orchestrator — diverse athlete profiles', () => {
   });
 
   it('generates programme for advanced strength male with InBody data', async () => {
-    const { provider } = buildProviderFromAthlete(advancedStrengthInBodyAthlete);
+    const { provider } = buildProviderFromAthlete(
+      advancedStrengthInBodyAthlete,
+    );
     const result = await runGeneration(advancedStrengthInBodyAthlete, provider);
 
     expect(result.programme.programme.goal_type).toBe('strength');
@@ -389,15 +426,19 @@ describe('Orchestrator — diverse athlete profiles', () => {
     expect(result.phases.length).toBeGreaterThan(0);
   });
 
-  it('generates programme for 6-day advanced strength', { timeout: 15_000 }, async () => {
-    const athlete: AthleteInput = {
-      ...advancedStrengthInBodyAthlete,
-      available_days_per_week: 6,
-    };
-    const { provider } = buildProviderFromAthlete(athlete);
-    const result = await runGeneration(athlete, provider);
-    expect(result.phases.length).toBeGreaterThan(0);
-  });
+  it(
+    'generates programme for 6-day advanced strength',
+    { timeout: 15_000 },
+    async () => {
+      const athlete: AthleteInput = {
+        ...advancedStrengthInBodyAthlete,
+        available_days_per_week: 6,
+      };
+      const { provider } = buildProviderFromAthlete(athlete);
+      const result = await runGeneration(athlete, provider);
+      expect(result.phases.length).toBeGreaterThan(0);
+    },
+  );
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -411,21 +452,31 @@ describe('Validation feedback loop', () => {
     mock.mockImplementation(() => {
       callCount++;
       if (callCount === 1) {
-        return [{
-          code: 'RPE_CEILING_BELOW_TARGET', severity: 'error',
-          category: 'prescription_quality', message: 'RPE ceiling below target',
-          phase_number: 1, day_of_week: 'MON', exercise_id: 'barbell_back_squat',
-        }];
+        return [
+          {
+            code: 'RPE_CEILING_BELOW_TARGET',
+            severity: 'error',
+            category: 'prescription_quality',
+            message: 'RPE ceiling below target',
+            phase_number: 1,
+            day_of_week: 'MON',
+            exercise_id: 'barbell_back_squat',
+          },
+        ];
       }
       return [];
     });
 
-    const { provider, programme } = buildProviderFromAthlete(beginnerFatLossAthlete);
+    const { provider, programme } = buildProviderFromAthlete(
+      beginnerFatLossAthlete,
+    );
     const result = await runGeneration(beginnerFatLossAthlete, provider);
 
     expect(result.phases.length).toBe(programme.phases.length);
     // 1 extra call for the retry of phase 1
-    expect(provider.generatePhase).toHaveBeenCalledTimes(programme.phases.length + 1);
+    expect(provider.generatePhase).toHaveBeenCalledTimes(
+      programme.phases.length + 1,
+    );
   });
 
   it('passes validation codes as retry feedback to the provider', async () => {
@@ -434,11 +485,17 @@ describe('Validation feedback loop', () => {
     mock.mockImplementation(() => {
       callCount++;
       if (callCount === 1) {
-        return [{
-          code: 'UNKNOWN_EXERCISE_ID', severity: 'error',
-          category: 'exercise_integrity', message: 'Exercise "fake_exercise" not found',
-          phase_number: 1, day_of_week: 'MON', exercise_id: 'fake_exercise',
-        }];
+        return [
+          {
+            code: 'UNKNOWN_EXERCISE_ID',
+            severity: 'error',
+            category: 'exercise_integrity',
+            message: 'Exercise "fake_exercise" not found',
+            phase_number: 1,
+            day_of_week: 'MON',
+            exercise_id: 'fake_exercise',
+          },
+        ];
       }
       return [];
     });
@@ -451,16 +508,24 @@ describe('Validation feedback loop', () => {
     expect(retryCall).toBeDefined();
     const providerCtx = retryCall![1] as AiGenerationProviderContext;
     expect(providerCtx.retryFeedback).toBeDefined();
-    expect(providerCtx.retryFeedback!.validationCodes).toContain('UNKNOWN_EXERCISE_ID');
+    expect(providerCtx.retryFeedback!.validationCodes).toContain(
+      'UNKNOWN_EXERCISE_ID',
+    );
   });
 
   it('throws AiGenerationError after exhausting all retries and replans', async () => {
     const mock = await getValidationMock();
-    mock.mockImplementation(() => [{
-      code: 'DUPLICATE_EXERCISE_IN_SESSION', severity: 'error',
-      category: 'exercise_integrity', message: 'Duplicate exercise',
-      phase_number: 1, day_of_week: 'MON', exercise_id: 'barbell_back_squat',
-    }]);
+    mock.mockImplementation(() => [
+      {
+        code: 'DUPLICATE_EXERCISE_IN_SESSION',
+        severity: 'error',
+        category: 'exercise_integrity',
+        message: 'Duplicate exercise',
+        phase_number: 1,
+        day_of_week: 'MON',
+        exercise_id: 'barbell_back_squat',
+      },
+    ]);
 
     const { provider } = buildProviderFromAthlete(beginnerFatLossAthlete);
 
@@ -476,17 +541,27 @@ describe('Validation feedback loop', () => {
 
   it('validation warnings do not trigger retries', async () => {
     const mock = await getValidationMock();
-    mock.mockImplementation(() => [{
-      code: 'PUSH_PULL_IMBALANCE', severity: 'warning',
-      category: 'movement_balance', message: 'Slight imbalance',
-      phase_number: 1, day_of_week: null, exercise_id: null,
-    }]);
+    mock.mockImplementation(() => [
+      {
+        code: 'PUSH_PULL_IMBALANCE',
+        severity: 'warning',
+        category: 'movement_balance',
+        message: 'Slight imbalance',
+        phase_number: 1,
+        day_of_week: null,
+        exercise_id: null,
+      },
+    ]);
 
-    const { provider, programme } = buildProviderFromAthlete(beginnerFatLossAthlete);
+    const { provider, programme } = buildProviderFromAthlete(
+      beginnerFatLossAthlete,
+    );
     const result = await runGeneration(beginnerFatLossAthlete, provider);
 
     expect(result.phases.length).toBe(programme.phases.length);
-    expect(provider.generatePhase).toHaveBeenCalledTimes(programme.phases.length);
+    expect(provider.generatePhase).toHaveBeenCalledTimes(
+      programme.phases.length,
+    );
   });
 
   it('multiple validation errors are all included in retry feedback', async () => {
@@ -497,14 +572,22 @@ describe('Validation feedback loop', () => {
       if (callCount === 1) {
         return [
           {
-            code: 'RPE_CEILING_BELOW_TARGET', severity: 'error',
-            category: 'prescription_quality', message: 'RPE issue',
-            phase_number: 1, day_of_week: null, exercise_id: null,
+            code: 'RPE_CEILING_BELOW_TARGET',
+            severity: 'error',
+            category: 'prescription_quality',
+            message: 'RPE issue',
+            phase_number: 1,
+            day_of_week: null,
+            exercise_id: null,
           },
           {
-            code: 'DUPLICATE_EXERCISE_DISPLAY_ORDER', severity: 'error',
-            category: 'structure', message: 'Display order conflict',
-            phase_number: 1, day_of_week: null, exercise_id: null,
+            code: 'DUPLICATE_EXERCISE_DISPLAY_ORDER',
+            severity: 'error',
+            category: 'structure',
+            message: 'Display order conflict',
+            phase_number: 1,
+            day_of_week: null,
+            exercise_id: null,
           },
         ];
       }
@@ -517,8 +600,12 @@ describe('Validation feedback loop', () => {
     const phaseCalls = (provider.generatePhase as Mock).mock.calls;
     const ctx = phaseCalls[1]![1] as AiGenerationProviderContext;
     expect(ctx.retryFeedback!.validationCodes).toHaveLength(2);
-    expect(ctx.retryFeedback!.validationCodes).toContain('RPE_CEILING_BELOW_TARGET');
-    expect(ctx.retryFeedback!.validationCodes).toContain('DUPLICATE_EXERCISE_DISPLAY_ORDER');
+    expect(ctx.retryFeedback!.validationCodes).toContain(
+      'RPE_CEILING_BELOW_TARGET',
+    );
+    expect(ctx.retryFeedback!.validationCodes).toContain(
+      'DUPLICATE_EXERCISE_DISPLAY_ORDER',
+    );
   });
 });
 
@@ -535,11 +622,17 @@ describe('Replanning — strategy re-generation', () => {
     mock.mockImplementation(() => {
       totalAttempts++;
       if (totalAttempts <= 3) {
-        return [{
-          code: 'EXERCISE_DIFFICULTY_INAPPROPRIATE', severity: 'error',
-          category: 'exercise_integrity', message: 'Wrong difficulty',
-          phase_number: 1, day_of_week: null, exercise_id: null,
-        }];
+        return [
+          {
+            code: 'EXERCISE_DIFFICULTY_INAPPROPRIATE',
+            severity: 'error',
+            category: 'exercise_integrity',
+            message: 'Wrong difficulty',
+            phase_number: 1,
+            day_of_week: null,
+            exercise_id: null,
+          },
+        ];
       }
       return [];
     });
@@ -559,16 +652,24 @@ describe('Replanning — strategy re-generation', () => {
       callCount++;
       // Only the first attempt for phase 1 fails, second succeeds
       if (callCount === 1) {
-        return [{
-          code: 'RPE_CEILING_BELOW_TARGET', severity: 'error',
-          category: 'prescription_quality', message: 'RPE issue',
-          phase_number: 1, day_of_week: null, exercise_id: null,
-        }];
+        return [
+          {
+            code: 'RPE_CEILING_BELOW_TARGET',
+            severity: 'error',
+            category: 'prescription_quality',
+            message: 'RPE issue',
+            phase_number: 1,
+            day_of_week: null,
+            exercise_id: null,
+          },
+        ];
       }
       return [];
     });
 
-    const { provider, programme } = buildProviderFromAthlete(beginnerFatLossAthlete);
+    const { provider, programme } = buildProviderFromAthlete(
+      beginnerFatLossAthlete,
+    );
     const result = await runGeneration(beginnerFatLossAthlete, provider);
 
     // No replan needed — retry fixed it
@@ -584,11 +685,17 @@ describe('Replanning — strategy re-generation', () => {
     mock.mockImplementation(() => {
       totalAttempts++;
       if (totalAttempts <= 3) {
-        return [{
-          code: 'CONDITIONING_TYPE_INVALID', severity: 'error',
-          category: 'structure', message: 'Invalid conditioning type',
-          phase_number: 1, day_of_week: 'SAT', exercise_id: null,
-        }];
+        return [
+          {
+            code: 'CONDITIONING_TYPE_INVALID',
+            severity: 'error',
+            category: 'structure',
+            message: 'Invalid conditioning type',
+            phase_number: 1,
+            day_of_week: 'SAT',
+            exercise_id: null,
+          },
+        ];
       }
       return [];
     });
@@ -600,16 +707,24 @@ describe('Replanning — strategy re-generation', () => {
     expect(strategyCalls.length).toBe(2);
     const replanCtx = strategyCalls[1]![1] as AiGenerationProviderContext;
     expect(replanCtx.retryFeedback).toBeDefined();
-    expect(replanCtx.retryFeedback!.validationCodes).toContain('CONDITIONING_TYPE_INVALID');
+    expect(replanCtx.retryFeedback!.validationCodes).toContain(
+      'CONDITIONING_TYPE_INVALID',
+    );
   });
 
   it('max 1 replan — throws after replan also fails', async () => {
     const mock = await getValidationMock();
-    mock.mockImplementation(() => [{
-      code: 'MUSCLE_VOLUME_EXCESSIVE', severity: 'error',
-      category: 'movement_balance', message: 'Volume exceeds MRV',
-      phase_number: 1, day_of_week: null, exercise_id: null,
-    }]);
+    mock.mockImplementation(() => [
+      {
+        code: 'MUSCLE_VOLUME_EXCESSIVE',
+        severity: 'error',
+        category: 'movement_balance',
+        message: 'Volume exceeds MRV',
+        phase_number: 1,
+        day_of_week: null,
+        exercise_id: null,
+      },
+    ]);
 
     const { provider } = buildProviderFromAthlete(beginnerFatLossAthlete);
 
@@ -636,7 +751,9 @@ describe('Reasoning — multi-turn behaviour', () => {
 
     const phaseCalls = (provider.generatePhase as Mock).mock.calls;
     for (const [, ctx] of phaseCalls) {
-      expect(ctx.reasoningOutput).toBe('Phase should use full-body compound movements.');
+      expect(ctx.reasoningOutput).toBe(
+        'Phase should use full-body compound movements.',
+      );
     }
   });
 
@@ -646,29 +763,45 @@ describe('Reasoning — multi-turn behaviour', () => {
     mock.mockImplementation(() => {
       callCount++;
       if (callCount === 1) {
-        return [{
-          code: 'RPE_CEILING_BELOW_TARGET', severity: 'error',
-          category: 'prescription_quality', message: 'RPE issue',
-          phase_number: 1, day_of_week: null, exercise_id: null,
-        }];
+        return [
+          {
+            code: 'RPE_CEILING_BELOW_TARGET',
+            severity: 'error',
+            category: 'prescription_quality',
+            message: 'RPE issue',
+            phase_number: 1,
+            day_of_week: null,
+            exercise_id: null,
+          },
+        ];
       }
       return [];
     });
 
-    const { provider, programme } = buildProviderFromAthlete(beginnerFatLossAthlete, {
-      generateReasoningResult: 'Reasoning output.',
-    });
+    const { provider, programme } = buildProviderFromAthlete(
+      beginnerFatLossAthlete,
+      {
+        generateReasoningResult: 'Reasoning output.',
+      },
+    );
 
     await runGeneration(beginnerFatLossAthlete, provider);
 
-    expect(provider.generateReasoning).toHaveBeenCalledTimes(programme.phases.length);
-    expect(provider.generatePhase).toHaveBeenCalledTimes(programme.phases.length + 1);
+    expect(provider.generateReasoning).toHaveBeenCalledTimes(
+      programme.phases.length,
+    );
+    expect(provider.generatePhase).toHaveBeenCalledTimes(
+      programme.phases.length + 1,
+    );
   });
 
   it('reasoning tokens are tracked in total', async () => {
-    const { provider, programme } = buildProviderFromAthlete(beginnerFatLossAthlete, {
-      generateReasoningResult: 'Focus on progressive overload.',
-    });
+    const { provider, programme } = buildProviderFromAthlete(
+      beginnerFatLossAthlete,
+      {
+        generateReasoningResult: 'Focus on progressive overload.',
+      },
+    );
 
     const result = await runGeneration(beginnerFatLossAthlete, provider);
 
@@ -714,7 +847,9 @@ describe('Tool executor wiring', () => {
 
     const phaseCalls = (provider.generatePhase as Mock).mock.calls;
     const toolExec = phaseCalls[0]![1].toolExecutor as ToolExecutor;
-    const results = toolExec('searchExercises', { movement_pattern: 'squat' }) as unknown[];
+    const results = toolExec('searchExercises', {
+      movement_pattern: 'squat',
+    }) as unknown[];
     expect(results.length).toBeGreaterThan(0);
   });
 
@@ -725,7 +860,9 @@ describe('Tool executor wiring', () => {
     const phaseCalls = (provider.generatePhase as Mock).mock.calls;
     const toolExec = phaseCalls[0]![1].toolExecutor as ToolExecutor;
     const result = toolExec('checkVolumeCompliance', {
-      muscle_group: 'quadriceps', weekly_sets: 10, fitness_level: 'beginner',
+      muscle_group: 'quadriceps',
+      weekly_sets: 10,
+      fitness_level: 'beginner',
     }) as Record<string, unknown>;
     expect(typeof result.compliant).toBe('boolean');
   });
@@ -799,16 +936,24 @@ describe('Deadline enforcement', () => {
 describe('Provider resilience', () => {
   it('provider throwing during strategy propagates', async () => {
     const provider: AiProgrammeGenerationProvider = {
-      generateStrategy: vi.fn(async () => { throw new Error('Network timeout'); }),
+      generateStrategy: vi.fn(async () => {
+        throw new Error('Network timeout');
+      }),
       generatePhase: vi.fn(),
     };
-    await expect(runGeneration(beginnerFatLossAthlete, provider)).rejects.toThrow('Network timeout');
+    await expect(
+      runGeneration(beginnerFatLossAthlete, provider),
+    ).rejects.toThrow('Network timeout');
   });
 
   it('provider throwing during phase propagates', async () => {
     const { provider } = buildProviderFromAthlete(beginnerFatLossAthlete);
-    (provider.generatePhase as Mock).mockRejectedValue(new Error('Rate limited'));
-    await expect(runGeneration(beginnerFatLossAthlete, provider)).rejects.toThrow('Rate limited');
+    (provider.generatePhase as Mock).mockRejectedValue(
+      new Error('Rate limited'),
+    );
+    await expect(
+      runGeneration(beginnerFatLossAthlete, provider),
+    ).rejects.toThrow('Rate limited');
   });
 
   it('provider throwing during reasoning propagates', async () => {
@@ -816,7 +961,9 @@ describe('Provider resilience', () => {
     provider.generateReasoning = vi.fn(async () => {
       throw new Error('Reasoning model unavailable');
     });
-    await expect(runGeneration(beginnerFatLossAthlete, provider)).rejects.toThrow('Reasoning model unavailable');
+    await expect(
+      runGeneration(beginnerFatLossAthlete, provider),
+    ).rejects.toThrow('Reasoning model unavailable');
   });
 });
 
@@ -826,7 +973,9 @@ describe('Provider resilience', () => {
 
 describe('Token tracking accuracy', () => {
   it('tracks tokens across strategy + all phases', async () => {
-    const { provider, programme } = buildProviderFromAthlete(beginnerFatLossAthlete);
+    const { provider, programme } = buildProviderFromAthlete(
+      beginnerFatLossAthlete,
+    );
     const result = await runGeneration(beginnerFatLossAthlete, provider);
 
     const n = programme.phases.length;
@@ -839,14 +988,24 @@ describe('Token tracking accuracy', () => {
     let callCount = 0;
     mock.mockImplementation(() => {
       callCount++;
-      return callCount === 1 ? [{
-        code: 'RPE_CEILING_BELOW_TARGET', severity: 'error',
-        category: 'prescription_quality', message: 'RPE',
-        phase_number: 1, day_of_week: null, exercise_id: null,
-      }] : [];
+      return callCount === 1
+        ? [
+            {
+              code: 'RPE_CEILING_BELOW_TARGET',
+              severity: 'error',
+              category: 'prescription_quality',
+              message: 'RPE',
+              phase_number: 1,
+              day_of_week: null,
+              exercise_id: null,
+            },
+          ]
+        : [];
     });
 
-    const { provider, programme } = buildProviderFromAthlete(beginnerFatLossAthlete);
+    const { provider, programme } = buildProviderFromAthlete(
+      beginnerFatLossAthlete,
+    );
     const result = await runGeneration(beginnerFatLossAthlete, provider);
 
     const n = programme.phases.length;
@@ -859,18 +1018,30 @@ describe('Token tracking accuracy', () => {
     let totalAttempts = 0;
     mock.mockImplementation(() => {
       totalAttempts++;
-      return totalAttempts <= 3 ? [{
-        code: 'MUSCLE_VOLUME_BELOW_REQUIRED', severity: 'error',
-        category: 'movement_balance', message: 'Below minimum',
-        phase_number: 1, day_of_week: null, exercise_id: null,
-      }] : [];
+      return totalAttempts <= 3
+        ? [
+            {
+              code: 'MUSCLE_VOLUME_BELOW_REQUIRED',
+              severity: 'error',
+              category: 'movement_balance',
+              message: 'Below minimum',
+              phase_number: 1,
+              day_of_week: null,
+              exercise_id: null,
+            },
+          ]
+        : [];
     });
 
-    const { provider, programme } = buildProviderFromAthlete(beginnerFatLossAthlete);
+    const { provider, programme } = buildProviderFromAthlete(
+      beginnerFatLossAthlete,
+    );
     const result = await runGeneration(beginnerFatLossAthlete, provider);
 
     // 2 strategy calls = 2 × 1000 input
-    expect(result.total_input_tokens).toBeGreaterThan(1000 + 2000 * programme.phases.length);
+    expect(result.total_input_tokens).toBeGreaterThan(
+      1000 + 2000 * programme.phases.length,
+    );
     expect(provider.generateStrategy).toHaveBeenCalledTimes(2);
   });
 });
@@ -881,7 +1052,9 @@ describe('Token tracking accuracy', () => {
 
 describe('Stage duration tracking', () => {
   it('records strategy and phase durations', async () => {
-    const { provider, programme } = buildProviderFromAthlete(beginnerFatLossAthlete);
+    const { provider, programme } = buildProviderFromAthlete(
+      beginnerFatLossAthlete,
+    );
     const result = await runGeneration(beginnerFatLossAthlete, provider);
 
     expect(typeof result.stage_durations_ms.strategy).toBe('number');
@@ -895,11 +1068,19 @@ describe('Stage duration tracking', () => {
     let totalAttempts = 0;
     mock.mockImplementation(() => {
       totalAttempts++;
-      return totalAttempts <= 3 ? [{
-        code: 'CONDITIONING_MODALITY_EXCLUDED', severity: 'error',
-        category: 'structure', message: 'Excluded modality',
-        phase_number: 1, day_of_week: null, exercise_id: null,
-      }] : [];
+      return totalAttempts <= 3
+        ? [
+            {
+              code: 'CONDITIONING_MODALITY_EXCLUDED',
+              severity: 'error',
+              category: 'structure',
+              message: 'Excluded modality',
+              phase_number: 1,
+              day_of_week: null,
+              exercise_id: null,
+            },
+          ]
+        : [];
     });
 
     const { provider } = buildProviderFromAthlete(beginnerFatLossAthlete);
@@ -923,7 +1104,9 @@ describe('Programme output integrity', () => {
   });
 
   it('phases in output match number of phase skeletons', async () => {
-    const { provider, programme } = buildProviderFromAthlete(beginnerFatLossAthlete);
+    const { provider, programme } = buildProviderFromAthlete(
+      beginnerFatLossAthlete,
+    );
     const result = await runGeneration(beginnerFatLossAthlete, provider);
     expect(result.phases.length).toBe(programme.phases.length);
     expect(result.programme.phases.length).toBe(programme.phases.length);
@@ -977,7 +1160,9 @@ describe('Phase context shape', () => {
   });
 
   it('athlete context reflects the input profile', async () => {
-    const { provider } = buildProviderFromAthlete(advancedStrengthInBodyAthlete);
+    const { provider } = buildProviderFromAthlete(
+      advancedStrengthInBodyAthlete,
+    );
     await runGeneration(advancedStrengthInBodyAthlete, provider);
 
     const phaseCalls = (provider.generatePhase as Mock).mock.calls;
@@ -989,7 +1174,9 @@ describe('Phase context shape', () => {
   });
 
   it('prior_phase_summaries are provided to phase generation', async () => {
-    const { provider, programme } = buildProviderFromAthlete(beginnerFatLossAthlete);
+    const { provider, programme } = buildProviderFromAthlete(
+      beginnerFatLossAthlete,
+    );
     await runGeneration(beginnerFatLossAthlete, provider);
 
     const phaseCalls = (provider.generatePhase as Mock).mock.calls;
@@ -1038,11 +1225,19 @@ describe('Logging', () => {
     let totalAttempts = 0;
     mock.mockImplementation(() => {
       totalAttempts++;
-      return totalAttempts <= 3 ? [{
-        code: 'MUSCLE_VOLUME_EXCESSIVE', severity: 'error',
-        category: 'movement_balance', message: 'Too much volume',
-        phase_number: 1, day_of_week: null, exercise_id: null,
-      }] : [];
+      return totalAttempts <= 3
+        ? [
+            {
+              code: 'MUSCLE_VOLUME_EXCESSIVE',
+              severity: 'error',
+              category: 'movement_balance',
+              message: 'Too much volume',
+              phase_number: 1,
+              day_of_week: null,
+              exercise_id: null,
+            },
+          ]
+        : [];
     });
 
     const logs: unknown[][] = [];
@@ -1060,11 +1255,19 @@ describe('Logging', () => {
     let callCount = 0;
     mock.mockImplementation(() => {
       callCount++;
-      return callCount === 1 ? [{
-        code: 'UNKNOWN_EXERCISE_ID', severity: 'error',
-        category: 'exercise_integrity', message: 'Unknown exercise',
-        phase_number: 1, day_of_week: null, exercise_id: null,
-      }] : [];
+      return callCount === 1
+        ? [
+            {
+              code: 'UNKNOWN_EXERCISE_ID',
+              severity: 'error',
+              category: 'exercise_integrity',
+              message: 'Unknown exercise',
+              phase_number: 1,
+              day_of_week: null,
+              exercise_id: null,
+            },
+          ]
+        : [];
     });
 
     const logs: unknown[][] = [];
@@ -1073,11 +1276,13 @@ describe('Logging', () => {
     const { provider } = buildProviderFromAthlete(beginnerFatLossAthlete);
     await runGeneration(beginnerFatLossAthlete, provider, { logger });
 
-    const failLog = logs.find((l) => l[0] === 'ai_generation_phase_validation_failed');
+    const failLog = logs.find(
+      (l) => l[0] === 'ai_generation_phase_validation_failed',
+    );
     expect(failLog).toBeDefined();
     const meta = failLog![1] as Record<string, unknown>;
     expect(meta.errors).toBe(1);
-    expect((meta.codes as string[])).toContain('UNKNOWN_EXERCISE_ID');
+    expect(meta.codes as string[]).toContain('UNKNOWN_EXERCISE_ID');
   });
 });
 
@@ -1097,21 +1302,29 @@ describe('Tool executor — cross-tool consistency', () => {
 
     const primaryMuscle = (squats[0]!.primary_muscles as string[])[0]!;
     const volumeCheck = executor('checkVolumeCompliance', {
-      muscle_group: primaryMuscle, weekly_sets: 10, fitness_level: 'beginner',
+      muscle_group: primaryMuscle,
+      weekly_sets: 10,
+      fitness_level: 'beginner',
     }) as Record<string, unknown>;
     expect(typeof volumeCheck.compliant).toBe('boolean');
   });
 
   it('evidence rule citations are consistent with volume check citations', () => {
     const volumeCheck = executor('checkVolumeCompliance', {
-      muscle_group: 'chest', weekly_sets: 10, fitness_level: 'intermediate',
+      muscle_group: 'chest',
+      weekly_sets: 10,
+      fitness_level: 'intermediate',
     }) as Record<string, unknown>;
     const rule = executor('getEvidenceRule', {
       rule_key: 'volume_fill_rates',
     }) as Record<string, unknown>;
 
-    expect((volumeCheck.citations as string[])).toContain('SCHOENFELD_2017_DOSE_RESPONSE');
-    expect((rule.citations as string[])).toContain('SCHOENFELD_2017_DOSE_RESPONSE');
+    expect(volumeCheck.citations as string[]).toContain(
+      'SCHOENFELD_2017_DOSE_RESPONSE',
+    );
+    expect(rule.citations as string[]).toContain(
+      'SCHOENFELD_2017_DOSE_RESPONSE',
+    );
   });
 
   it('all movement patterns in the library are searchable', () => {
@@ -1120,7 +1333,9 @@ describe('Tool executor — cross-tool consistency', () => {
       for (const p of ex.movement_patterns) patterns.add(p);
     }
     for (const pattern of patterns) {
-      const results = executor('searchExercises', { movement_pattern: pattern }) as unknown[];
+      const results = executor('searchExercises', {
+        movement_pattern: pattern,
+      }) as unknown[];
       expect(results.length).toBeGreaterThan(0);
     }
   });
@@ -1131,7 +1346,9 @@ describe('Tool executor — cross-tool consistency', () => {
       for (const m of ex.primary_muscles) muscles.add(m);
     }
     for (const muscle of muscles) {
-      const results = executor('searchExercises', { muscle_group: muscle }) as unknown[];
+      const results = executor('searchExercises', {
+        muscle_group: muscle,
+      }) as unknown[];
       expect(results.length).toBeGreaterThan(0);
     }
   });
@@ -1142,7 +1359,9 @@ describe('Tool executor — cross-tool consistency', () => {
       for (const e of ex.equipment) equip.add(e);
     }
     for (const eq of equip) {
-      const results = executor('searchExercises', { equipment: eq }) as unknown[];
+      const results = executor('searchExercises', {
+        equipment: eq,
+      }) as unknown[];
       expect(results.length).toBeGreaterThan(0);
     }
   });

@@ -6,6 +6,8 @@ export type AiReasoningResult = {
     inputTokens: number | null;
     outputTokens: number | null;
   };
+  provider: 'openai' | 'anthropic';
+  model: string;
 };
 
 export const aiReasoningPrompt = `

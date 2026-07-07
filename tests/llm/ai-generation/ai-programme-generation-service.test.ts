@@ -207,6 +207,8 @@ describe('generateAiProgramme', () => {
     provider.generateReasoning = vi.fn(async () => ({
       reasoning: 'This phase should focus on compound movements...',
       usage: { inputTokens: 300, outputTokens: 200 },
+      provider: 'openai' as const,
+      model: 'test-model',
     }));
 
     const result = await generateAiProgramme({
@@ -218,7 +220,9 @@ describe('generateAiProgramme', () => {
       exerciseLibraryVersion: 'test-v1',
     });
 
-    expect(provider.generateReasoning).toHaveBeenCalledTimes(programme.phases.length);
+    expect(provider.generateReasoning).toHaveBeenCalledTimes(
+      programme.phases.length,
+    );
     // Reasoning tokens are tracked
     const reasoningTokens = 300 * programme.phases.length;
     const reasoningOutputTokens = 200 * programme.phases.length;
@@ -236,6 +240,8 @@ describe('generateAiProgramme', () => {
     provider.generateReasoning = vi.fn(async () => ({
       reasoning: 'Focus on squat and hinge patterns.',
       usage: { inputTokens: 300, outputTokens: 200 },
+      provider: 'openai' as const,
+      model: 'test-model',
     }));
 
     await generateAiProgramme({
@@ -247,9 +253,12 @@ describe('generateAiProgramme', () => {
       exerciseLibraryVersion: 'test-v1',
     });
 
-    const phaseCalls = (provider.generatePhase as ReturnType<typeof vi.fn>).mock.calls;
+    const phaseCalls = (provider.generatePhase as ReturnType<typeof vi.fn>).mock
+      .calls;
     for (const [, providerCtx] of phaseCalls) {
-      expect(providerCtx.reasoningOutput).toBe('Focus on squat and hinge patterns.');
+      expect(providerCtx.reasoningOutput).toBe(
+        'Focus on squat and hinge patterns.',
+      );
     }
   });
 
@@ -266,7 +275,8 @@ describe('generateAiProgramme', () => {
       exerciseLibraryVersion: 'test-v1',
     });
 
-    const phaseCalls = (provider.generatePhase as ReturnType<typeof vi.fn>).mock.calls;
+    const phaseCalls = (provider.generatePhase as ReturnType<typeof vi.fn>).mock
+      .calls;
     for (const [, providerCtx] of phaseCalls) {
       expect(providerCtx.toolExecutor).toBeDefined();
       expect(typeof providerCtx.toolExecutor).toBe('function');

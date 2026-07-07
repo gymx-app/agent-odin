@@ -1,18 +1,35 @@
 import { TooManyRequestsError } from '../../shared/errors/http-errors.js';
 import type { SupabaseClientLike } from './supabase.types.js';
 
+export type GenerationLogStep =
+  | 'strategy'
+  | 'build'
+  | 'phase_prep'
+  | 'phase_reasoning'
+  | 'phase_tools'
+  | 'phase_week'
+  | 'assemble';
+
 type GenerationLogRow = {
   user_id: string;
-  step: 'strategy' | 'build';
+  step: GenerationLogStep;
   tokens_input: number;
   tokens_output: number;
   repair_attempted: boolean;
+  repair_reasons?: string[] | null;
   athlete_goal?: string | null;
+  status?: 'succeeded' | 'failed';
+  error_code?: string | null;
+  duration_ms?: number;
+  stage_durations_ms?: Record<string, number> | null;
+  provider?: 'openai' | 'anthropic' | null;
+  model?: string | null;
+  planner_version?: string | null;
 };
 
 export const checkRateLimit = async (
   userId: string,
-  step: 'strategy' | 'build',
+  step: GenerationLogStep,
   adminClient: SupabaseClientLike,
   limitPerDay: number,
 ): Promise<void> => {

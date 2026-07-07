@@ -22,7 +22,10 @@ import type {
 } from './ai-programme-generation-provider.js';
 import { aiStrategySystemPrompt } from './ai-generation-strategy-prompt.js';
 import { aiPhaseSystemPrompt } from './ai-generation-phase-prompt.js';
-import { aiReasoningPrompt, type AiReasoningResult } from './agent-reasoning.js';
+import {
+  aiReasoningPrompt,
+  type AiReasoningResult,
+} from './agent-reasoning.js';
 import type { FunctionTool } from 'openai/resources/responses/responses';
 import { AGENT_TOOLS } from './agent-tools.js';
 import { toOpenAISchema } from './openai-schema-compat.js';
@@ -62,7 +65,8 @@ const withRateLimitRetry = async <T>(fn: () => Promise<T>): Promise<T> => {
       return await fn();
     } catch (error) {
       const waitMs = isRateLimitError(error);
-      if (waitMs === null || attempt === MAX_RATE_LIMIT_RETRIES - 1) throw error;
+      if (waitMs === null || attempt === MAX_RATE_LIMIT_RETRIES - 1)
+        throw error;
       await sleep(waitMs + 1000);
     }
   }
@@ -73,14 +77,14 @@ const OpenAIStrategySchema = toOpenAISchema(AiStrategyOutputSchema);
 const OpenAIPhaseSchema = toOpenAISchema(AiPhaseOutputSchema);
 const OpenAIWeekSchema = toOpenAISchema(AiWeekOutputSchema);
 
-export class OpenAIAiProgrammeGenerationProvider
-  implements AiProgrammeGenerationProvider
-{
+export class OpenAIAiProgrammeGenerationProvider implements AiProgrammeGenerationProvider {
   constructor(
     private readonly client: OpenAI,
     private readonly config: Pick<
       AppConfig,
-      'openaiGenerationModel' | 'openaiStrategyModel' | 'openaiGenerationTimeoutMs'
+      | 'openaiGenerationModel'
+      | 'openaiStrategyModel'
+      | 'openaiGenerationTimeoutMs'
     >,
   ) {}
 
@@ -100,7 +104,10 @@ export class OpenAIAiProgrammeGenerationProvider
   ): Promise<AiStrategyGenerationResult> {
     return this.generateStructured(
       providerCtx.strategySystemPrompt ?? aiStrategySystemPrompt,
-      { strategy_context: context, retry_feedback: providerCtx.retryFeedback ?? null },
+      {
+        strategy_context: context,
+        retry_feedback: providerCtx.retryFeedback ?? null,
+      },
       AiStrategyOutputSchema,
       'ai_strategy_generation',
       8000,
@@ -114,7 +121,10 @@ export class OpenAIAiProgrammeGenerationProvider
     providerCtx: AiGenerationProviderContext,
   ): Promise<AiPhaseGenerationResult> {
     const model = this.model;
-    const userContent = { phase_context: context, retry_feedback: providerCtx.retryFeedback ?? null };
+    const userContent = {
+      phase_context: context,
+      retry_feedback: providerCtx.retryFeedback ?? null,
+    };
 
     const input: OpenAI.Responses.ResponseInputItem[] = [
       { role: 'system', content: aiPhaseSystemPrompt },
@@ -125,12 +135,15 @@ export class OpenAIAiProgrammeGenerationProvider
       input.push({ role: 'assistant', content: providerCtx.reasoningOutput });
       input.push({
         role: 'user',
-        content: 'Now generate the phase using the tools to find exercises and check compliance. Output the complete structured phase.',
+        content:
+          'Now generate the phase using the tools to find exercises and check compliance. Output the complete structured phase.',
       });
     }
 
     if (providerCtx.toolConversation) {
-      input.push(...(providerCtx.toolConversation as OpenAI.Responses.ResponseInputItem[]));
+      input.push(
+        ...(providerCtx.toolConversation as OpenAI.Responses.ResponseInputItem[]),
+      );
     }
 
     let totalInputTokens = 0;
@@ -139,18 +152,21 @@ export class OpenAIAiProgrammeGenerationProvider
 
     try {
       if (providerCtx.toolConversation || providerCtx.toolsOnly === false) {
-        const response = await withRateLimitRetry(() => this.client.responses.create({
-          model,
-          input: [
-            ...input,
-            {
-              role: 'user',
-              content: 'Based on the exercise search results and compliance checks above, now output the complete structured phase as a single JSON object. Output ONLY valid JSON, no markdown fences or commentary.',
-            } as OpenAI.Responses.ResponseInputItem,
-          ],
-          text: { format: { type: 'json_object' } },
-          max_output_tokens: 20000,
-        }));
+        const response = await withRateLimitRetry(() =>
+          this.client.responses.create({
+            model,
+            input: [
+              ...input,
+              {
+                role: 'user',
+                content:
+                  'Based on the exercise search results and compliance checks above, now output the complete structured phase as a single JSON object. Output ONLY valid JSON, no markdown fences or commentary.',
+              } as OpenAI.Responses.ResponseInputItem,
+            ],
+            text: { format: { type: 'json_object' } },
+            max_output_tokens: 20000,
+          }),
+        );
 
         totalInputTokens += response.usage?.input_tokens ?? 0;
         totalOutputTokens += response.usage?.output_tokens ?? 0;
@@ -163,7 +179,10 @@ export class OpenAIAiProgrammeGenerationProvider
                 try {
                   raw = JSON.parse(item.text);
                 } catch {
-                  throw refinementError('LLM_OUTPUT_INVALID', 'Phase output was not valid JSON.');
+                  throw refinementError(
+                    'LLM_OUTPUT_INVALID',
+                    'Phase output was not valid JSON.',
+                  );
                 }
                 const parsed = AiPhaseOutputSchema.safeParse(raw);
                 if (parsed.success) {
@@ -172,7 +191,10 @@ export class OpenAIAiProgrammeGenerationProvider
                     provider: 'openai',
                     model,
                     responseId: response.id,
-                    usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+                    usage: {
+                      inputTokens: totalInputTokens,
+                      outputTokens: totalOutputTokens,
+                    },
                   };
                 }
                 throw refinementError(
@@ -183,28 +205,40 @@ export class OpenAIAiProgrammeGenerationProvider
             }
           }
         }
-        throw refinementError('LLM_OUTPUT_INVALID', 'No output in final phase generation call.');
+        throw refinementError(
+          'LLM_OUTPUT_INVALID',
+          'No output in final phase generation call.',
+        );
       }
 
       for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
-        const response = await withRateLimitRetry(() => this.client.responses.parse({
-          model,
-          input,
-          ...(previousResponseId
-            ? { previous_response_id: previousResponseId }
-            : {}),
-          tools: AGENT_TOOLS as FunctionTool[],
-          text: {
-            format: zodTextFormat(OpenAIPhaseSchema as never, 'ai_phase_generation'),
-          },
-          max_output_tokens: 32000,
-        }));
+        const response = await withRateLimitRetry(() =>
+          this.client.responses.parse({
+            model,
+            input,
+            ...(previousResponseId
+              ? { previous_response_id: previousResponseId }
+              : {}),
+            tools: AGENT_TOOLS as FunctionTool[],
+            text: {
+              format: zodTextFormat(
+                OpenAIPhaseSchema as never,
+                'ai_phase_generation',
+              ),
+            },
+            max_output_tokens: 32000,
+          }),
+        );
 
         previousResponseId = response.id;
         totalInputTokens += response.usage?.input_tokens ?? 0;
         totalOutputTokens += response.usage?.output_tokens ?? 0;
 
-        const toolCalls: Array<{ id: string; name: string; arguments: string }> = [];
+        const toolCalls: Array<{
+          id: string;
+          name: string;
+          arguments: string;
+        }> = [];
         let parsedOutput: AiPhaseGenerationResult['output'] | null = null;
 
         for (const output of response.output) {
@@ -227,7 +261,8 @@ export class OpenAIAiProgrammeGenerationProvider
               if (item.type === 'output_text' && item.parsed) {
                 const parsed = OpenAIPhaseSchema.safeParse(item.parsed);
                 if (parsed.success) {
-                  parsedOutput = parsed.data as AiPhaseGenerationResult['output'];
+                  parsedOutput =
+                    parsed.data as AiPhaseGenerationResult['output'];
                 } else {
                   throw refinementError(
                     'LLM_OUTPUT_INVALID',
@@ -239,12 +274,19 @@ export class OpenAIAiProgrammeGenerationProvider
           }
         }
 
-        if (providerCtx.toolsOnly && toolCalls.length > 0 && providerCtx.toolExecutor) {
+        if (
+          providerCtx.toolsOnly &&
+          toolCalls.length > 0 &&
+          providerCtx.toolExecutor
+        ) {
           const toolResults: OpenAI.Responses.ResponseInputItem[] = [];
           for (const call of toolCalls) {
             let args: Record<string, unknown>;
-            try { args = JSON.parse(call.arguments) as Record<string, unknown>; }
-            catch { args = {}; }
+            try {
+              args = JSON.parse(call.arguments) as Record<string, unknown>;
+            } catch {
+              args = {};
+            }
             const result = providerCtx.toolExecutor(call.name, args);
             toolResults.push({
               type: 'function_call_output',
@@ -271,7 +313,10 @@ export class OpenAIAiProgrammeGenerationProvider
             provider: 'openai',
             model,
             responseId: previousResponseId ?? null,
-            usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+            usage: {
+              inputTokens: totalInputTokens,
+              outputTokens: totalOutputTokens,
+            },
             toolConversation: conversationItems,
           } as AiPhaseGenerationResult & { toolConversation: unknown[] };
         }
@@ -361,17 +406,22 @@ export class OpenAIAiProgrammeGenerationProvider
     providerCtx: AiGenerationProviderContext,
   ): Promise<AiReasoningResult> {
     const model = this.model;
-    const userContent = { phase_context: context, retry_feedback: providerCtx.retryFeedback ?? null };
+    const userContent = {
+      phase_context: context,
+      retry_feedback: providerCtx.retryFeedback ?? null,
+    };
 
     try {
-      const response = await withRateLimitRetry(() => this.client.responses.create({
-        model,
-        input: [
-          { role: 'system', content: aiReasoningPrompt },
-          { role: 'user', content: JSON.stringify(userContent) },
-        ],
-        max_output_tokens: 1500,
-      }));
+      const response = await withRateLimitRetry(() =>
+        this.client.responses.create({
+          model,
+          input: [
+            { role: 'system', content: aiReasoningPrompt },
+            { role: 'user', content: JSON.stringify(userContent) },
+          ],
+          max_output_tokens: 1500,
+        }),
+      );
 
       let reasoning = '';
       for (const output of response.output) {
@@ -390,6 +440,8 @@ export class OpenAIAiProgrammeGenerationProvider
           inputTokens: response.usage?.input_tokens ?? null,
           outputTokens: response.usage?.output_tokens ?? null,
         },
+        provider: 'openai',
+        model,
       };
     } catch (error) {
       if (
@@ -416,7 +468,9 @@ export class OpenAIAiProgrammeGenerationProvider
   ): Promise<AiWeekGenerationResult> {
     const model = this.model;
 
-    const weekUserMessage = weekCtx.weekPrompt + '\nOutput ONLY valid JSON for this single week object. No markdown fences.';
+    const weekUserMessage =
+      weekCtx.weekPrompt +
+      '\nOutput ONLY valid JSON for this single week object. No markdown fences.';
 
     let input: OpenAI.Responses.ResponseInputItem[];
     let previousResponseId: string | undefined;
@@ -427,25 +481,37 @@ export class OpenAIAiProgrammeGenerationProvider
     } else {
       input = [
         { role: 'system', content: aiPhaseSystemPrompt },
-        { role: 'user', content: JSON.stringify({ phase_context: weekCtx.phaseContext, week_generation_instructions: weekCtx.weekPrompt }) },
+        {
+          role: 'user',
+          content: JSON.stringify({
+            phase_context: weekCtx.phaseContext,
+            week_generation_instructions: weekCtx.weekPrompt,
+          }),
+        },
       ];
       if (weekCtx.reasoning) {
         input.push({ role: 'assistant', content: weekCtx.reasoning });
       }
       if (weekCtx.toolConversation && weekCtx.toolConversation.length > 0) {
-        input.push(...(weekCtx.toolConversation as OpenAI.Responses.ResponseInputItem[]));
+        input.push(
+          ...(weekCtx.toolConversation as OpenAI.Responses.ResponseInputItem[]),
+        );
       }
       input.push({ role: 'user', content: weekUserMessage });
     }
 
     try {
-      const response = await withRateLimitRetry(() => this.client.responses.create({
-        model,
-        input,
-        ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
-        text: { format: zodTextFormat(OpenAIWeekSchema as never, 'week') },
-        max_output_tokens: 8000,
-      }));
+      const response = await withRateLimitRetry(() =>
+        this.client.responses.create({
+          model,
+          input,
+          ...(previousResponseId
+            ? { previous_response_id: previousResponseId }
+            : {}),
+          text: { format: zodTextFormat(OpenAIWeekSchema as never, 'week') },
+          max_output_tokens: 8000,
+        }),
+      );
 
       let weekJson = '';
       for (const output of response.output) {
@@ -462,13 +528,21 @@ export class OpenAIAiProgrammeGenerationProvider
       try {
         raw = JSON.parse(weekJson);
       } catch {
-        throw refinementError('LLM_OUTPUT_INVALID', 'Week output was not valid JSON.');
+        throw refinementError(
+          'LLM_OUTPUT_INVALID',
+          'Week output was not valid JSON.',
+        );
       }
 
       const parsed = OpenAIWeekSchema.safeParse(raw);
       if (!parsed.success) {
-        const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
-        throw refinementError('LLM_OUTPUT_INVALID', `Week validation failed: ${issues}`);
+        const issues = parsed.error.issues
+          .map((i) => `${i.path.join('.')}: ${i.message}`)
+          .join('; ');
+        throw refinementError(
+          'LLM_OUTPUT_INVALID',
+          `Week validation failed: ${issues}`,
+        );
       }
 
       return {
@@ -482,14 +556,28 @@ export class OpenAIAiProgrammeGenerationProvider
         },
       };
     } catch (error) {
-      if (error instanceof Error && 'code' in error && typeof error.code === 'string' && error.code.startsWith('LLM_')) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        typeof error.code === 'string' &&
+        error.code.startsWith('LLM_')
+      ) {
         throw error;
       }
-      if (error instanceof Error && (error.name.includes('Timeout') || error.message.includes('timed out'))) {
-        throw refinementError('LLM_PROVIDER_TIMEOUT', 'The week generation call timed out.');
+      if (
+        error instanceof Error &&
+        (error.name.includes('Timeout') || error.message.includes('timed out'))
+      ) {
+        throw refinementError(
+          'LLM_PROVIDER_TIMEOUT',
+          'The week generation call timed out.',
+        );
       }
       const detail = error instanceof Error ? error.message : String(error);
-      throw refinementError('LLM_PROVIDER_ERROR', `The generation provider is unavailable: ${detail}`);
+      throw refinementError(
+        'LLM_PROVIDER_ERROR',
+        `The generation provider is unavailable: ${detail}`,
+      );
     }
   }
 
@@ -505,17 +593,22 @@ export class OpenAIAiProgrammeGenerationProvider
     const model = modelOverride ?? this.model;
 
     try {
-      const response = await withRateLimitRetry(() => this.client.responses.parse({
-        model,
-        input: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: JSON.stringify(userContent) },
-        ],
-        text: {
-          format: zodTextFormat((openaiSchema ?? schema) as never, schemaName),
-        },
-        max_output_tokens: maxOutputTokens,
-      }));
+      const response = await withRateLimitRetry(() =>
+        this.client.responses.parse({
+          model,
+          input: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: JSON.stringify(userContent) },
+          ],
+          text: {
+            format: zodTextFormat(
+              (openaiSchema ?? schema) as never,
+              schemaName,
+            ),
+          },
+          max_output_tokens: maxOutputTokens,
+        }),
+      );
 
       for (const output of response.output) {
         if (output.type !== 'message') continue;
