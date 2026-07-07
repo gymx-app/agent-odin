@@ -32,6 +32,7 @@ const config: AppConfig = {
   anthropicTimeoutMs: 45000,
   allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1'],
   rateLimitStrategyPerDay: 10,
+  openaiStrategyModel: 'gpt-4o-mini',
 };
 
 describe('GET /api/health', () => {
@@ -49,7 +50,9 @@ describe('GET /api/health', () => {
         status: 'ok',
       },
     });
-    expect((json as { data: { timestamp: unknown } }).data.timestamp).toEqual(expect.any(String));
+    expect((json as { data: { timestamp: unknown } }).data.timestamp).toEqual(
+      expect.any(String),
+    );
   });
 
   it('returns a generated request ID', async () => {

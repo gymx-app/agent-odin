@@ -33,7 +33,11 @@ describe('environment configuration', () => {
   });
 
   it('allows unauthenticated endpoints to load without Supabase credentials', () => {
-    expect(parseEnv({ NODE_ENV: 'production' })).toEqual(
+    expect(
+      parseEnv({
+        NODE_ENV: 'production',
+      }),
+    ).toEqual(
       expect.objectContaining({
         supabaseUrl: null,
         supabaseAnonKey: null,

@@ -419,3 +419,11 @@ import_map = "./functions/import_map.json"
 [functions.preview]
 verify_jwt = false
 import_map = "./functions/import_map.json"
+
+[functions.generate-programme-v2]
+verify_jwt = false
+import_map = "./functions/import_map.json"
+
+[functions.inbody-parse]
+verify_jwt = false
+import_map = "./functions/import_map.json"

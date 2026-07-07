@@ -82,7 +82,7 @@ const request = async <T>(
 const paths = {
   health: isEdgeFunction ? '/functions/v1/health' : '/api/health',
   generateProgramme: isEdgeFunction ? '/functions/v1/generate-programme' : '/api/odin/generate-programme',
-  generateProgrammeV2: '/api/v2/odin/generate-programme',
+  generateProgrammeV2: isEdgeFunction ? '/functions/v1/generate-programme-v2' : '/api/v2/odin/generate-programme',
   parseInBody: '/api/v1/inbody/parse',
 };
 
@@ -156,15 +156,28 @@ export const odinApi = {
       body: { file, media_type },
     }),
 
+  // strategy -> build: 1 LLM call for strategy, then the deterministic
+  // planner fills in every phase/week with no further LLM calls (only
+  // retries the strategy call if a repair is needed). This is the only
+  // generation pipeline in the codebase — the granular per-phase/per-week
+  // job pipeline (~26 LLM calls per programme) was removed entirely.
   generateProgrammeV2: async (
     token: string,
     athlete: AthleteInputV2,
     onProgress?: (progress: StepProgress) => void,
   ): Promise<ProgrammePreviewResponse> => {
-    onProgress?.({ step: 'strategy', detail: 'Generating training strategy (v2)...' });
+    onProgress?.({
+      step: 'strategy',
+      detail: 'Generating training strategy (v2)...',
+    });
     const strategyResult = await request<{
       step: 'strategy';
       strategy: unknown;
+      interpreted_injuries: Array<{
+        area: string;
+        modification: 'avoid' | 'modify';
+        notes: string;
+      }>;
       usage: { inputTokens: number; outputTokens: number };
     }>(paths.generateProgrammeV2, {
       method: 'POST',
@@ -175,12 +188,29 @@ export const odinApi = {
     const totalInputTokens = strategyResult.usage.inputTokens ?? 0;
     const totalOutputTokens = strategyResult.usage.outputTokens ?? 0;
 
-    onProgress?.({ step: 'build', detail: 'Building programme structure (v2)...' });
-    const buildResult = await request<ProgrammePreviewResponse>(paths.generateProgrammeV2, {
-      method: 'POST',
-      token,
-      body: { step: 'build', athlete, strategy: strategyResult.strategy },
+    // Reuse the strategy step's injury interpretation instead of re-running
+    // the classifier LLM call on the build step too.
+    const athleteForBuild = {
+      ...athlete,
+      injuries: strategyResult.interpreted_injuries,
+    };
+
+    onProgress?.({
+      step: 'build',
+      detail: 'Building programme structure (v2)...',
     });
+    const buildResult = await request<ProgrammePreviewResponse>(
+      paths.generateProgrammeV2,
+      {
+        method: 'POST',
+        token,
+        body: {
+          step: 'build',
+          athlete: athleteForBuild,
+          strategy: strategyResult.strategy,
+        },
+      },
+    );
 
     buildResult.generation = {
       ...buildResult.generation,

@@ -28,6 +28,7 @@ const createConfig = (overrides: Partial<AppConfig> = {}): AppConfig => ({
   anthropicTimeoutMs: 45000,
   allowedPlannerVersions: ['legacy_v1', 'longitudinal_v1'],
   rateLimitStrategyPerDay: 10,
+  openaiStrategyModel: 'gpt-4o-mini',
   ...overrides,
 });
 
