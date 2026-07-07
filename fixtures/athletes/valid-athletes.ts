@@ -97,7 +97,11 @@ export const enrichedRecompositionAthlete: AthleteInput = {
   schedule: {
     available_days: ['MON', 'TUE', 'THU', 'SAT'],
     preferred_days: ['MON', 'THU'],
-    unavailable_days: ['WED', 'FRI', 'SUN'],
+    // SUN is not listed here: the athlete plays tennis on SUN (see `sport`
+    // below), so it's occupied by sport, not truly unavailable — listing it
+    // as unavailable directly contradicted sport.session_days and made the
+    // calendar unsatisfiable (CALENDAR_UNSATISFIABLE).
+    unavailable_days: ['WED', 'FRI'],
     preferred_workout_time: 'evening',
     rolling_schedule_acceptable: false,
   },

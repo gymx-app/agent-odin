@@ -132,7 +132,10 @@ const validateLongitudinalProgramme = (
               { exercise_id: prescription.exercise_id },
             ),
           );
-        } else if (approved.name !== prescription.exercise_name) {
+        } else if (
+          (approved.display_name ?? approved.name) !==
+          prescription.exercise_name
+        ) {
           findings.push(
             finding(
               validationCodes.LONGITUDINAL_EXERCISE_NAME_MISMATCH,
@@ -221,7 +224,10 @@ export class ProgrammeValidationService {
       return this.validate({ ...input, programme });
     }
 
-    if (input.programme.planner_version !== 'longitudinal_v1' && input.programme.planner_version !== 'ai_agent_v1') {
+    if (
+      input.programme.planner_version !== 'longitudinal_v1' &&
+      input.programme.planner_version !== 'ai_agent_v1'
+    ) {
       const findings = [
         finding(
           validationCodes.UNSUPPORTED_PLANNER_VERSION,

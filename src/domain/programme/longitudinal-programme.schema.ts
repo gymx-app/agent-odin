@@ -443,7 +443,11 @@ const ProgrammeDaySchema = z
     const requiresResistance = ['resistance', 'combined'].includes(
       day.day_type,
     );
-    const requiresConditioning = ['conditioning', 'combined'].includes(
+    // 'sport' days always carry a sport_conditioning entry representing the
+    // athlete's reported sport load (see conditioning-planner.ts's
+    // day_type === 'sport' branch) — this isn't optional, so 'sport' must
+    // be treated as conditioning-bearing like 'conditioning'/'combined'.
+    const requiresConditioning = ['conditioning', 'combined', 'sport'].includes(
       day.day_type,
     );
     const plannedResistance =
@@ -459,9 +463,7 @@ const ProgrammeDaySchema = z
     const hasFinisherOnly =
       day.day_type === 'resistance' &&
       day.conditioning.length > 0 &&
-      day.conditioning.every(
-        (item) => item.placement === 'after_resistance',
-      );
+      day.conditioning.every((item) => item.placement === 'after_resistance');
     const plannedConditioning =
       (!hasFinisherOnly && day.conditioning.length > 0) ||
       (requiresConditioning && day.training_budget !== undefined);

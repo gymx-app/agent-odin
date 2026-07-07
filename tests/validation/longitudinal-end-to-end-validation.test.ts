@@ -36,6 +36,7 @@ describe('end-to-end longitudinal validation and repair', () => {
         'exercise-sequencing',
         'conditioning',
         'programme-coherence',
+        'evidence-citations',
       ],
     );
     expect(report.repair).toEqual({

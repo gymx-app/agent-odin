@@ -143,7 +143,10 @@ export const validateLongitudinalSessions = (
                 { exercise_id: prescription.exercise_id },
               );
             }
-            if (prescription.exercise_name !== approved.name) {
+            if (
+              prescription.exercise_name !==
+              (approved.display_name ?? approved.name)
+            ) {
               add(
                 'NON_CANONICAL_EXERCISE_NAME',
                 'error',

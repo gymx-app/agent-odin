@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      # format:check intentionally omitted: 130+ pre-existing files in this
+      # repo are not prettier-clean today, so gating on it would fail from
+      # day one for reasons unrelated to any given change. Re-add once the
+      # repo is reformatted (a separate, dedicated pass).
+      - run: npm test
