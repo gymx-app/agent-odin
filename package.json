@@ -13,9 +13,10 @@
     "test:watch": "vitest",
     "build": "tsc -p tsconfig.build.json",
     "dev:api": "npx supabase functions serve",
-    "bundle:functions": "esbuild api/health.ts --bundle --format=esm --platform=node --target=esnext --outfile=supabase/functions/_bundles/health-handler.js && esbuild api/odin/generate-programme.ts --bundle --format=esm --platform=node --target=esnext --outfile=supabase/functions/_bundles/generate-programme-handler.js",
-    "deploy:functions": "npm run bundle:functions && npx supabase functions deploy health generate-programme",
-    "supabase:seed:exercises": "tsx scripts/generate-exercise-seed.ts > supabase/seed.sql"
+    "bundle:functions": "esbuild api/health.ts --bundle --format=esm --platform=node --target=esnext --outfile=supabase/functions/_bundles/health-handler.js && esbuild api/odin/generate-programme.ts --bundle --format=esm --platform=node --target=esnext --outfile=supabase/functions/_bundles/generate-programme-handler.js && esbuild api/odin/generate-programme-v2.ts --bundle --format=esm --platform=node --target=esnext --outfile=supabase/functions/_bundles/generate-programme-v2-handler.js && esbuild api/inbody/parse.ts --bundle --format=esm --platform=node --target=esnext --outfile=supabase/functions/_bundles/inbody-parse-handler.js",
+    "deploy:functions": "npm run bundle:functions && npx supabase functions deploy health generate-programme generate-programme-v2 inbody-parse",
+    "supabase:seed:exercises": "tsx scripts/generate-exercise-seed.ts > supabase/seed.sql",
+    "eval:live": "tsx --env-file=.env.local scripts/eval-live.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",

@@ -8,3 +8,4 @@ coverage/
 .env*
 supabase/functions/_bundles/
 supabase/.temp/
+eval-results/
