@@ -6,6 +6,52 @@ import { validationCodes } from './validation-codes.js';
 import { finding } from './validation-helpers.js';
 import type { ProgrammeValidationFinding } from './validation.types.js';
 
+// Checks one candidate substitute against the approved library + eligibility
+// rules, returning the finding if it fails either check (or null if it's a
+// valid substitute). Extracted so a standalone "confirm this specific swap"
+// check (outside the context of a full programme) can reuse the exact same
+// codes/messages as the full-programme validator below.
+export const checkSubstitutionCandidate = (
+  sourceExerciseId: string,
+  substituteId: string,
+  exerciseById: Map<string, Exercise>,
+  profile: NormalizedAthleteProfile,
+): ProgrammeValidationFinding | null => {
+  const substitute = exerciseById.get(substituteId);
+
+  if (!substitute) {
+    return finding(
+      validationCodes.SUBSTITUTION_GROUP_INVALID,
+      'error',
+      'exercise_integrity',
+      'Substitution group contains an unknown exercise ID.',
+      {
+        metadata: {
+          exercise_id: sourceExerciseId,
+          substitute_id: substituteId,
+        },
+      },
+    );
+  }
+
+  if (evaluateExerciseEligibility(substitute, profile).status === 'excluded') {
+    return finding(
+      validationCodes.SUBSTITUTE_EXERCISE_EXCLUDED,
+      'error',
+      'exercise_integrity',
+      'Substitution group contains an excluded exercise.',
+      {
+        metadata: {
+          exercise_id: sourceExerciseId,
+          substitute_id: substituteId,
+        },
+      },
+    );
+  }
+
+  return null;
+};
+
 const canonicalTitles = [
   'Full Body',
   'Upper Body',
@@ -208,32 +254,14 @@ export const validateLongitudinalSessions = (
             });
             prescription.substitution_options?.approved_exercise_ids.forEach(
               (substituteId) => {
-                const substitute = exerciseById.get(substituteId);
-                if (!substitute) {
-                  add(
-                    'SUBSTITUTION_GROUP_INVALID',
-                    'error',
-                    'exercise_integrity',
-                    'Substitution group contains an unknown exercise ID.',
-                    {
-                      exercise_id: prescription.exercise_id,
-                      substitute_id: substituteId,
-                    },
-                  );
-                } else if (
-                  evaluateExerciseEligibility(substitute, profile).status ===
-                  'excluded'
-                ) {
-                  add(
-                    'SUBSTITUTE_EXERCISE_EXCLUDED',
-                    'error',
-                    'exercise_integrity',
-                    'Substitution group contains an excluded exercise.',
-                    {
-                      exercise_id: prescription.exercise_id,
-                      substitute_id: substituteId,
-                    },
-                  );
+                const substitutionFinding = checkSubstitutionCandidate(
+                  prescription.exercise_id,
+                  substituteId,
+                  exerciseById,
+                  profile,
+                );
+                if (substitutionFinding) {
+                  findings.push(substitutionFinding);
                 }
               },
             );

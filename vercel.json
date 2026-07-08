@@ -4,12 +4,16 @@
     { "source": "/api/v1/health", "destination": "/api/health" },
     { "source": "/api/v1/odin/generate-programme", "destination": "/api/odin/generate-programme" },
     { "source": "/api/v2/odin/generate-programme", "destination": "/api/odin/generate-programme-v2" },
-    { "source": "/api/v1/inbody/parse", "destination": "/api/inbody/parse" }
+    { "source": "/api/v1/inbody/parse", "destination": "/api/inbody/parse" },
+    { "source": "/api/v2/odin/swap-options", "destination": "/api/odin/swap-options" },
+    { "source": "/api/v2/odin/confirm-swap", "destination": "/api/odin/confirm-swap" }
   ],
   "functions": {
     "api/health.ts": { "maxDuration": 10 },
     "api/odin/generate-programme.ts": { "maxDuration": 60 },
     "api/odin/generate-programme-v2.ts": { "maxDuration": 60 },
-    "api/inbody/parse.ts": { "maxDuration": 30 }
+    "api/inbody/parse.ts": { "maxDuration": 30 },
+    "api/odin/swap-options.ts": { "maxDuration": 10 },
+    "api/odin/confirm-swap.ts": { "maxDuration": 10 }
   }
 }
