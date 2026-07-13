@@ -2031,7 +2031,7 @@ export const seedExercises: Exercise[] = [
     stability_demand: 1,
     movement_demands: {
       high_elbow_flexion_load: 4,
-      fixed_pronated_grip: 2,
+      fixed_supinated_grip: 2,
     },
     default_rep_range: { min: 6, max: 15 },
     substitution_group: 'elbow_flexion',
@@ -3932,6 +3932,7 @@ export const seedExercises: Exercise[] = [
     movement_demands: {
       overhead_loading: 2,
       high_elbow_flexion_load: 4,
+      fixed_supinated_grip: 2,
     },
     default_rep_range: { min: 8, max: 15 },
     substitution_group: 'vertical_pull_cable',

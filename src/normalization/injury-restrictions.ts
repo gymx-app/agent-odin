@@ -14,7 +14,11 @@ const baseRestrictionTagsByArea: Record<string, MovementDemandTag[]> = {
     'loaded_spinal_flexion',
     'unsupported_hip_hinge',
   ],
-  wrist: ['high_wrist_extension', 'fixed_pronated_grip'],
+  wrist: [
+    'high_wrist_extension',
+    'fixed_pronated_grip',
+    'fixed_supinated_grip',
+  ],
   shoulder: [
     'overhead_loading',
     'deep_shoulder_extension',

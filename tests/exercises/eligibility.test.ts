@@ -91,6 +91,34 @@ describe('evaluateExerciseEligibility', () => {
     expect(result.warnings[0]).toContain('experimental');
   });
 
+  it('excludes supinated-grip curls and pulldowns for a wrist avoid restriction (TFCC)', () => {
+    const profile = normalizeAthlete(
+      createAthlete({
+        injuries: [
+          {
+            area: 'wrist',
+            severity: 'avoid',
+            notes: 'TFCC tear.',
+          },
+        ],
+      }),
+    );
+
+    expect(
+      evaluateExerciseEligibility(
+        findSeedExercise('barbell_biceps_curl'),
+        profile,
+      ).status,
+    ).toBe('excluded');
+
+    expect(
+      evaluateExerciseEligibility(
+        findSeedExercise('underhand_lat_pulldown'),
+        profile,
+      ).status,
+    ).toBe('excluded');
+  });
+
   it('does not conflict when movement demand score is zero', () => {
     const profile = normalizeAthlete(
       createAthlete({
