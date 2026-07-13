@@ -51,6 +51,22 @@ describe('Phase Planner V2', () => {
     expect(result.planned_deload_weeks).toEqual([]);
   });
 
+  it('keeps Foundation effort flat for a true beginner', () => {
+    const result = plan({ fitness_level: 'beginner' }, 10, 3);
+    const foundation = result.phases.find(({ name }) => name === 'Foundation');
+    expect(foundation?.effort_direction).toBe('maintain');
+  });
+
+  it('ramps Foundation effort for an already-trained athlete', () => {
+    const result = plan(
+      { fitness_level: 'intermediate', goal: 'muscle_gain' },
+      12,
+      4,
+    );
+    const foundation = result.phases.find(({ name }) => name === 'Foundation');
+    expect(foundation?.effort_direction).toBe('increase');
+  });
+
   it('creates Foundation, Hypertrophy and Recovery for intermediate hypertrophy', () => {
     const result = plan(
       { fitness_level: 'intermediate', goal: 'muscle_gain' },

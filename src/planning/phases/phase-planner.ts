@@ -48,7 +48,11 @@ export const planProgrammePhases = (
       start_week,
       end_week,
       weeks_count,
-      ...phaseDirections(template.phase_type, input.strategy.primary_objective),
+      ...phaseDirections(
+        template.phase_type,
+        input.strategy.primary_objective,
+        input.profile.athlete_state.training_status.value,
+      ),
       progression_model: input.strategy.progression_model,
       rationale: [
         decision(template.rationale_code, template.name, template.objective),

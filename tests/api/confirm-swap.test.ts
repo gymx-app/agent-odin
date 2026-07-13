@@ -76,6 +76,55 @@ describe('POST /api/odin/confirm-swap', () => {
     });
   });
 
+  it('keeps the replaced exercise revertible in the returned substitution_options', async () => {
+    const handler = createConfirmSwapHandler(config);
+    const response = createTestResponse();
+
+    await handler(
+      postRequest({
+        exercise_id: 'dumbbell_biceps_curl',
+        chosen_alternative_id: 'band_biceps_curl',
+        athlete: createV2Athlete(),
+      }),
+      response,
+    );
+
+    const json = response.json() as {
+      data: { substitution_options: { approved_exercise_ids: string[] } };
+    };
+
+    // The exercise just swapped away from must stay selectable so the user
+    // can revert the swap, even though it wasn't a top-ranked match for
+    // the newly-chosen exercise.
+    expect(json.data.substitution_options.approved_exercise_ids).toContain(
+      'dumbbell_biceps_curl',
+    );
+  });
+
+  it('drops the replaced exercise from substitution_options once it becomes ineligible', async () => {
+    const handler = createConfirmSwapHandler(config);
+    const response = createTestResponse();
+
+    await handler(
+      postRequest({
+        exercise_id: 'barbell_biceps_curl',
+        chosen_alternative_id: 'dumbbell_hammer_curl',
+        athlete: createV2Athlete({
+          injuries: [{ area: 'wrist', modification: 'avoid', notes: 'TFCC tear.' }],
+        }),
+      }),
+      response,
+    );
+
+    const json = response.json() as {
+      data: { substitution_options: { approved_exercise_ids: string[] } };
+    };
+
+    expect(json.data.substitution_options.approved_exercise_ids).not.toContain(
+      'barbell_biceps_curl',
+    );
+  });
+
   it('rejects an unknown chosen_alternative_id with SUBSTITUTION_GROUP_INVALID', async () => {
     const handler = createConfirmSwapHandler(config);
     const response = createTestResponse();

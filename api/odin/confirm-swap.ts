@@ -14,6 +14,10 @@ import type { Exercise } from '../../src/domain/exercise/exercise.types.js';
 import { seedExercises } from '../../src/exercises/approved-exercise-library.js';
 import { normalizeAthlete } from '../../src/normalization/athlete-normalizer.js';
 import { checkSubstitutionCandidate } from '../../src/validation/session-validator.js';
+import { evaluateExerciseEligibility } from '../../src/exercises/eligibility.js';
+import { findExerciseSubstitutions } from '../../src/exercises/substitutions.js';
+
+const SUBSTITUTION_POOL_SIZE = 3;
 import { odinError, type OdinErrorCode } from '../../src/shared/errors/odin-errors.js';
 import type {
   HttpRequest,
@@ -74,6 +78,29 @@ export const createConfirmSwapHandler = (appConfig: AppConfig = config) => {
 
       const chosen = exerciseById.get(body.chosen_alternative_id) as Exercise;
 
+      // The prescription's substitution_options were computed once, at
+      // assembly time, relative to whatever exercise originally filled the
+      // slot — never relative to `chosen`. Left stale, the exercise being
+      // replaced here (still a valid, eligible match by symmetry) can fall
+      // out of a future top-N cut and become unrevertable. Recompute here,
+      // relative to `chosen`, and guarantee the replaced exercise a seat.
+      const replacedExercise = exerciseById.get(body.exercise_id);
+      const replacedStillEligible =
+        replacedExercise !== undefined &&
+        evaluateExerciseEligibility(replacedExercise, normalizedProfile)
+          .status !== 'excluded';
+
+      const rankedAlternativeIds = findExerciseSubstitutions(
+        chosen,
+        seedExercises,
+        normalizedProfile,
+      ).map(({ exercise }) => exercise.id);
+
+      const approved_exercise_ids = [
+        ...(replacedStillEligible ? [body.exercise_id] : []),
+        ...rankedAlternativeIds.filter((id) => id !== body.exercise_id),
+      ].slice(0, SUBSTITUTION_POOL_SIZE);
+
       return successResponse({
         valid: true as const,
         exercise_id: body.exercise_id,
@@ -81,6 +108,10 @@ export const createConfirmSwapHandler = (appConfig: AppConfig = config) => {
           exercise_id: chosen.id,
           name: chosen.display_name ?? chosen.name,
           equipment: chosen.equipment,
+        },
+        substitution_options: {
+          approved_exercise_ids,
+          preserve: 'movement_pattern' as const,
         },
       });
     },
