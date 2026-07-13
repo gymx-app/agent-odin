@@ -80,6 +80,7 @@ export const MovementDemandTagSchema = z.enum([
   'high_abduction_loading',
   'high_wrist_extension',
   'fixed_pronated_grip',
+  'fixed_supinated_grip',
   'high_elbow_flexion_load',
   'high_elbow_extension_load',
   'deep_ankle_dorsiflexion',

@@ -91,6 +91,33 @@ describe('evaluateExerciseEligibility', () => {
     expect(result.warnings[0]).toContain('experimental');
   });
 
+  it('excludes fixed-supinated-grip exercises for an avoid-severity wrist injury', () => {
+    const profile = normalizeAthlete(
+      createAthlete({
+        injuries: [
+          {
+            area: 'wrist',
+            severity: 'avoid',
+            notes: 'TFCC tear, avoid supinated grip loading.',
+          },
+        ],
+      }),
+    );
+
+    for (const exerciseId of [
+      'barbell_biceps_curl',
+      'dumbbell_biceps_curl',
+      'underhand_lat_pulldown',
+      'chin_up',
+      'barbell_preacher_curl',
+    ]) {
+      expect(
+        evaluateExerciseEligibility(findSeedExercise(exerciseId), profile)
+          .status,
+      ).toBe('excluded');
+    }
+  });
+
   it('does not conflict when movement demand score is zero', () => {
     const profile = normalizeAthlete(
       createAthlete({

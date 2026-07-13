@@ -611,6 +611,7 @@ export const seedExercises: Exercise[] = [
     stability_demand: 1,
     movement_demands: {
       high_elbow_flexion_load: 3,
+      fixed_supinated_grip: 2,
     },
     default_rep_range: { min: 8, max: 15 },
     substitution_group: 'elbow_flexion',
@@ -629,6 +630,7 @@ export const seedExercises: Exercise[] = [
     stability_demand: 1,
     movement_demands: {
       high_elbow_flexion_load: 3,
+      fixed_supinated_grip: 2,
     },
     default_rep_range: { min: 8, max: 15 },
     substitution_group: 'elbow_flexion',
@@ -647,6 +649,7 @@ export const seedExercises: Exercise[] = [
     stability_demand: 1,
     movement_demands: {
       high_elbow_flexion_load: 1,
+      fixed_supinated_grip: 2,
     },
     default_rep_range: { min: 10, max: 25 },
     substitution_group: 'elbow_flexion',
@@ -1930,6 +1933,7 @@ export const seedExercises: Exercise[] = [
     movement_demands: {
       overhead_loading: 3,
       high_elbow_flexion_load: 5,
+      fixed_supinated_grip: 4,
     },
     default_rep_range: { min: 3, max: 12 },
     substitution_group: 'vertical_pull_bodyweight',
@@ -2031,7 +2035,7 @@ export const seedExercises: Exercise[] = [
     stability_demand: 1,
     movement_demands: {
       high_elbow_flexion_load: 4,
-      fixed_pronated_grip: 2,
+      fixed_supinated_grip: 2,
     },
     default_rep_range: { min: 6, max: 15 },
     substitution_group: 'elbow_flexion',
@@ -2071,6 +2075,7 @@ export const seedExercises: Exercise[] = [
     movement_demands: {
       high_elbow_flexion_load: 4,
       deep_shoulder_extension: 2,
+      fixed_supinated_grip: 2,
     },
     default_rep_range: { min: 8, max: 15 },
     substitution_group: 'elbow_flexion',
@@ -2109,6 +2114,7 @@ export const seedExercises: Exercise[] = [
     stability_demand: 1,
     movement_demands: {
       high_elbow_flexion_load: 3,
+      fixed_supinated_grip: 2,
     },
     default_rep_range: { min: 8, max: 15 },
     substitution_group: 'elbow_flexion',
@@ -3932,6 +3938,7 @@ export const seedExercises: Exercise[] = [
     movement_demands: {
       overhead_loading: 2,
       high_elbow_flexion_load: 4,
+      fixed_supinated_grip: 3,
     },
     default_rep_range: { min: 8, max: 15 },
     substitution_group: 'vertical_pull_cable',
@@ -3991,6 +3998,7 @@ export const seedExercises: Exercise[] = [
     stability_demand: 1,
     movement_demands: {
       high_elbow_flexion_load: 5,
+      fixed_supinated_grip: 2,
     },
     default_rep_range: { min: 6, max: 12 },
     substitution_group: 'elbow_flexion',
@@ -4011,6 +4019,7 @@ export const seedExercises: Exercise[] = [
     movement_demands: {
       high_elbow_flexion_load: 4,
       deep_shoulder_extension: 2,
+      fixed_supinated_grip: 2,
     },
     default_rep_range: { min: 8, max: 15 },
     substitution_group: 'elbow_flexion',
@@ -4030,6 +4039,7 @@ export const seedExercises: Exercise[] = [
     stability_demand: 1,
     movement_demands: {
       high_elbow_flexion_load: 3,
+      fixed_supinated_grip: 2,
     },
     default_rep_range: { min: 8, max: 15 },
     substitution_group: 'elbow_flexion',
@@ -4067,6 +4077,7 @@ export const seedExercises: Exercise[] = [
     stability_demand: 1,
     movement_demands: {
       high_elbow_flexion_load: 4,
+      fixed_supinated_grip: 2,
     },
     default_rep_range: { min: 8, max: 15 },
     substitution_group: 'elbow_flexion',
@@ -4086,6 +4097,7 @@ export const seedExercises: Exercise[] = [
     stability_demand: 1,
     movement_demands: {
       high_elbow_flexion_load: 3,
+      fixed_supinated_grip: 2,
     },
     default_rep_range: { min: 8, max: 15 },
     substitution_group: 'elbow_flexion',
@@ -5600,7 +5612,11 @@ export const seedExercises: Exercise[] = [
     skill_demand: 2,
     stability_demand: 2,
     fatigue_cost: { systemic: 1, local: 2, axial: 0, grip: 2 },
-    movement_demands: { high_elbow_flexion_load: 3, deep_shoulder_extension: 2 },
+    movement_demands: {
+      high_elbow_flexion_load: 3,
+      deep_shoulder_extension: 2,
+      fixed_supinated_grip: 2,
+    },
     default_rep_range: { min: 10, max: 15 },
     substitution_group: 'elbow_flexion',
   }),
@@ -5854,7 +5870,11 @@ export const seedExercises: Exercise[] = [
     skill_demand: 4,
     stability_demand: 4,
     fatigue_cost: { systemic: 4, local: 4, axial: 1, grip: 4 },
-    movement_demands: { overhead_loading: 3, high_elbow_flexion_load: 5 },
+    movement_demands: {
+      overhead_loading: 3,
+      high_elbow_flexion_load: 5,
+      fixed_supinated_grip: 4,
+    },
     default_rep_range: { min: 3, max: 8 },
     default_rest_seconds: { min: 120, max: 240 },
     substitution_group: 'vertical_pull_bodyweight',
@@ -6977,7 +6997,7 @@ export const seedExercises: Exercise[] = [
     skill_demand: 1,
     stability_demand: 1,
     fatigue_cost: { systemic: 1, local: 2, axial: 0, grip: 2 },
-    movement_demands: { high_elbow_flexion_load: 4 },
+    movement_demands: { high_elbow_flexion_load: 4, fixed_supinated_grip: 2 },
     default_rep_range: { min: 8, max: 15 },
     substitution_group: 'elbow_flexion',
   }),
