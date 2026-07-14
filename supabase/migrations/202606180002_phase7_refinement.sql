@@ -1,4 +1,4 @@
-alter table public.programmes
+alter table public.odin_programmes
   add column if not exists refinement_data jsonb not null default
   '{"requested":false,"applied":false,"status":"not_requested","reason_code":null,"model":null,"prompt_version":null,"schema_version":null}'::jsonb;
 
@@ -38,12 +38,12 @@ as $$
 begin
   if exists (
     select 1
-    from public.programmes
+    from public.odin_programmes
     where user_id = p_user_id
       and status = 'draft'
   ) then
     if p_replace_existing_draft then
-      update public.programmes
+      update public.odin_programmes
       set status = 'archived'
       where user_id = p_user_id
         and status = 'draft';
@@ -53,7 +53,7 @@ begin
     end if;
   end if;
 
-  insert into public.programmes (
+  insert into public.odin_programmes (
     user_id,
     name,
     goal_type,

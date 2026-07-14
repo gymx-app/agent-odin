@@ -19,7 +19,7 @@ create table if not exists public.exercise_library (
   constraint exercise_library_json_id_matches check (exercise_data ->> 'id' = id)
 );
 
-create table if not exists public.programmes (
+create table if not exists public.odin_programmes (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
@@ -35,7 +35,7 @@ create table if not exists public.programmes (
 
 create table if not exists public.programme_versions (
   id uuid primary key default gen_random_uuid(),
-  programme_id uuid not null references public.programmes(id) on delete cascade,
+  programme_id uuid not null references public.odin_programmes(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
   version_number integer not null check (version_number > 0),
   change_reason text not null,
@@ -76,14 +76,14 @@ create table if not exists public.idempotency_keys (
 
 create index if not exists athlete_profiles_user_id_idx on public.athlete_profiles(user_id);
 create index if not exists exercise_library_status_idx on public.exercise_library(status);
-create index if not exists programmes_user_status_created_idx on public.programmes(user_id, status, created_at desc);
+create index if not exists programmes_user_status_created_idx on public.odin_programmes(user_id, status, created_at desc);
 create index if not exists programme_versions_programme_version_idx on public.programme_versions(programme_id, version_number desc);
 create index if not exists agent_runs_user_created_idx on public.agent_runs(user_id, created_at desc);
 create index if not exists idempotency_keys_expires_at_idx on public.idempotency_keys(expires_at);
 
 alter table public.athlete_profiles enable row level security;
 alter table public.exercise_library enable row level security;
-alter table public.programmes enable row level security;
+alter table public.odin_programmes enable row level security;
 alter table public.programme_versions enable row level security;
 alter table public.agent_runs enable row level security;
 alter table public.idempotency_keys enable row level security;
@@ -110,9 +110,9 @@ create policy "exercise library authenticated active read"
   to authenticated
   using (status = 'active');
 
-drop policy if exists "programmes select own" on public.programmes;
-create policy "programmes select own"
-  on public.programmes for select
+drop policy if exists "odin_programmes select own" on public.odin_programmes;
+create policy "odin_programmes select own"
+  on public.odin_programmes for select
   using (auth.uid() = user_id);
 
 drop policy if exists "programme versions select own" on public.programme_versions;
@@ -121,7 +121,7 @@ create policy "programme versions select own"
   using (
     exists (
       select 1
-      from public.programmes p
+      from public.odin_programmes p
       where p.id = programme_id
         and p.user_id = auth.uid()
     )
@@ -147,9 +147,9 @@ create trigger set_exercise_library_updated_at
   before update on public.exercise_library
   for each row execute function public.set_updated_at();
 
-drop trigger if exists set_programmes_updated_at on public.programmes;
+drop trigger if exists set_programmes_updated_at on public.odin_programmes;
 create trigger set_programmes_updated_at
-  before update on public.programmes
+  before update on public.odin_programmes
   for each row execute function public.set_updated_at();
 
 create or replace function public.create_programme_with_version(
@@ -171,12 +171,12 @@ as $$
 begin
   if exists (
     select 1
-    from public.programmes
+    from public.odin_programmes
     where user_id = p_user_id
       and status = 'draft'
   ) then
     if p_replace_existing_draft then
-      update public.programmes
+      update public.odin_programmes
       set status = 'archived'
       where user_id = p_user_id
         and status = 'draft';
@@ -186,7 +186,7 @@ begin
     end if;
   end if;
 
-  insert into public.programmes (
+  insert into public.odin_programmes (
     user_id,
     name,
     goal_type,

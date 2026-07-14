@@ -202,6 +202,15 @@ drop function if exists public.create_programme_with_version(
   uuid, text, text, text, text, jsonb, jsonb, jsonb, integer, boolean
 );
 
+-- A prior, broken deploy already created this exact 13-arg signature
+-- (referencing tables/columns that didn't exist yet); drop it explicitly
+-- since CREATE OR REPLACE can't be used across the arg-count change from
+-- the 10-arg version above, and a bare CREATE fails on the pre-existing
+-- match.
+drop function if exists public.create_programme_with_version(
+  uuid, text, text, text, text, jsonb, jsonb, jsonb, integer, boolean, text, text, text
+);
+
 create function public.create_programme_with_version(
   p_user_id uuid,
   p_name text,
@@ -240,11 +249,11 @@ begin
   perform pg_advisory_xact_lock(hashtextextended(p_user_id::text, 0));
 
   if exists (
-    select 1 from public.programmes p
+    select 1 from public.odin_programmes p
     where p.user_id = p_user_id and p.status = 'draft'
   ) then
     if p_replace_existing_draft then
-      update public.programmes p
+      update public.odin_programmes p
       set status = 'archived'
       where p.user_id = p_user_id and p.status = 'draft';
     else
@@ -263,7 +272,7 @@ begin
     raise exception 'IDEMPOTENCY_CLAIM_INVALID' using errcode = 'P0001';
   end if;
 
-  insert into public.programmes (
+  insert into public.odin_programmes (
     user_id, name, goal_type, status, source, programme_data,
     validation_data, refinement_data, schema_version
   )
@@ -271,7 +280,7 @@ begin
     p_user_id, p_name, p_goal_type, p_status, p_source, p_programme_data,
     p_validation_data, p_refinement_data, p_schema_version
   )
-  returning programmes.id into new_programme_id;
+  returning odin_programmes.id into new_programme_id;
 
   insert into public.programme_versions (
     programme_id, user_id, version_number, change_reason, programme_data,
@@ -301,7 +310,7 @@ begin
   return query
   select p.id, p.user_id, p.name, p.goal_type, p.status, p.source,
     p.programme_data, p.validation_data, p.refinement_data, 1
-  from public.programmes p
+  from public.odin_programmes p
   where p.id = new_programme_id;
 end;
 $$;
@@ -331,7 +340,7 @@ stable
 as $$
   select p.id, p.user_id, p.name, p.goal_type, p.status, p.source,
     p.programme_data, p.validation_data, p.refinement_data, v.version_number
-  from public.programmes p
+  from public.odin_programmes p
   join lateral (
     select pv.version_number
     from public.programme_versions pv
@@ -357,7 +366,7 @@ stable
 as $$
   select p.id, p.user_id, p.name, p.goal_type, p.status, p.source,
     p.programme_data, p.validation_data, p.refinement_data, v.version_number
-  from public.programmes p
+  from public.odin_programmes p
   join lateral (
     select pv.version_number
     from public.programme_versions pv
