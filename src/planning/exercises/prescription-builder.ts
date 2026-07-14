@@ -38,11 +38,29 @@ const exactReps = (
   return Math.max(min, Math.min(max, Math.round((min + max) / 2)));
 };
 
-const restSeconds = (
+// Role-based defaults stay the base case: Schoenfeld et al. (2016,
+// J Strength Cond Res) found 3-min rest outperformed 1-min for both
+// strength AND hypertrophy outcomes on compound lifts even at hypertrophy
+// rep ranges (8-12), so primary/secondary work should not get shorter
+// rest just because the rep target sits in a "hypertrophy" zone.
+//
+// Load intent only overrides the role default at the true extremes,
+// where the training goal clearly diverges from the role default's
+// assumption: very heavy, low-rep work (NSCA strength/power guidance,
+// Haff & Triplett, Essentials of Strength Training and Conditioning)
+// needs more than the role default provides, and very high-rep metabolic
+// work needs less, since full ATP-PC recovery isn't the point.
+const HEAVY_REP_THRESHOLD = 5;
+const HEAVY_REST_SECONDS = 210;
+const HIGH_REP_THRESHOLD = 15;
+const HIGH_REP_REST_SECONDS = 60;
+
+export const restSeconds = (
   slot: MovementSlotV2,
   candidate: ExerciseCandidate,
+  targetReps: number,
 ): number => {
-  const desired =
+  const roleDefault =
     slot.sequence_role === 'primary'
       ? 180
       : slot.sequence_role === 'secondary'
@@ -50,6 +68,12 @@ const restSeconds = (
         : slot.sequence_role === 'isolation'
           ? 75
           : 90;
+  const desired =
+    targetReps <= HEAVY_REP_THRESHOLD
+      ? Math.max(roleDefault, HEAVY_REST_SECONDS)
+      : targetReps >= HIGH_REP_THRESHOLD
+        ? Math.min(roleDefault, HIGH_REP_REST_SECONDS)
+        : roleDefault;
   return Math.max(
     candidate.exercise.default_rest_seconds.min,
     Math.min(candidate.exercise.default_rest_seconds.max, desired),
@@ -125,7 +149,7 @@ export const buildExactPrescription = (
       target_reps: targetReps,
       target_rpe: slot.target_rpe,
       rpe_ceiling: slot.rpe_ceiling,
-      rest_seconds: restSeconds(slot, candidate),
+      rest_seconds: restSeconds(slot, candidate, targetReps),
     })),
     progression_bounds: {
       ...progressionBounds,
