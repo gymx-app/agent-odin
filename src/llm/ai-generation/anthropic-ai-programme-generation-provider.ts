@@ -19,7 +19,10 @@ import type {
   AiNarrativeSynthesisContext,
   AiNarrativeSynthesisResult,
 } from './ai-programme-generation-provider.js';
-import { NarrativeSynthesisOutputSchema } from './narrative-contract.schema.js';
+import {
+  NarrativeSynthesisOutputSchema,
+  NarrativeSynthesisStructuralSchema,
+} from './narrative-contract.schema.js';
 import { aiStrategySystemPrompt } from './ai-generation-strategy-prompt.js';
 import { aiPhaseSystemPrompt } from './ai-generation-phase-prompt.js';
 import {
@@ -286,10 +289,17 @@ export class AnthropicAiProgrammeGenerationProvider implements AiProgrammeGenera
       $refStrategy: 'none',
     });
 
+    // Validate against the refine()-stripped shape here, not the full
+    // contract schema: generateStructured discards the parsed JSON and
+    // throws a generic error on any safeParse failure, which would lose
+    // per-sentence detail the retry loop needs whenever a single sentence
+    // fails the goal/profile-fact contract. narrative-synthesis.service.ts
+    // re-validates result.output against the full schema and extracts
+    // specific issues for retry feedback.
     const result = await this.generateStructured(
       context.systemPrompt,
       context.userContent,
-      NarrativeSynthesisOutputSchema,
+      NarrativeSynthesisStructuralSchema,
       jsonSchema,
       4000,
     );
