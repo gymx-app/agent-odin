@@ -45,6 +45,7 @@ import {
   collectRationaleCodes,
   CITATION_SHAPE,
 } from '../../src/validation/evidence-citation-validator.js';
+import { ALL_CITATION_CODES } from '../../src/planning/evidence.js';
 import type {
   HttpRequest,
   HttpResponse,
@@ -528,10 +529,21 @@ export const createGenerateProgrammeV2Handler = (
             ? [...new Set(repair_log.flatMap((r) => r.errorCodes))]
             : null;
 
+          // Union of citations actually stamped on decisions in the assembled
+          // programme (baseline assessment, conditioning finishers) with the
+          // full evidence registry (volume fill rates, HIIT cycling, equipment
+          // preference, etc.) — those rules genuinely drove this athlete's
+          // phase/split/volume decisions even though the deterministic planner
+          // never attaches a citation-shaped rationale_code to them. Without
+          // this, narrative synthesis only ever had baseline/finisher codes to
+          // cite, which are topically irrelevant to most phase/split/day-pattern
+          // narratives, so citation_codes came back empty on every sentence
+          // even when the narrative itself was correct.
           const citationCodes = (() => {
             const codes = new Set<string>();
             collectRationaleCodes(programme, codes);
-            return [...codes].filter((code) => CITATION_SHAPE.test(code));
+            const embedded = [...codes].filter((code) => CITATION_SHAPE.test(code));
+            return [...new Set([...embedded, ...ALL_CITATION_CODES])];
           })();
 
           let narrativeResult: Awaited<ReturnType<typeof synthesizeNarratives>>;

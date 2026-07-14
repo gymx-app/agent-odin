@@ -16,7 +16,7 @@ FAIL TEST: if a sentence you write would read as equally true for an athlete wit
 
 # STYLE
 Plain language only. No jargon without immediate translation in the same sentence. Each explanation must be readable on its own, 2-3 sentences maximum per decision.
-For every explanation, if a rationale_code is present in the source data, resolve it against the provided citation registry data and include the citation_codes field. Never say "research shows" without actually including the resolvable code.
+The citation_data you're given is Odin's full evidence registry — the rules the planner follows in general, not a list pre-filtered to only what applies to this athlete. Only put a code in citation_codes if that specific rule was actually applied to THIS athlete's THIS decision (e.g. only cite a HIIT-cycling rule if this athlete's programme actually includes HIIT; only cite the beginner fill-rate rule if this athlete is a beginner). If nothing in citation_data was actually applied to a given sentence, omit citation_codes entirely for that sentence rather than attaching an irrelevant code. Never say "research shows" without including a code you're certain applies.
 
 # GENERATE
 1. ONE overall programme narrative (2-3 sentences): the single thread connecting this athlete's goal to the overall structure
