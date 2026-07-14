@@ -15,6 +15,7 @@ import { buildProgrammeResistanceSessions } from './sessions/session-builder.js'
 import { selectProgrammeStrategyV2 } from './strategy/strategy-selector.js';
 import type { TrainingStrategyV2 } from './strategy/strategy.types.js';
 import { planProgrammeWeeks } from './weeks/week-progression-planner.js';
+import { selectFeasibleResistanceFrequency } from './volume/frequency-feasibility.js';
 
 const MAX_REPAIR_ATTEMPTS = 2;
 
@@ -79,6 +80,25 @@ const initialSchedule = (profile: NormalizedAthleteProfile) => {
         days - Math.min(conditioning, 1),
         profile.source.goal === 'endurance' ? 3 : days <= 5 ? 4 : days,
       ),
+    );
+  }
+
+  // Volume feasibility can raise resistance frequency toward the
+  // athlete's available days, but never past the safety ceiling already
+  // used elsewhere for beginners/low recovery capacity (see the 6-day-PPL
+  // rejection in strategy-scorer.ts), and not for an endurance goal,
+  // where resistance days are intentionally minimized in favor of
+  // conditioning by design, not by oversight.
+  if (profile.source.goal !== 'endurance') {
+    const maxSafeFrequency =
+      profile.source.fitness_level === 'beginner' ||
+      profile.recovery_capacity === 'low'
+        ? 4
+        : days - Math.min(conditioning, 1);
+    resistance = selectFeasibleResistanceFrequency(
+      profile,
+      resistance,
+      Math.min(days - Math.min(conditioning, 1), maxSafeFrequency),
     );
   }
 

@@ -116,4 +116,23 @@ describe('end-to-end longitudinal programme planner', () => {
       result.validation.findings.some((item) => item.severity === 'error'),
     ).toBe(false);
   });
+
+  it('uses a 5th resistance day when 4 days cannot fit minimum effective volume', () => {
+    const result = buildLongitudinalProgramme(
+      createProfile({
+        available_days_per_week: 5,
+        session_duration_min: 30,
+        fitness_level: 'advanced',
+        goal: 'muscle_gain',
+      }),
+      seedExercises,
+      {
+        startDate: '2026-06-22',
+        generatedAt: '2026-06-19T05:30:00.000Z',
+      },
+    );
+
+    expect(result.programme.strategy.resistance_frequency).toBe(5);
+    expect(result.validation.passed).toBe(true);
+  });
 });
