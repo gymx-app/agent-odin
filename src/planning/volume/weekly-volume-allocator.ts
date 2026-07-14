@@ -69,7 +69,7 @@ export const allocateWeeklyVolume = (
       : []),
   ];
 
-  const muscleTargets = budgetMuscleGroups(input, volumeFactor);
+  const muscleTargets = budgetMuscleGroups(input, volumeFactor, total_working_sets);
   const movementPatternBudgets = budgetMovementPatterns(
     input,
     total_working_sets,

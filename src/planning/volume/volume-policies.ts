@@ -26,13 +26,13 @@ export const CORE_MOVEMENT_PATTERNS: MovementPattern[] = [
   'horizontal_pull',
   'vertical_pull',
   'knee_flexion_isolation',
-  'knee_extension_isolation',
   'elbow_flexion',
   'elbow_extension',
   'shoulder_abduction',
   'calf_raise',
   'core_anti_extension',
   'core_anti_rotation',
+  'hip_abduction',
 ];
 
 export const MOVEMENT_MUSCLE_MAP: Record<MovementPattern, MuscleGroup[]> = {
