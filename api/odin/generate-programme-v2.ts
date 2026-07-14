@@ -40,6 +40,11 @@ import {
   logGeneration,
 } from '../../src/infrastructure/supabase/generation-log.js';
 import { aiStrategySystemPromptV2 } from '../../src/llm/ai-generation/ai-generation-strategy-prompt-v2.js';
+import { synthesizeNarratives } from '../../src/llm/ai-generation/narrative-synthesis.service.js';
+import {
+  collectRationaleCodes,
+  CITATION_SHAPE,
+} from '../../src/validation/evidence-citation-validator.js';
 import type {
   HttpRequest,
   HttpResponse,
@@ -538,6 +543,36 @@ export const createGenerateProgrammeV2Handler = (
             planner_version: PLANNER_VERSION,
           });
 
+          const citationCodes = (() => {
+            const codes = new Set<string>();
+            collectRationaleCodes(programme, codes);
+            return [...codes].filter((code) => CITATION_SHAPE.test(code));
+          })();
+
+          let narrativeResult: Awaited<ReturnType<typeof synthesizeNarratives>>;
+          try {
+            narrativeResult = await synthesizeNarratives(
+              {
+                profile: normalized as unknown as Record<string, unknown>,
+                rationale: rationale as unknown as Record<string, unknown>,
+                validation_findings: validation.findings.map((f) => ({
+                  code: f.code,
+                  message: f.message,
+                  severity: f.severity,
+                })),
+                citation_codes: citationCodes,
+              },
+              provider,
+              context.requestId,
+            );
+          } catch (err) {
+            logger.error('narrative synthesis failed', {
+              userId: user.id,
+              message: err instanceof Error ? err.message : String(err),
+            });
+            narrativeResult = { narratives: null, citations: null, narratives_unavailable: true };
+          }
+
           return successResponse({
             step: 'build',
             source: 'ai_generated' as const,
@@ -550,6 +585,9 @@ export const createGenerateProgrammeV2Handler = (
                 : null,
             validation,
             rationale,
+            narratives: narrativeResult.narratives,
+            citations: narrativeResult.citations,
+            narratives_unavailable: narrativeResult.narratives_unavailable,
             refinement: {
               requested: false,
               attempted: repairAttempted,

@@ -9,9 +9,9 @@ import type { ProgrammeValidationFinding } from './validation.types.js';
 // RECENT_VOLUME_ANCHORED) in the same string[]. Only strings shaped like a
 // citation (AUTHOR_YEAR_TOPIC) are checked against the registry — internal
 // tags never match this shape, so this doesn't false-positive on them.
-const CITATION_SHAPE = /^[A-Z][A-Z0-9]*_(?:19|20)\d{2}_[A-Z0-9_]+$/;
+export const CITATION_SHAPE = /^[A-Z][A-Z0-9]*_(?:19|20)\d{2}_[A-Z0-9_]+$/;
 
-const collectRationaleCodes = (value: unknown, out: Set<string>): void => {
+export const collectRationaleCodes = (value: unknown, out: Set<string>): void => {
   if (Array.isArray(value)) {
     value.forEach((v) => collectRationaleCodes(v, out));
     return;

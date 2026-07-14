@@ -457,3 +457,136 @@ export const ALL_CITATION_CODES = new Set<string>([
   ...PUSHUP_NORM_CITATIONS,
   ...BASELINE_ASSESSMENT_CITATIONS,
 ]);
+
+// Structured form of the citation keys documented in the comment block above,
+// for consumers (e.g. narrative synthesis) that need author/year/finding as
+// data rather than prose. Transcribed from those comments — not a new source
+// of truth; keep in sync with the comment block when citations change.
+export type CitationEntry = {
+  author: string;
+  year: number;
+  finding: string;
+};
+
+export const CITATION_REGISTRY: Record<string, CitationEntry> = {
+  SCHOENFELD_2017_DOSE_RESPONSE: {
+    author: 'Schoenfeld BJ, Ogborn D, Krieger JW',
+    year: 2017,
+    finding:
+      '10+ sets per muscle per week is superior to fewer than 5; there is a graded dose-response across <5, 5-9, and 10+ weekly sets per muscle group.',
+  },
+  SCHOENFELD_2019_VOLUME_HYPERTROPHY: {
+    author: 'Schoenfeld BJ et al.',
+    year: 2019,
+    finding:
+      '45 weekly sets produced greater hypertrophy than 27, which produced greater hypertrophy than 9, in trained men.',
+  },
+  ISRAETEL_RP_VOLUME_LANDMARKS: {
+    author: 'Israetel M, Hoffmann J',
+    year: 2019,
+    finding:
+      'Maintenance volume is roughly 6 sets/muscle/week; minimum effective volume roughly 6-8; maximum adaptive volume 12-20; maximum recoverable volume varies by individual.',
+  },
+  SABAG_2022_CONCURRENT_HIIT: {
+    author: 'Sabag A et al.',
+    year: 2018,
+    finding:
+      'HIIT may reduce interference with strength/hypertrophy gains compared to steady-state endurance when combined with resistance training; cycling HIIT showed more lower-body interference than running.',
+  },
+  MURLASITS_2018_CONCURRENT: {
+    author: 'Murlasits Z et al.',
+    year: 2018,
+    finding:
+      'Doing resistance training before endurance training preserves strength gains in programmes of 5+ weeks. Shorter endurance bouts (≤30 min) cause less interference than longer bouts (50-60+ min).',
+  },
+  VIANA_2019_HIIT_FAT_LOSS: {
+    author: 'Viana RB et al.',
+    year: 2019,
+    finding:
+      'HIIT and sprint interval training reduce total body fat mass (mean ~1.58 kg) with similar efficacy to moderate-intensity continuous training but roughly 40% less time commitment.',
+  },
+  WEWEGE_2017_HIIT_OBESITY: {
+    author: 'Wewege M et al.',
+    year: 2017,
+    finding:
+      'HIIT reduces total body fat mass by 1.38-2 kg in overweight and obese adults; 3+ sessions/week for 8+ weeks is most effective for body composition change.',
+  },
+  ACSM_2021_GUIDELINES: {
+    author: 'American College of Sports Medicine',
+    year: 2021,
+    finding:
+      'Previously sedentary or untrained individuals should complete a base-building phase of moderate-intensity exercise before starting HIIT. Progressive overload should not exceed a 10-20% volume increase per week.',
+  },
+  GENTIL_2017_MINIMUM_VOLUME: {
+    author: 'Gentil P et al.',
+    year: 2017,
+    finding:
+      'Even low-volume protocols (≤4 sets/muscle/week) produce substantial hypertrophy gains; the meaningful threshold is roughly 4-6 sets/week.',
+  },
+  KRIEGER_2010_SETS_META: {
+    author: 'Krieger JW',
+    year: 2010,
+    finding:
+      '2-3 sets per exercise produce greater hypertrophy than 1 set; 4-6 sets per exercise show additional but diminishing returns.',
+  },
+  SCHOENFELD_2021_LOAD_HYPERTROPHY: {
+    author: 'Schoenfeld BJ et al.',
+    year: 2021,
+    finding:
+      'External load of 30%+ 1RM produces comparable hypertrophy to heavy loads when taken to failure, but heavier loads are superior for maximal strength development.',
+  },
+  WEAKLEY_2022_CONCURRENT_DOSE: {
+    author: 'Weakley J et al.',
+    year: 2022,
+    finding:
+      'Endurance bouts of 30 minutes or less cause less interference with strength training than 50-60+ minute bouts. Twice-weekly endurance work has minimal interference; three times weekly shows a detriment. A 3-6 hour separation is recommended for same-day sessions.',
+  },
+  ACSM_2021_PUSHUP_NORMS: {
+    author: 'American College of Sports Medicine',
+    year: 2021,
+    finding:
+      'Normative push-up tables by age and sex classify muscular endurance into percentile categories from poor to excellent.',
+  },
+  REYNOLDS_1999_PREDICTION: {
+    author: 'Reynolds JM, Gordon TJ, Robergs RA',
+    year: 1999,
+    finding:
+      'All 7 tested one-rep-max prediction equations correlated at r>0.95 with actual squat 1RM in untrained subjects; the Brzycki equation is most commonly recommended for ≤10 reps.',
+  },
+  EPLEY_1985_PREDICTION: {
+    author: 'Epley B',
+    year: 1985,
+    finding:
+      'A linear formula (1RM = weight × (1 + reps / 30)) is the most widely validated one-rep-max prediction model across populations, accurate for 1-15 reps.',
+  },
+  BRZYCKI_1993_PREDICTION: {
+    author: 'Brzycki M',
+    year: 1993,
+    finding:
+      'A hyperbolic formula (1RM = weight × 36 / (37 - reps)) for predicting one-rep max from reps-to-fatigue is most accurate for ≤10 reps.',
+  },
+  RIPPETOE_2013_STRENGTH_STANDARDS: {
+    author: 'Rippetoe M, Baker A',
+    year: 2013,
+    finding:
+      'Bodyweight-ratio strength standards by training status and sex exist for the squat, bench press, deadlift, and overhead press.',
+  },
+  EXRX_STRENGTH_STANDARDS: {
+    author: 'ExRx.net',
+    year: 2023,
+    finding:
+      'Population-derived bodyweight-ratio strength norms for major lifts exist across untrained-to-elite categories, broken out by sex and bodyweight class.',
+  },
+  WOOD_2022_POPULATION_NORMS: {
+    author: 'Wood TM et al.',
+    year: 2024,
+    finding:
+      '10th-90th percentile strength ratios by sex, age, and weight class were derived from 809,986 powerlifting competition entries — the largest such dataset to date.',
+  },
+  MCGUIGAN_2017_PUSHUP_BENCH: {
+    author: 'Bartolomei S et al.',
+    year: 2020,
+    finding:
+      'There is a large correlation (r=0.79) between ballistic push-up force output and bench press one-rep max.',
+  },
+};

@@ -19,6 +19,8 @@ import type {
   AiProgrammeGenerationProvider,
   AiStrategyContext,
   AiPhaseContext,
+  AiNarrativeSynthesisContext,
+  AiNarrativeSynthesisResult,
 } from './ai-programme-generation-provider.js';
 import { aiStrategySystemPrompt } from './ai-generation-strategy-prompt.js';
 import { aiPhaseSystemPrompt } from './ai-generation-phase-prompt.js';
@@ -29,9 +31,11 @@ import {
 import type { FunctionTool } from 'openai/resources/responses/responses';
 import { AGENT_TOOLS } from './agent-tools.js';
 import { toOpenAISchema } from './openai-schema-compat.js';
+import { NarrativeSynthesisOutputSchema } from './narrative-contract.schema.js';
 
 const MAX_TOOL_TURNS = 10;
 const MAX_RATE_LIMIT_RETRIES = 3;
+const OpenAINarrativeSchema = toOpenAISchema(NarrativeSynthesisOutputSchema);
 
 const stripNullsDeep = (obj: unknown): unknown => {
   if (obj === null) return undefined;
@@ -579,6 +583,28 @@ export class OpenAIAiProgrammeGenerationProvider implements AiProgrammeGeneratio
         `The generation provider is unavailable: ${detail}`,
       );
     }
+  }
+
+  async generateNarrativeSynthesis(
+    context: AiNarrativeSynthesisContext,
+  ): Promise<AiNarrativeSynthesisResult> {
+    // No modelOverride passed: defaults to this.model (openaiGenerationModel),
+    // the strong model also used for phase generation — not openaiStrategyModel.
+    const result = await this.generateStructured(
+      context.systemPrompt,
+      context.userContent,
+      NarrativeSynthesisOutputSchema,
+      'narrative_synthesis',
+      4000,
+      OpenAINarrativeSchema,
+    );
+
+    return {
+      output: result.output,
+      provider: result.provider,
+      model: result.model,
+      usage: result.usage,
+    };
   }
 
   private async generateStructured<T>(

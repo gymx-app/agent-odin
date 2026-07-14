@@ -16,7 +16,10 @@ import type {
   AiProgrammeGenerationProvider,
   AiStrategyContext,
   AiPhaseContext,
+  AiNarrativeSynthesisContext,
+  AiNarrativeSynthesisResult,
 } from './ai-programme-generation-provider.js';
+import { NarrativeSynthesisOutputSchema } from './narrative-contract.schema.js';
 import { aiStrategySystemPrompt } from './ai-generation-strategy-prompt.js';
 import { aiPhaseSystemPrompt } from './ai-generation-phase-prompt.js';
 import {
@@ -273,6 +276,30 @@ export class AnthropicAiProgrammeGenerationProvider implements AiProgrammeGenera
         `The generation provider is unavailable: ${detail}`,
       );
     }
+  }
+
+  async generateNarrativeSynthesis(
+    context: AiNarrativeSynthesisContext,
+  ): Promise<AiNarrativeSynthesisResult> {
+    const jsonSchema = zodToJsonSchema(NarrativeSynthesisOutputSchema, {
+      target: 'jsonSchema7',
+      $refStrategy: 'none',
+    });
+
+    const result = await this.generateStructured(
+      context.systemPrompt,
+      context.userContent,
+      NarrativeSynthesisOutputSchema,
+      jsonSchema,
+      4000,
+    );
+
+    return {
+      output: result.output,
+      provider: result.provider,
+      model: result.model,
+      usage: result.usage,
+    };
   }
 
   private async generateStructured<T>(

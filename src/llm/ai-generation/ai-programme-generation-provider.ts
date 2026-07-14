@@ -36,6 +36,21 @@ export type AiPhaseContext = {
   constraints: Record<string, unknown>;
 };
 
+export type AiNarrativeSynthesisContext = {
+  systemPrompt: string;
+  userContent: unknown;
+};
+
+// output is intentionally unvalidated here — the caller re-validates against
+// its own (refinement-bearing) Zod schema, since the OpenAI provider strips
+// refinements before requesting structured output (see openai-schema-compat.ts).
+export type AiNarrativeSynthesisResult = {
+  output: unknown;
+  provider: string;
+  model: string;
+  usage: { inputTokens: number | null; outputTokens: number | null };
+};
+
 export interface AiProgrammeGenerationProvider {
   generateStrategy(
     context: AiStrategyContext,
@@ -56,4 +71,9 @@ export interface AiProgrammeGenerationProvider {
     weekCtx: AiWeekGenerationContext,
     providerCtx: AiGenerationProviderContext,
   ): Promise<AiWeekGenerationResult>;
+
+  generateNarrativeSynthesis?(
+    context: AiNarrativeSynthesisContext,
+    providerCtx: AiGenerationProviderContext,
+  ): Promise<AiNarrativeSynthesisResult>;
 }
