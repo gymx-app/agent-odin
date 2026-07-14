@@ -227,7 +227,18 @@ export const buildProgrammeResistanceSessions = (input: {
       ...week,
       days: week.days.map((day) => {
         if (day.day_type !== 'resistance' || !day.training_budget) return day;
-        const priorContext = continuityByCycleDay.get(day.cycle_day);
+        // Continuity holds within a phase (a mesocycle keeps its exercise
+        // selection stable so an athlete can track progressive overload on
+        // the same lift), but resets at phase boundaries — otherwise an
+        // exercise picked in Foundation stays locked in through
+        // Accumulation, Intensification, and every phase after that for
+        // the life of the programme, since the +15 continuity score bonus
+        // (exercise-candidate-builder.ts) almost always wins with nothing
+        // to weigh against it. phase_id was already carried on the stored
+        // context for exactly this check; it just wasn't being read.
+        const storedContext = continuityByCycleDay.get(day.cycle_day);
+        const priorContext =
+          storedContext?.phase_id === phase.phase_id ? storedContext : undefined;
         const builderInput = {
           profile: input.profile,
           strategy: input.strategy,

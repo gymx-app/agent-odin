@@ -375,4 +375,60 @@ describe('Session Construction V2', () => {
         );
       });
   });
+
+  it('resets exercise continuity at phase boundaries', () => {
+    const context = setup(
+      {
+        goal: 'muscle_gain',
+        fitness_level: 'advanced',
+        training_history: {
+          years_consistent_training: 8,
+          consistency_last_12_weeks: 'high',
+          exercise_competency: 'advanced',
+        },
+      },
+      20,
+      5,
+    );
+    expect(context.weekPlan.phases.length).toBeGreaterThan(1);
+
+    const phases = buildProgrammeResistanceSessions({
+      profile: context.profile,
+      strategy: context.strategy,
+      phases: context.weekPlan.phases,
+      exercises: seedExercises,
+    });
+
+    const firstPhase = phases[0]!;
+    const secondPhase = phases[1]!;
+    const resistanceDays = (
+      phase: (typeof phases)[number],
+    ) => phase.weeks.flatMap((week) => week.days).filter(
+      (day) => day.day_type === 'resistance',
+    );
+
+    // Within the first phase, week-to-week continuity should still hold —
+    // this is the existing, desired behavior, unaffected by the fix.
+    const withinPhaseContinuityPreserved = resistanceDays(firstPhase)
+      .slice(1)
+      .some((day) =>
+        day.exercises.some((exercise) =>
+          exercise.sequencing_rationale.includes('EXERCISE_CONTINUITY_PRESERVED'),
+        ),
+      );
+    expect(withinPhaseContinuityPreserved).toBe(true);
+
+    // The first week of the next phase should never carry a forced
+    // continuity bonus from the previous phase's selections — the
+    // exercise pool is free to vary at the mesocycle boundary.
+    const firstWeekOfSecondPhase = secondPhase.weeks[0]!.days.filter(
+      (day) => day.day_type === 'resistance',
+    );
+    const carriesPriorPhaseContinuity = firstWeekOfSecondPhase.some((day) =>
+      day.exercises.some((exercise) =>
+        exercise.sequencing_rationale.includes('EXERCISE_CONTINUITY_PRESERVED'),
+      ),
+    );
+    expect(carriesPriorPhaseContinuity).toBe(false);
+  });
 });
