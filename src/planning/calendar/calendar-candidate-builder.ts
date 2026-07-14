@@ -44,7 +44,12 @@ const sessionKinds = (
       (_, index) => order[index % order.length]!,
     );
   }
-  if (frequency === 5) return ['upper', 'lower', 'push', 'pull', 'legs'];
+  // Lower-body-dominant kinds (lower, pull, legs all load hinge/knee/lower_body
+  // at moderate-plus) must never sit next to each other in this list: whichever
+  // two land on physically adjacent calendar days trips HIGH_FATIGUE_MOVEMENT_OVERLAP
+  // (calendar-validator.ts). Alternating with upper/push (both movement-neutral)
+  // keeps every adjacent pair, under any resistance-day placement, safe.
+  if (frequency === 5) return ['lower', 'upper', 'pull', 'push', 'legs'];
   if (frequency === 4) return ['upper', 'lower', 'upper', 'lower'];
   return Array.from({ length: frequency }, () => 'full_body');
 };
