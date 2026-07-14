@@ -2,6 +2,7 @@ import { allocatePhaseLengths } from './phase-length-allocator.js';
 import { phaseDirections } from './phase-policies.js';
 import { buildPhaseSequence } from './phase-sequence-builder.js';
 import { selectPlannedDeloadWeeks } from './deload-policy.js';
+import { PHASE_DELOAD_ADJUSTMENTS } from '../fatigue/deload-adjustments.js';
 import type {
   PhaseArchitecture,
   PhaseDecision,
@@ -74,14 +75,7 @@ export const planProgrammePhases = (
       strategy: input.strategy.fatigue_strategy,
       planned_deload_weeks,
       deload_adjustments:
-        planned_deload_weeks.length > 0
-          ? {
-              volume_factor: 0.7,
-              intensity_factor: 0.85,
-              effort_factor: 0.8,
-              conditioning_factor: 0.8,
-            }
-          : {},
+        planned_deload_weeks.length > 0 ? PHASE_DELOAD_ADJUSTMENTS : {},
       readiness_triggers:
         input.strategy.fatigue_strategy === 'readiness_triggered' ||
         input.strategy.fatigue_strategy === 'combined'
