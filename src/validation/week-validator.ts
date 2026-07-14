@@ -173,7 +173,7 @@ export const validateLongitudinalWeeks = (
           { week_number: week.week_number, muscle_group: budget.muscle_group },
         );
       }
-      if (delivered < budget.minimum_effective_target) {
+      if (week.week_type !== 'deload' && delivered < budget.minimum_effective_target) {
         add(
           'MUSCLE_VOLUME_BELOW_REQUIRED',
           'warning',

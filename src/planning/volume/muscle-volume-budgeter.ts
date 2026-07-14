@@ -4,6 +4,7 @@ import { BASE_DIRECT_SETS, CORE_MUSCLE_GROUPS } from './volume-policies.js';
 export const budgetMuscleGroups = (
   input: WeekPlannerInput,
   volumeFactor: number,
+  totalWorkingSets: number = Infinity,
 ): Array<{
   muscle_group: string;
   direct_set_target: number;
@@ -19,7 +20,7 @@ export const budgetMuscleGroups = (
   const deficit = input.profile.source.nutrition?.calorie_status === 'deficit';
   const goal = input.strategy.primary_objective;
 
-  return CORE_MUSCLE_GROUPS.map((muscle_group) => {
+  const targets = CORE_MUSCLE_GROUPS.map((muscle_group) => {
     const recentTarget = recent?.[muscle_group];
     let anchor = recentTarget ?? BASE_DIRECT_SETS[status];
     const priority =
@@ -48,4 +49,26 @@ export const budgetMuscleGroups = (
       ],
     };
   });
+
+  // The movement-pattern budgeter distributes total_working_sets across
+  // muscles proportionally to direct_set_target (see patternDemandWeight in
+  // movement-volume-budgeter.ts). When weekly capacity can't cover every
+  // muscle's floor (low-frequency/short-session athletes), that same
+  // shortfall must be reflected in minimum_effective_target — otherwise the
+  // validator flags a floor no allocation could ever satisfy.
+  const totalDirect = targets.reduce((sum, t) => sum + t.direct_set_target, 0);
+  const shortfallScale = totalDirect > 0 ? Math.min(1, totalWorkingSets / totalDirect) : 1;
+  if (shortfallScale >= 1) return targets;
+
+  return targets.map((target) => ({
+    ...target,
+    minimum_effective_target: Math.max(
+      1,
+      Math.round(target.minimum_effective_target * shortfallScale),
+    ),
+    rationale_codes: [
+      ...target.rationale_codes,
+      'SESSION_CAPACITY_MINIMUM_REDUCED',
+    ],
+  }));
 };

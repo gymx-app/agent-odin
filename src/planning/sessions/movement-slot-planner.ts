@@ -47,6 +47,13 @@ const templates: Record<SessionKind, SlotTemplate[]> = {
       required: true,
     },
     {
+      pattern: 'hip_abduction',
+      substitutions: [],
+      muscles: ['glutes'],
+      role: 'accessory',
+      required: false,
+    },
+    {
       pattern: 'core_anti_extension',
       substitutions: ['core_anti_rotation', 'carry'],
       muscles: ['abdominals'],
@@ -111,6 +118,13 @@ const templates: Record<SessionKind, SlotTemplate[]> = {
       substitutions: [],
       muscles: ['hamstrings'],
       role: 'isolation',
+      required: false,
+    },
+    {
+      pattern: 'hip_abduction',
+      substitutions: [],
+      muscles: ['glutes'],
+      role: 'accessory',
       required: false,
     },
     {
@@ -187,6 +201,13 @@ const templates: Record<SessionKind, SlotTemplate[]> = {
       substitutions: [],
       muscles: ['hamstrings'],
       role: 'isolation',
+      required: false,
+    },
+    {
+      pattern: 'hip_abduction',
+      substitutions: [],
+      muscles: ['glutes'],
+      role: 'accessory',
       required: false,
     },
     {
