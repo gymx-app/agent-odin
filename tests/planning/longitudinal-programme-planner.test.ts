@@ -61,6 +61,7 @@ describe('end-to-end longitudinal programme planner', () => {
       'sessions',
       'warmup_and_sequence',
       'conditioning',
+      'weight_prescription',
       'composition',
       'validation',
       'repair',
@@ -134,5 +135,53 @@ describe('end-to-end longitudinal programme planner', () => {
 
     expect(result.programme.strategy.resistance_frequency).toBe(5);
     expect(result.validation.passed).toBe(true);
+  });
+
+  it('populates weight_kg for prescribed compound lifts when the athlete self-reports known lifts', () => {
+    const result = buildLongitudinalProgramme(
+      createProfile({
+        available_days_per_week: 4,
+        fitness_level: 'advanced',
+        goal: 'strength',
+        baseline_path: 'self_reported',
+        known_lifts: [
+          { exercise_id: 'squat', weight_kg: 140, reps: 5 },
+          { exercise_id: 'bench_press', weight_kg: 100, reps: 5 },
+          { exercise_id: 'deadlift', weight_kg: 180, reps: 3 },
+          { exercise_id: 'overhead_press', weight_kg: 60, reps: 5 },
+          { exercise_id: 'barbell_row', weight_kg: 90, reps: 5 },
+        ],
+      }),
+      seedExercises,
+      {
+        startDate: '2026-06-22',
+        generatedAt: '2026-06-19T05:30:00.000Z',
+      },
+    );
+
+    expect(result.validation.passed).toBe(true);
+    const allExercises = result.programme.phases
+      .flatMap((phase) => phase.weeks)
+      .flatMap((week) => week.days)
+      .flatMap((day) => day.exercises);
+    const knownLiftIds = new Set([
+      'barbell_back_squat',
+      'barbell_bench_press',
+      'barbell_deadlift',
+      'trap_bar_deadlift',
+      'barbell_overhead_press',
+      'barbell_bent_over_row',
+      'barbell_pendlay_row',
+      'tbar_row',
+    ]);
+    const pricedCompoundLifts = allExercises.filter(
+      (exercise) =>
+        knownLiftIds.has(exercise.exercise_id) && exercise.weight_kg !== null,
+    );
+    expect(pricedCompoundLifts.length).toBeGreaterThan(0);
+    // Every priced exercise should be plate-loadable.
+    pricedCompoundLifts.forEach((exercise) => {
+      expect(exercise.weight_kg! % 2.5).toBe(0);
+    });
   });
 });

@@ -95,6 +95,15 @@
  *   factors that enhance muscle strength. PMC 2024.
  *   PMC: https://pmc.ncbi.nlm.nih.gov/articles/PMC11688070/
  *   Finding: Endurance bouts ≤30 min cause less interference than 50-60+ min.
+ *
+ * HELMS_2016_RPE_SCALE
+ *   Helms ER, Cronin J, Storey A, Zourdos MC. Application of the
+ *   Repetitions in Reserve-Based Rating of Perceived Exertion Scale for
+ *   Resistance Training. Strength Cond J. 2016;38(4):42-49.
+ *   Finding: an RPE/RIR-based %1RM correspondence table (originating from
+ *   Mike Tuchscherer's Reactive Training Systems chart, and reproduced/
+ *   validated in this paper) lets a target RPE and rep count be converted
+ *   to an estimated percentage of 1RM.
  *   2x/week endurance has minimal interference; 3x/week shows detriment.
  *   3-6 hour separation recommended for same-day sessions.
  */
@@ -148,6 +157,41 @@ export const INDIRECT_SET_CREDIT_FACTOR = 0.5;
 export const INDIRECT_SET_CREDIT_CITATIONS = [
   'ISRAETEL_RP_INDIRECT_VOLUME',
 ] as const;
+
+// ─── RPE-based %1RM estimation ────────────────────────────────────────
+// Helms, Cronin, Storey & Zourdos (2016) / Tuchscherer RTS chart: percent
+// of 1RM by target RPE (6-10, in 0.5 increments) and target reps (1-12).
+// Deliberately not extrapolated beyond this published range — outside it,
+// callers should fall back to a goal-based percentage rather than trust a
+// number this table was never validated for.
+export const RPE_PERCENT_1RM_TABLE: Record<string, number[]> = {
+  '10': [100, 95.5, 92.2, 89.2, 86.3, 83.7, 81.1, 78.6, 76.2, 73.9, 71.7, 69.4],
+  '9.5': [97.8, 93.9, 90.7, 87.8, 85.0, 82.4, 79.9, 77.4, 75.1, 72.8, 70.6, 68.5],
+  '9': [95.5, 92.2, 89.2, 86.3, 83.7, 81.1, 78.6, 76.2, 73.9, 71.7, 69.4, 67.4],
+  '8.5': [93.9, 90.7, 87.8, 85.0, 82.4, 79.9, 77.4, 75.1, 72.8, 70.6, 68.5, 66.4],
+  '8': [92.2, 89.2, 86.3, 83.7, 81.1, 78.6, 76.2, 73.9, 71.7, 69.4, 67.4, 65.3],
+  '7.5': [90.7, 87.8, 85.0, 82.4, 79.9, 77.4, 75.1, 72.8, 70.6, 68.5, 66.4, 64.5],
+  '7': [89.2, 86.3, 83.7, 81.1, 78.6, 76.2, 73.9, 71.7, 69.4, 67.4, 65.3, 63.4],
+  '6.5': [87.8, 85.0, 82.4, 79.9, 77.4, 75.1, 72.8, 70.6, 68.5, 66.4, 64.5, 62.6],
+  '6': [86.3, 83.7, 81.1, 78.6, 76.2, 73.9, 71.7, 69.4, 67.4, 65.3, 63.4, 61.5],
+};
+
+// Rounds target_rpe to the nearest 0.5 (the table's granularity) before
+// lookup. Returns undefined outside the table's published range (RPE < 6
+// or > 10, reps < 1 or > 12) rather than guessing.
+export const percentOneRepMaxForRpeReps = (
+  targetRpe: number,
+  targetReps: number,
+): number | undefined => {
+  const rpeKey = (Math.round(targetRpe * 2) / 2).toString();
+  const row = RPE_PERCENT_1RM_TABLE[rpeKey];
+  if (!row || !Number.isInteger(targetReps) || targetReps < 1 || targetReps > 12) {
+    return undefined;
+  }
+  return row[targetReps - 1];
+};
+
+export const RPE_PERCENT_1RM_CITATIONS = ['HELMS_2016_RPE_SCALE'] as const;
 
 // ─── Equipment preference scoring ────────────────────────────────────
 // Schoenfeld 2021: External load ≥30% 1RM matches bodyweight-to-failure
@@ -616,5 +660,11 @@ export const CITATION_REGISTRY: Record<string, CitationEntry> = {
     year: 2020,
     finding:
       'There is a large correlation (r=0.79) between ballistic push-up force output and bench press one-rep max.',
+  },
+  HELMS_2016_RPE_SCALE: {
+    author: 'Helms ER, Cronin J, Storey A, Zourdos MC',
+    year: 2016,
+    finding:
+      "A target RPE (repetitions in reserve) and rep count can be converted to an estimated percentage of 1RM via a published correspondence table, letting load prescriptions track an athlete's RPE-based intensity progression.",
   },
 };

@@ -1,5 +1,6 @@
 import type { LongitudinalOdinProgramme } from '../domain/programme/programme.types.js';
 import type { CompoundExerciseId, KnownLift, BaselinePath } from '../domain/athlete/athlete-input-v2.schema.js';
+import { percentOneRepMaxForRpeReps } from './evidence.js';
 
 // ── Epley 1985 ────────────────────────────────────────────────────────────────
 // Estimates 1RM from a submaximal set.
@@ -12,7 +13,11 @@ export const estimateOneRepMax = (weight_kg: number, reps: number): number => {
 };
 
 // ── ACSM 2026 ─────────────────────────────────────────────────────────────────
-// Maps goal type to % of estimated 1RM for the working weight.
+// Maps goal type to % of estimated 1RM for the working weight. Used as a
+// fallback when a set's target RPE/reps fall outside the RPE_PERCENT_1RM_TABLE
+// range (see evidence.ts) — otherwise every set uses that table instead, so
+// weight tracks the RPE-based intensity progression each phase already
+// computes rather than staying flat across the whole programme.
 // Rounded to nearest 2.5 kg (standard plate increment).
 const WORKING_WEIGHT_PCT: Record<string, number> = {
   strength: 0.825,       // midpoint of ≥80% range
@@ -22,6 +27,9 @@ const WORKING_WEIGHT_PCT: Record<string, number> = {
   endurance: 0.65,
   general_fitness: 0.65,
 };
+
+const roundToPlate = (weight_kg: number): number =>
+  Math.round(weight_kg / 2.5) * 2.5;
 
 export const calculateWorkingWeight = (
   estimated_1rm_kg: number,
@@ -33,7 +41,25 @@ export const calculateWorkingWeight = (
       `Unknown goal_type: "${goal_type}". Expected one of: ${Object.keys(WORKING_WEIGHT_PCT).join(', ')}`,
     );
   }
-  return Math.round((estimated_1rm_kg * pct) / 2.5) * 2.5;
+  return roundToPlate(estimated_1rm_kg * pct);
+};
+
+// A set's target RPE and target reps, via the RPE_PERCENT_1RM_TABLE, take
+// priority over the flat goal-based percentage — this is what lets load
+// actually climb through Accumulation → Intensification → Realization as
+// each phase's RPE targets increase, instead of staying at one static
+// number for the whole programme.
+const workingWeightForSet = (
+  estimated_1rm_kg: number,
+  goal_type: string,
+  set: { target_rpe: number; target_reps: number } | undefined,
+): number => {
+  const rpeBasedPct = set
+    ? percentOneRepMaxForRpeReps(set.target_rpe, set.target_reps)
+    : undefined;
+  return rpeBasedPct !== undefined
+    ? roundToPlate(estimated_1rm_kg * (rpeBasedPct / 100))
+    : calculateWorkingWeight(estimated_1rm_kg, goal_type);
 };
 
 // ── Compound lift → library exercise ID mapping ───────────────────────────────
@@ -68,15 +94,16 @@ export const applyWeightPrescription = (
   const lifts = athlete.known_lifts ?? [];
   if (lifts.length === 0) return phases;
 
-  // Build a flat map: library_exercise_id → working_weight_kg
-  const weightByExerciseId = new Map<string, number>();
+  // Build a flat map: library_exercise_id → estimated 1RM (kg). The
+  // working weight for each occurrence of that exercise is computed fresh
+  // below, from that specific occurrence's prescribed RPE/reps.
+  const estimated1rmByExerciseId = new Map<string, number>();
   for (const lift of lifts) {
     const estimated1rm = estimateOneRepMax(lift.weight_kg, lift.reps);
-    const workingWeight = calculateWorkingWeight(estimated1rm, athlete.goal);
     const libraryIds = COMPOUND_TO_LIBRARY_IDS[lift.exercise_id as CompoundExerciseId];
     if (libraryIds) {
       for (const id of libraryIds) {
-        weightByExerciseId.set(id, workingWeight);
+        estimated1rmByExerciseId.set(id, estimated1rm);
       }
     }
   }
@@ -87,10 +114,18 @@ export const applyWeightPrescription = (
       ...week,
       days: week.days.map((day) => ({
         ...day,
-        exercises: day.exercises.map((ex) => ({
-          ...ex,
-          weight_kg: weightByExerciseId.get(ex.exercise_id) ?? null,
-        })),
+        exercises: day.exercises.map((ex) => {
+          const estimated1rm = estimated1rmByExerciseId.get(ex.exercise_id);
+          if (estimated1rm === undefined) {
+            return { ...ex, weight_kg: null };
+          }
+          const workingSet =
+            ex.sets?.find((set) => set.set_type === 'working') ?? ex.sets?.[0];
+          return {
+            ...ex,
+            weight_kg: workingWeightForSet(estimated1rm, athlete.goal, workingSet),
+          };
+        }),
       })),
     })),
   }));

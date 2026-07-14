@@ -199,6 +199,23 @@ const OriginMetadataSchema = z
   })
   .strict();
 
+// Mirrors KnownLiftSchema/BaselinePathSchema in athlete-input-v2.schema.ts
+// (can't import from there — v2 imports this file, and doing the reverse
+// would be circular). mapAthleteInputV2ToBase passes these through as-is;
+// declaring them here just makes that pass-through type-safe to read
+// downstream (weight-prescription.ts).
+const KnownLiftLikeSchema = z.object({
+  exercise_id: z.enum([
+    'squat',
+    'bench_press',
+    'deadlift',
+    'overhead_press',
+    'barbell_row',
+  ]),
+  weight_kg: z.number().positive(),
+  reps: z.number().int().min(1).max(12),
+});
+
 export const AthleteInputBaseSchema = z.object({
     name: z.string().trim().min(1),
     age: z.number().int().min(16).max(100),
@@ -231,6 +248,10 @@ export const AthleteInputBaseSchema = z.object({
     origin_metadata: OriginMetadataSchema.optional(),
     // Low-priority AI context field — no deterministic pipeline logic.
     nationality: z.string().trim().min(1).max(100).optional(),
+    known_lifts: z.array(KnownLiftLikeSchema).nullable().optional(),
+    baseline_path: z
+      .enum(['self_reported', 'day_one_test', 'skipped'])
+      .optional(),
   });
 
 export const AthleteInputSchema = AthleteInputBaseSchema

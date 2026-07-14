@@ -16,6 +16,7 @@ import { selectProgrammeStrategyV2 } from './strategy/strategy-selector.js';
 import type { TrainingStrategyV2 } from './strategy/strategy.types.js';
 import { planProgrammeWeeks } from './weeks/week-progression-planner.js';
 import { selectFeasibleResistanceFrequency } from './volume/frequency-feasibility.js';
+import { applyWeightPrescription } from './weight-prescription.js';
 
 const MAX_REPAIR_ATTEMPTS = 2;
 
@@ -196,6 +197,13 @@ export const buildLongitudinalProgramme = (
       phases: resistancePhases,
     }),
   );
+  const pricedPhases = run('weight_prescription', () =>
+    applyWeightPrescription(conditioning.phases, {
+      baseline_path: profile.source.baseline_path ?? 'skipped',
+      known_lifts: profile.source.known_lifts ?? null,
+      goal: profile.source.goal,
+    }),
+  );
   const progressionModel =
     weekPlan.weeks[0]?.planning_metadata.progression_policy.model ??
     strategy.progression_model;
@@ -226,7 +234,7 @@ export const buildLongitudinalProgramme = (
     },
     strategy,
     calendar,
-    phases: conditioning.phases,
+    phases: pricedPhases,
     progression_policy: {
       policy_id: 'default-progression',
       default_model: progressionModel,
@@ -433,6 +441,14 @@ export const buildProgrammeFromAiStrategy = (
     }),
   );
 
+  const pricedPhases = run('weight_prescription', () =>
+    applyWeightPrescription(conditioning.phases, {
+      baseline_path: profile.source.baseline_path ?? 'skipped',
+      known_lifts: profile.source.known_lifts ?? null,
+      goal: profile.source.goal,
+    }),
+  );
+
   const progressionModel =
     weekPlan.weeks[0]?.planning_metadata.progression_policy.model ??
     strategy.progression_model;
@@ -462,7 +478,7 @@ export const buildProgrammeFromAiStrategy = (
     },
     strategy,
     calendar,
-    phases: conditioning.phases,
+    phases: pricedPhases,
     progression_policy: {
       policy_id: 'default-progression',
       default_model: progressionModel,
