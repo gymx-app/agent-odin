@@ -120,11 +120,12 @@ describe('synthesizeNarratives', () => {
 
     const result = await synthesizeNarratives(baseInput, provider, 'req-1');
 
-    expect(result).toEqual({
-      narratives: null,
-      citations: null,
-      narratives_unavailable: true,
-    });
+    expect(result.narratives).toBeNull();
+    expect(result.citations).toBeNull();
+    expect(result.narratives_unavailable).toBe(true);
+    if (!result.narratives_unavailable) throw new Error('expected unavailable');
+    expect(result.retry_reasons).toHaveLength(3);
+    expect(result.retry_reasons[0]).toContain('provider unavailable');
     expect(generateNarrativeSynthesis).toHaveBeenCalledTimes(3);
   });
 

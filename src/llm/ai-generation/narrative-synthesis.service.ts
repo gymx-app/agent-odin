@@ -27,7 +27,14 @@ export type NarrativeSynthesisResult =
       citations: CitationOutputEntry[];
       narratives_unavailable: false;
     }
-  | { narratives: null; citations: null; narratives_unavailable: true };
+  | {
+      narratives: null;
+      citations: null;
+      narratives_unavailable: true;
+      // Server-side diagnostics only — not part of the public API response,
+      // logged so a failure is debuggable without reproducing it by hand.
+      retry_reasons: string[];
+    };
 
 const buildCitations = (output: NarrativeSynthesisOutput): CitationOutputEntry[] => {
   const referencedBy = new Map<string, Set<string>>();
@@ -61,7 +68,12 @@ export const synthesizeNarratives = async (
   requestId: string,
 ): Promise<NarrativeSynthesisResult> => {
   if (!provider.generateNarrativeSynthesis) {
-    return { narratives: null, citations: null, narratives_unavailable: true };
+    return {
+      narratives: null,
+      citations: null,
+      narratives_unavailable: true,
+      retry_reasons: ['provider does not implement generateNarrativeSynthesis'],
+    };
   }
 
   const citationData = Object.fromEntries(
@@ -71,6 +83,7 @@ export const synthesizeNarratives = async (
   );
 
   let retryFeedback: { messages: string[] } | null = null;
+  const allRetryReasons: string[] = [];
 
   for (let attempt = 0; attempt < MAX_NARRATIVE_RETRIES; attempt++) {
     try {
@@ -102,15 +115,22 @@ export const synthesizeNarratives = async (
         };
       }
 
-      retryFeedback = {
-        messages: parsed.error.issues.map(
-          (issue) => `${issue.path.join('.')}: ${issue.message}`,
-        ),
-      };
-    } catch {
+      const messages = parsed.error.issues.map(
+        (issue) => `${issue.path.join('.')}: ${issue.message}`,
+      );
+      retryFeedback = { messages };
+      allRetryReasons.push(`attempt ${attempt}: ${messages.join('; ')}`);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
       retryFeedback = { messages: ['Narrative generation request failed; retry.'] };
+      allRetryReasons.push(`attempt ${attempt}: threw — ${detail}`);
     }
   }
 
-  return { narratives: null, citations: null, narratives_unavailable: true };
+  return {
+    narratives: null,
+    citations: null,
+    narratives_unavailable: true,
+    retry_reasons: allRetryReasons,
+  };
 };

@@ -528,21 +528,6 @@ export const createGenerateProgrammeV2Handler = (
             ? [...new Set(repair_log.flatMap((r) => r.errorCodes))]
             : null;
 
-          void logGeneration(adminClient, {
-            user_id: user.id,
-            step: 'build',
-            tokens_input: buildResult.totalInputTokens,
-            tokens_output: buildResult.totalOutputTokens,
-            repair_attempted: repairAttempted,
-            repair_reasons: repairReasons,
-            athlete_goal: body.athlete.goal,
-            status: 'succeeded',
-            duration_ms: Date.now() - stepStartedAt,
-            provider: buildResult.provider,
-            model: buildResult.model,
-            planner_version: PLANNER_VERSION,
-          });
-
           const citationCodes = (() => {
             const codes = new Set<string>();
             collectRationaleCodes(programme, codes);
@@ -570,8 +555,42 @@ export const createGenerateProgrammeV2Handler = (
               userId: user.id,
               message: err instanceof Error ? err.message : String(err),
             });
-            narrativeResult = { narratives: null, citations: null, narratives_unavailable: true };
+            narrativeResult = {
+              narratives: null,
+              citations: null,
+              narratives_unavailable: true,
+              retry_reasons: [
+                `threw outside retry loop — ${err instanceof Error ? err.message : String(err)}`,
+              ],
+            };
           }
+
+          if (narrativeResult.narratives_unavailable) {
+            logger.warn('narrative synthesis unavailable', {
+              userId: user.id,
+              requestId: context.requestId,
+              reasons: narrativeResult.retry_reasons,
+            });
+          }
+
+          void logGeneration(adminClient, {
+            user_id: user.id,
+            step: 'build',
+            tokens_input: buildResult.totalInputTokens,
+            tokens_output: buildResult.totalOutputTokens,
+            repair_attempted: repairAttempted,
+            repair_reasons: repairReasons,
+            athlete_goal: body.athlete.goal,
+            status: 'succeeded',
+            duration_ms: Date.now() - stepStartedAt,
+            provider: buildResult.provider,
+            model: buildResult.model,
+            planner_version: PLANNER_VERSION,
+            narratives_unavailable: narrativeResult.narratives_unavailable,
+            narrative_retry_reasons: narrativeResult.narratives_unavailable
+              ? narrativeResult.retry_reasons
+              : null,
+          });
 
           return successResponse({
             step: 'build',

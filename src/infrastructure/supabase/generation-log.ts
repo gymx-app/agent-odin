@@ -25,6 +25,8 @@ type GenerationLogRow = {
   provider?: 'openai' | 'anthropic' | null;
   model?: string | null;
   planner_version?: string | null;
+  narratives_unavailable?: boolean | null;
+  narrative_retry_reasons?: string[] | null;
 };
 
 export const checkRateLimit = async (
