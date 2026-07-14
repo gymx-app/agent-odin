@@ -50,26 +50,25 @@ const primaryMuscle = (pattern: MovementPattern): MuscleGroup | undefined =>
 const indirectMuscles = (pattern: MovementPattern): MuscleGroup[] =>
   MOVEMENT_MUSCLE_MAP[pattern].slice(1);
 
-// How many active sets a pattern "demands" based on the muscles it
-// trains — patterns whose primary muscle has a higher weekly target get
-// proportionally more of the week's sets, instead of every active
-// pattern getting an even turn regardless of what it actually trains.
+// How many active sets a pattern "demands" based on the muscle it
+// primarily trains — patterns whose primary muscle has a higher weekly
+// target get proportionally more of the week's sets, instead of every
+// active pattern getting an even turn regardless of what it actually
+// trains. Indirect muscles are deliberately excluded here: they're
+// credited separately via computeIndirectSetCredit, and folding their
+// demand into this weight too would double-count it (the compound
+// pattern would get extra sets to "serve" the indirect muscle, and that
+// muscle would then also receive bonus credit from those same sets).
 const patternDemandWeight = (
   pattern: MovementPattern,
   targetByMuscle: Map<string, number>,
   primaryPatternCountByMuscle: Map<string, number>,
 ): number => {
   const primary = primaryMuscle(pattern);
-  const primaryWeight = primary
+  return primary
     ? (targetByMuscle.get(primary) ?? 0) /
-      Math.max(1, primaryPatternCountByMuscle.get(primary) ?? 1)
+        Math.max(1, primaryPatternCountByMuscle.get(primary) ?? 1)
     : 0;
-  const indirectWeight = indirectMuscles(pattern).reduce(
-    (sum, muscle) =>
-      sum + (targetByMuscle.get(muscle) ?? 0) * INDIRECT_SET_CREDIT_FACTOR,
-    0,
-  );
-  return primaryWeight + indirectWeight;
 };
 
 // Largest-remainder allocation: gives each pattern its floor share, then
@@ -162,6 +161,22 @@ export const budgetMovementPatterns = (
       rationale_codes: ['MUSCLE_DEMAND_WEIGHTED_ALLOCATION'],
     };
   });
+};
+
+// Sets each muscle receives as the primary target of its allocated
+// patterns — the same accounting the validator uses to check delivered
+// volume against a muscle's bounds (see week-validator.ts).
+export const primaryDeliveredSetsByMuscle = (
+  patternBudgets: MovementPatternBudget[],
+): Record<string, number> => {
+  const delivered: Record<string, number> = {};
+  patternBudgets.forEach(({ movement_pattern, set_target }) => {
+    const primary = primaryMuscle(movement_pattern as MovementPattern);
+    if (primary) {
+      delivered[primary] = (delivered[primary] ?? 0) + set_target;
+    }
+  });
+  return delivered;
 };
 
 // For each muscle, sum the indirect credit it earns from patterns where

@@ -3,6 +3,7 @@ import { estimateMaximumSessionSets } from '../weeks/week-policies.js';
 import {
   budgetMovementPatterns,
   computeIndirectSetCredit,
+  primaryDeliveredSetsByMuscle,
 } from './movement-volume-budgeter.js';
 import { budgetMuscleGroups } from './muscle-volume-budgeter.js';
 import {
@@ -75,10 +76,21 @@ export const allocateWeeklyVolume = (
     muscleTargets,
   );
   const indirectCreditByMuscle = computeIndirectSetCredit(movementPatternBudgets);
-  const muscleGroupBudgets = muscleTargets.map((target) => ({
-    ...target,
-    indirect_set_credit: indirectCreditByMuscle[target.muscle_group] ?? 0,
-  }));
+  const primaryDeliveredByMuscle = primaryDeliveredSetsByMuscle(
+    movementPatternBudgets,
+  );
+  // Indirect credit is bonus stimulus from compound patterns, capped so it
+  // never pushes a muscle past its own recoverable ceiling on top of what
+  // its primary patterns already deliver.
+  const muscleGroupBudgets = muscleTargets.map((target) => {
+    const rawIndirect = indirectCreditByMuscle[target.muscle_group] ?? 0;
+    const delivered = primaryDeliveredByMuscle[target.muscle_group] ?? 0;
+    const indirect_set_credit = Math.max(
+      0,
+      Math.min(rawIndirect, target.maximum_recoverable_target - delivered),
+    );
+    return { ...target, indirect_set_credit };
+  });
 
   return {
     total_working_sets,
