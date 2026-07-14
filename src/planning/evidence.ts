@@ -24,6 +24,13 @@
  *   RP Strength. https://rpstrength.com/blogs/articles/training-volume-landmarks-muscle-growth
  *   MV ~6 sets/muscle/week; MEV ~6-8; MAV 12-20; individual MRV varies.
  *
+ * ISRAETEL_RP_INDIRECT_VOLUME
+ *   Israetel M. How Much Should You Train Each Muscle? RP Strength.
+ *   https://rpstrength.com/blogs/articles/how-much-should-you-train-each-muscle
+ *   Finding: a compound movement's secondary/indirect muscle involvement
+ *   counts toward that muscle's weekly volume, at roughly half the credit
+ *   of a set where the muscle is the primary target.
+ *
  * SABAG_2022_CONCURRENT_HIIT
  *   Sabag A et al. The compatibility of concurrent high intensity interval
  *   training and resistance training for muscular strength and hypertrophy:
@@ -125,6 +132,21 @@ export const MIN_SESSION_VOLUME_CITATIONS = [
   'GENTIL_2017_MINIMUM_VOLUME',
   'KRIEGER_2010_SETS_META',
   'SCHOENFELD_2017_DOSE_RESPONSE',
+] as const;
+
+// ─── Indirect (secondary-muscle) set crediting ────────────────────────
+// A movement pattern's non-primary muscle (e.g. glutes on a squat, or
+// triceps on a horizontal press) receives partial credit toward its
+// weekly volume target rather than zero credit, since it's still worked
+// through a meaningful range of motion under load — but less credit than
+// a set where that muscle is the primary target, since stimulus is
+// diluted across the compound movement. RP's volume-landmarks
+// methodology treats indirect/secondary-muscle sets as roughly half the
+// value of a direct/primary set for volume-counting purposes.
+export const INDIRECT_SET_CREDIT_FACTOR = 0.5;
+
+export const INDIRECT_SET_CREDIT_CITATIONS = [
+  'ISRAETEL_RP_INDIRECT_VOLUME',
 ] as const;
 
 // ─── Equipment preference scoring ────────────────────────────────────
@@ -486,6 +508,12 @@ export const CITATION_REGISTRY: Record<string, CitationEntry> = {
     year: 2019,
     finding:
       'Maintenance volume is roughly 6 sets/muscle/week; minimum effective volume roughly 6-8; maximum adaptive volume 12-20; maximum recoverable volume varies by individual.',
+  },
+  ISRAETEL_RP_INDIRECT_VOLUME: {
+    author: 'Israetel M',
+    year: 2019,
+    finding:
+      "A compound movement's secondary/indirect muscle involvement counts toward that muscle's weekly volume, at roughly half the credit of a set where the muscle is the primary target.",
   },
   SABAG_2022_CONCURRENT_HIIT: {
     author: 'Sabag A et al.',

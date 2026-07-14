@@ -40,6 +40,26 @@ describe('V2 week validator', () => {
         programme.phases[0]!.weeks[0]!.week_type = 'testing';
       },
     ],
+    [
+      'muscle volume below required',
+      'MUSCLE_VOLUME_BELOW_REQUIRED',
+      (programme: ReturnType<typeof clone>) => {
+        // Quadriceps needs a minimum of 4 delivered sets, but zeroing out
+        // squat (its only primary-muscle source in this fixture) with no
+        // indirect credit leaves it at 0 delivered — this is only
+        // detectable now that the check compares against what was
+        // actually allocated, not against bounds derived from the same
+        // target it's checking.
+        programme.phases[0]!.weeks[0]!.planning_metadata.movement_pattern_budgets[0]!.set_target = 0;
+      },
+    ],
+    [
+      'muscle volume excessive',
+      'MUSCLE_VOLUME_EXCESSIVE',
+      (programme: ReturnType<typeof clone>) => {
+        programme.phases[0]!.weeks[0]!.planning_metadata.movement_pattern_budgets[0]!.set_target = 20;
+      },
+    ],
   ])('reports %s', (_name, code, mutate) => {
     const programme = clone();
     mutate(programme);

@@ -1,13 +1,33 @@
 import type { NormalizedAthleteProfile } from '../domain/athlete/athlete.types.js';
+import type { MovementPattern } from '../domain/exercise/exercise-taxonomy.js';
 import type { LongitudinalOdinProgramme } from '../domain/programme/programme.types.js';
 import {
   MAX_WEEKLY_VOLUME_INCREASE,
   WEEK_FACTOR_BOUNDS,
   estimateMaximumSessionSets,
 } from '../planning/weeks/week-policies.js';
+import { MOVEMENT_MUSCLE_MAP } from '../planning/volume/volume-policies.js';
 import { validationCodes } from './validation-codes.js';
 import { finding } from './validation-helpers.js';
 import type { ProgrammeValidationFinding } from './validation.types.js';
+
+// A muscle's delivered sets = sets from patterns where it's the primary
+// target, plus indirect_set_credit from patterns where it's secondary
+// (e.g. glutes on a squat). Comparing target bounds against what was
+// actually allocated, rather than against bounds derived from the target
+// itself, is what makes this a real check instead of a tautology.
+const deliveredDirectSetsByMuscle = (
+  movementPatternBudgets: LongitudinalOdinProgramme['phases'][number]['weeks'][number]['planning_metadata']['movement_pattern_budgets'],
+): Record<string, number> => {
+  const delivered: Record<string, number> = {};
+  movementPatternBudgets.forEach(({ movement_pattern, set_target }) => {
+    const primary = MOVEMENT_MUSCLE_MAP[movement_pattern as MovementPattern]?.[0];
+    if (primary) {
+      delivered[primary] = (delivered[primary] ?? 0) + set_target;
+    }
+  });
+  return delivered;
+};
 
 const excludedPatterns = (profile: NormalizedAthleteProfile): Set<string> => {
   const patterns = new Set<string>();
@@ -137,22 +157,28 @@ export const validateLongitudinalWeeks = (
         { week_number: week.week_number },
       );
     }
+    const deliveredByMuscle = deliveredDirectSetsByMuscle(
+      week.planning_metadata.movement_pattern_budgets,
+    );
     week.planning_metadata.muscle_group_budgets.forEach((budget) => {
-      if (budget.direct_set_target > budget.maximum_recoverable_target) {
+      const delivered =
+        (deliveredByMuscle[budget.muscle_group] ?? 0) +
+        budget.indirect_set_credit;
+      if (delivered > budget.maximum_recoverable_target) {
         add(
           'MUSCLE_VOLUME_EXCESSIVE',
           'error',
           'prescription_quality',
-          'Muscle budget exceeds its recoverable target.',
+          'Allocated sets exceed the muscle group\'s recoverable target.',
           { week_number: week.week_number, muscle_group: budget.muscle_group },
         );
       }
-      if (budget.direct_set_target < budget.minimum_effective_target) {
+      if (delivered < budget.minimum_effective_target) {
         add(
           'MUSCLE_VOLUME_BELOW_REQUIRED',
           'warning',
           'prescription_quality',
-          'Muscle budget is below its planned minimum.',
+          'Allocated sets fall below the muscle group\'s planned minimum.',
           { week_number: week.week_number, muscle_group: budget.muscle_group },
         );
       }

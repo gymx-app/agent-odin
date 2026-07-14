@@ -1,6 +1,9 @@
 import type { ProgrammeDay, WeekPlannerInput } from '../weeks/week.types.js';
 import { estimateMaximumSessionSets } from '../weeks/week-policies.js';
-import { budgetMovementPatterns } from './movement-volume-budgeter.js';
+import {
+  budgetMovementPatterns,
+  computeIndirectSetCredit,
+} from './movement-volume-budgeter.js';
 import { budgetMuscleGroups } from './muscle-volume-budgeter.js';
 import {
   VOLUME_FILL_RATES,
@@ -65,10 +68,22 @@ export const allocateWeeklyVolume = (
       : []),
   ];
 
+  const muscleTargets = budgetMuscleGroups(input, volumeFactor);
+  const movementPatternBudgets = budgetMovementPatterns(
+    input,
+    total_working_sets,
+    muscleTargets,
+  );
+  const indirectCreditByMuscle = computeIndirectSetCredit(movementPatternBudgets);
+  const muscleGroupBudgets = muscleTargets.map((target) => ({
+    ...target,
+    indirect_set_credit: indirectCreditByMuscle[target.muscle_group] ?? 0,
+  }));
+
   return {
     total_working_sets,
-    muscle_group_budgets: budgetMuscleGroups(input, volumeFactor),
-    movement_pattern_budgets: budgetMovementPatterns(input, total_working_sets),
+    muscle_group_budgets: muscleGroupBudgets,
+    movement_pattern_budgets: movementPatternBudgets,
     session_set_budgets,
     rationale_codes,
   };
