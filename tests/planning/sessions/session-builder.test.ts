@@ -6,6 +6,7 @@ import { seedExercises } from '../../../src/exercises/approved-exercise-library.
 import { normalizeAthlete } from '../../../src/normalization/athlete-normalizer.js';
 import { planTrainingCalendar } from '../../../src/planning/calendar/calendar-planner.js';
 import { planProgrammePhases } from '../../../src/planning/phases/phase-planner.js';
+import { buildExerciseCandidatesV2 } from '../../../src/planning/exercises/exercise-candidate-builder.js';
 import {
   buildProgrammeResistanceSessions,
   buildResistanceSession,
@@ -430,5 +431,110 @@ describe('Session Construction V2', () => {
       ),
     );
     expect(carriesPriorPhaseContinuity).toBe(false);
+  });
+
+  it('scores a cross-programme seeded exercise with continuity, only when no within-programme prior exists', () => {
+    const context = setup({ fitness_level: 'advanced', goal: 'strength' }, 12, 3);
+    const firstPhase = context.weekPlan.phases[0]!;
+    const firstWeekDay = firstPhase.weeks[0]!.days.find(
+      (day) => day.day_type === 'resistance',
+    )!;
+    const baseline = buildResistanceSession({
+      profile: context.profile,
+      strategy: context.strategy,
+      phase: firstPhase,
+      week: firstPhase.weeks[0]!,
+      calendar_day: firstWeekDay,
+      session_budget: firstWeekDay.training_budget!,
+      exercises: seedExercises,
+    });
+    const squatSlot = baseline.movement_slots.find(
+      (slot) => slot.movement_pattern === 'squat',
+    )!;
+    expect(squatSlot).toBeDefined();
+
+    const builderInput = {
+      profile: context.profile,
+      strategy: context.strategy,
+      phase: firstPhase,
+      week: firstPhase.weeks[0]!,
+      calendar_day: firstWeekDay,
+      session_budget: firstWeekDay.training_budget!,
+      exercises: seedExercises,
+    };
+
+    const withoutSeed = buildExerciseCandidatesV2(
+      builderInput,
+      squatSlot,
+      new Set(),
+    );
+    const seededCandidates = buildExerciseCandidatesV2(
+      { ...builderInput, recent_exercise_ids_by_movement_pattern: { squat: 'dumbbell_goblet_squat' } },
+      squatSlot,
+      new Set(),
+    );
+
+    const scoreFor = (candidates: typeof withoutSeed, id: string) =>
+      candidates.find((candidate) => candidate.exercise.id === id)?.score;
+
+    expect(scoreFor(seededCandidates, 'dumbbell_goblet_squat')).toBe(
+      scoreFor(withoutSeed, 'dumbbell_goblet_squat')! + 15,
+    );
+    expect(
+      seededCandidates
+        .find((candidate) => candidate.exercise.id === 'dumbbell_goblet_squat')
+        ?.rationale_codes,
+    ).toContain('PRIOR_PROGRAMME_EXERCISE_CONTINUED');
+
+    // A within-programme prior (e.g. week 2, once week 1 has already run)
+    // takes priority over the cross-programme seed — it should not also
+    // get the cross-programme rationale code once real programme history
+    // exists.
+    const withWithinProgrammePrior = buildExerciseCandidatesV2(
+      {
+        ...builderInput,
+        prior_programme_context: {
+          phase_id: firstPhase.phase_id,
+          by_slot_id: { [squatSlot.slot_id]: 'barbell_back_squat' },
+        },
+        recent_exercise_ids_by_movement_pattern: { squat: 'dumbbell_goblet_squat' },
+      },
+      squatSlot,
+      new Set(),
+    );
+    const barbellCandidate = withWithinProgrammePrior.find(
+      (candidate) => candidate.exercise.id === 'barbell_back_squat',
+    );
+    expect(barbellCandidate?.rationale_codes).toContain(
+      'EXERCISE_CONTINUITY_PRESERVED',
+    );
+    const goblet = withWithinProgrammePrior.find(
+      (candidate) => candidate.exercise.id === 'dumbbell_goblet_squat',
+    );
+    expect(goblet?.rationale_codes).not.toContain(
+      'PRIOR_PROGRAMME_EXERCISE_CONTINUED',
+    );
+  });
+
+  it('only seeds continuity from a prior programme for the very first week', () => {
+    const context = setup({ fitness_level: 'advanced', goal: 'strength' }, 12, 3);
+
+    const phases = buildProgrammeResistanceSessions({
+      profile: context.profile,
+      strategy: context.strategy,
+      phases: context.weekPlan.phases,
+      exercises: seedExercises,
+      recent_exercise_ids_by_movement_pattern: {
+        squat: 'dumbbell_goblet_squat',
+      },
+    });
+
+    const week2Day = phases[0]!.weeks[1]!.days.find(
+      (day) => day.day_type === 'resistance',
+    )!;
+    const week2CarriesSeedRationale = week2Day.exercises.some((exercise) =>
+      exercise.sequencing_rationale.includes('PRIOR_PROGRAMME_EXERCISE_CONTINUED'),
+    );
+    expect(week2CarriesSeedRationale).toBe(false);
   });
 });

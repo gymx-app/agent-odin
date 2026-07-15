@@ -252,6 +252,15 @@ export const AthleteInputBaseSchema = z.object({
     baseline_path: z
       .enum(['self_reported', 'day_one_test', 'skipped'])
       .optional(),
+    // Exercises the athlete was recently running, from a previous,
+    // separately generated programme — agent-odin has no persistence of
+    // its own, so the caller supplies this. Keyed by movement_pattern
+    // (e.g. "squat"), not exercise slot, since slot layout isn't stable
+    // across two differently-structured programmes. Only seeds the very
+    // first week of a new programme; see session-builder.ts.
+    recent_exercise_ids_by_movement_pattern: z
+      .record(z.string(), z.string())
+      .optional(),
   });
 
 export const AthleteInputSchema = AthleteInputBaseSchema

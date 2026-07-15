@@ -81,7 +81,11 @@ export const buildExerciseCandidatesV2 = (
     slot.movement_pattern,
     ...slot.allowed_substitution_patterns,
   ];
-  const priorId = input.prior_programme_context?.by_slot_id[slot.slot_id];
+  const withinProgrammePriorId =
+    input.prior_programme_context?.by_slot_id[slot.slot_id];
+  const crossProgrammePriorId =
+    input.recent_exercise_ids_by_movement_pattern?.[slot.movement_pattern];
+  const priorId = withinProgrammePriorId ?? crossProgrammePriorId;
   const baseDifficulty =
     input.profile.athlete_state.training_status.value === 'advanced'
       ? 3
@@ -155,7 +159,14 @@ export const buildExerciseCandidatesV2 = (
             ...(eligibility.status === 'modifiable'
               ? ['MODIFIABLE_EXERCISE_SELECTED']
               : []),
-            ...(continuity ? ['EXERCISE_CONTINUITY_PRESERVED'] : []),
+            ...(continuity && withinProgrammePriorId === exercise.id
+              ? ['EXERCISE_CONTINUITY_PRESERVED']
+              : []),
+            ...(continuity &&
+            withinProgrammePriorId !== exercise.id &&
+            crossProgrammePriorId === exercise.id
+              ? ['PRIOR_PROGRAMME_EXERCISE_CONTINUED']
+              : []),
             ...(fatigueFit ? ['LOW_FATIGUE_EXERCISE_SELECTED'] : []),
             ...(goalBonusScore > 0 ? ['GOAL_PREFERENCE_APPLIED'] : []),
             ...(equipBonus > 0 ? ['LOADED_EQUIPMENT_PREFERRED'] : []),

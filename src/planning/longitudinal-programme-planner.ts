@@ -186,6 +186,12 @@ export const buildLongitudinalProgramme = (
       strategy,
       phases: weekPlan.phases,
       exercises,
+      ...(profile.source.recent_exercise_ids_by_movement_pattern
+        ? {
+            recent_exercise_ids_by_movement_pattern:
+              profile.source.recent_exercise_ids_by_movement_pattern,
+          }
+        : {}),
     }),
   );
   run('warmup_and_sequence', () => resistancePhases);
@@ -429,6 +435,12 @@ export const buildProgrammeFromAiStrategy = (
       strategy,
       phases: weekPlan.phases,
       exercises,
+      ...(profile.source.recent_exercise_ids_by_movement_pattern
+        ? {
+            recent_exercise_ids_by_movement_pattern:
+              profile.source.recent_exercise_ids_by_movement_pattern,
+          }
+        : {}),
     }),
   );
 

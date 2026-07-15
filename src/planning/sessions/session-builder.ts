@@ -215,15 +215,20 @@ export const buildProgrammeResistanceSessions = (input: {
   strategy: LongitudinalOdinProgramme['strategy'];
   phases: LongitudinalOdinProgramme['phases'];
   exercises: Exercise[];
+  // Seed for the very first week of a brand-new programme, from a
+  // separately generated PRIOR programme the caller (gx) knows about —
+  // agent-odin has no persistence of its own. See session.types.ts for
+  // why this is keyed by movement_pattern rather than slot_id.
+  recent_exercise_ids_by_movement_pattern?: Record<string, string>;
 }): LongitudinalOdinProgramme['phases'] => {
   const continuityByCycleDay = new Map<
     number,
     NonNullable<ResistanceSessionBuilderInput['prior_programme_context']>
   >();
 
-  return input.phases.map((phase) => ({
+  return input.phases.map((phase, phaseIndex) => ({
     ...phase,
-    weeks: phase.weeks.map((week) => ({
+    weeks: phase.weeks.map((week, weekIndex) => ({
       ...week,
       days: week.days.map((day) => {
         if (day.day_type !== 'resistance' || !day.training_budget) return day;
@@ -248,6 +253,20 @@ export const buildProgrammeResistanceSessions = (input: {
           session_budget: day.training_budget,
           exercises: input.exercises,
           ...(priorContext ? { prior_programme_context: priorContext } : {}),
+          // Only the very first week of the whole programme has no
+          // within-programme history yet — that's the one moment the
+          // cross-programme seed can matter. Every week after this
+          // already has priorContext (or a deliberate phase-boundary
+          // reset), so continuing to pass it forward would fight that
+          // reset instead of just seeding a cold start.
+          ...(phaseIndex === 0 &&
+          weekIndex === 0 &&
+          input.recent_exercise_ids_by_movement_pattern
+            ? {
+                recent_exercise_ids_by_movement_pattern:
+                  input.recent_exercise_ids_by_movement_pattern,
+              }
+            : {}),
         };
         const constructed = buildResistanceSession(builderInput);
         const result = finalizeResistanceSession(builderInput, constructed);

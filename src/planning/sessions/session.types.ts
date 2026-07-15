@@ -81,4 +81,13 @@ export type ResistanceSessionBuilderInput = {
   session_budget: SessionTrainingBudget;
   exercises: Exercise[];
   prior_programme_context?: PriorExerciseContext;
+  // Exercises the athlete was recently running, from a PREVIOUS, separately
+  // generated programme (agent-odin has no persistence of its own — the
+  // caller supplies this). Keyed by movement_pattern rather than slot_id:
+  // slot_id is derived from session-template position and isn't stable
+  // across two programmes with different splits/calendars, but movement
+  // pattern is. Only meaningful as a seed for the very first week of a
+  // brand-new programme — prior_programme_context (within-programme
+  // continuity) takes over from there.
+  recent_exercise_ids_by_movement_pattern?: Record<string, string>;
 };
