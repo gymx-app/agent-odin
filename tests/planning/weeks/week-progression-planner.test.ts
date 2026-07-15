@@ -293,6 +293,44 @@ describe('Week Progression Planner V2', () => {
     );
   });
 
+  it('rotates heavy/moderate/light intensity across resistance days when periodization_model is undulating', () => {
+    const { profile, strategy, calendar, phasePlan } = plan(
+      { fitness_level: 'advanced', goal: 'muscle_gain' },
+      8,
+      3,
+    );
+    const undulatingStrategy = { ...strategy, periodization_model: 'undulating' as const };
+    const result = planProgrammeWeeks({
+      profile,
+      strategy: undulatingStrategy,
+      calendar,
+      phases: phasePlan.phases,
+      planned_deload_weeks: phasePlan.planned_deload_weeks,
+    });
+
+    const resistanceDays = result.weeks[0]!.days.filter(
+      (day) => day.day_type === 'resistance',
+    );
+    expect(resistanceDays.length).toBeGreaterThanOrEqual(3);
+    const rpes = resistanceDays.map((day) => day.training_budget!.effort_target);
+    // Heavy/moderate/light should not all collapse to the same RPE.
+    expect(new Set(rpes).size).toBeGreaterThan(1);
+    expect(rpes[0]).toBeGreaterThan(rpes[2]!);
+  });
+
+  it('keeps a flat weekly intensity target for non-undulating periodization models', () => {
+    const { result } = plan(
+      { fitness_level: 'advanced', goal: 'strength' },
+      8,
+      3,
+    );
+    const resistanceDays = result.weeks[0]!.days.filter(
+      (day) => day.day_type === 'resistance',
+    );
+    const rpes = resistanceDays.map((day) => day.training_budget!.effort_target);
+    expect(new Set(rpes).size).toBe(1);
+  });
+
   it('is deterministic', () => {
     const results = Array.from(
       { length: 5 },

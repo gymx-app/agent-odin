@@ -2,7 +2,10 @@ import {
   planFatigueBudget,
   deloadAdjustments,
 } from '../fatigue/fatigue-budget-planner.js';
-import { planIntensityTarget } from '../intensity/intensity-planner.js';
+import {
+  planIntensityTarget,
+  undulatingDayRoleForIndex,
+} from '../intensity/intensity-planner.js';
 import { selectMachineProgressionPolicy } from '../progression/progression-policy-selector.js';
 import {
   allocateWeeklyVolume,
@@ -154,6 +157,28 @@ export const planProgrammeWeeks = (
       const rationale_codes = [
         ...new Set([...factors.rationale_codes, ...volume.rationale_codes]),
       ];
+      // Daily undulating periodization rotates intensity across the
+      // week's resistance days (heavy/moderate/light) instead of holding
+      // one flat target — only when periodization_model is actually
+      // 'undulating'; every other model keeps the shared week-level
+      // `intensity` computed above, unchanged. `intensity` itself still
+      // anchors planning_metadata.intensity_target as the week's baseline.
+      const isUndulating = input.strategy.periodization_model === 'undulating';
+      let resistanceDayIndex = 0;
+      const days = input.calendar.days.map((day) => {
+        let dayIntensity = intensity;
+        if (isUndulating && day.planned_session_type === 'resistance') {
+          dayIntensity = planIntensityTarget(
+            input,
+            week_type,
+            factors.planned_intensity_factor,
+            factors.planned_effort_factor,
+            undulatingDayRoleForIndex(resistanceDayIndex),
+          );
+          resistanceDayIndex += 1;
+        }
+        return buildDay(input, week_number, day, volume, dayIntensity, fatigue);
+      });
       const week: PlannedProgrammeWeek = {
         week_id: `${phase.phase_id}-week-${week_number}`,
         week_number,
@@ -162,9 +187,7 @@ export const planProgrammeWeeks = (
         planned_volume_factor: factors.planned_volume_factor,
         planned_intensity_factor: factors.planned_intensity_factor,
         planned_effort_factor: factors.planned_effort_factor,
-        days: input.calendar.days.map((day) =>
-          buildDay(input, week_number, day, volume, intensity, fatigue),
-        ),
+        days,
         progression_notes: [
           `Use ${progressionPolicy.model.replaceAll('_', ' ')} progression within the prescribed RPE ceiling.`,
         ],
