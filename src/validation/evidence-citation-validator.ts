@@ -30,11 +30,19 @@ export const collectRationaleCodes = (value: unknown, out: Set<string>): void =>
       out.add(maybeCode);
     }
     for (const [key, val] of Object.entries(value)) {
-      if (key === 'rationale_codes' && Array.isArray(val)) {
+      // ConditioningPrescription's citation-bearing field is plain
+      // `rationale: string[]` — a different key name than
+      // `rationale_codes`, so it was previously invisible to this
+      // collector (and therefore to both the hallucination check below
+      // and narrative synthesis's per-athlete citation pool). Recursing
+      // unconditionally afterwards (not in an else branch) means this
+      // doesn't skip the `code`-field extraction above for `rationale`
+      // arrays that hold StrategyDecision/WeekPlanningDecision objects
+      // rather than plain strings.
+      if ((key === 'rationale_codes' || key === 'rationale') && Array.isArray(val)) {
         val.forEach((code) => typeof code === 'string' && out.add(code));
-      } else {
-        collectRationaleCodes(val, out);
       }
+      collectRationaleCodes(val, out);
     }
   }
 };

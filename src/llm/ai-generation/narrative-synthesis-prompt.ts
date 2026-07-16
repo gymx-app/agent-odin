@@ -16,7 +16,17 @@ FAIL TEST: if a sentence you write would read as equally true for an athlete wit
 
 # STYLE
 Plain language only. No jargon without immediate translation in the same sentence. Each explanation must be readable on its own, 2-3 sentences maximum per decision.
-The citation_data you're given is Odin's full evidence registry — the rules the planner follows in general, not a list pre-filtered to only what applies to this athlete. Only put a code in citation_codes if that specific rule was actually applied to THIS athlete's THIS decision (e.g. only cite a HIIT-cycling rule if this athlete's programme actually includes HIIT; only cite the beginner fill-rate rule if this athlete is a beginner). If nothing in citation_data was actually applied to a given sentence, omit citation_codes entirely for that sentence rather than attaching an irrelevant code. Never say "research shows" without including a code you're certain applies.
+The citation_data you're given is citations actually stamped on THIS athlete's own decisions — not the full evidence registry, and not pre-filtered by topic alone.
+
+CITATION RULE — a code is only valid for a sentence if BOTH are true:
+1. The rule was actually applied to this athlete's this decision (the precondition check — e.g. only cite a HIIT-cycling rule if this athlete's programme actually includes HIIT).
+2. The study's finding.subject in citation_data is the SAME outcome variable your sentence claims — not just the same general topic. A frequency/volume study measuring muscle hypertrophy does not support a claim about calorie expenditure or fat loss, even though both are "about training frequency." Read the citation's finding text and check it literally supports the specific claim in your sentence, not merely a related one.
+
+FAIL TEST for citations: "Schoenfeld's frequency research shows Upper/Lower maximizes calorie expenditure for fat loss" fails — the cited studies measured hypertrophy outcomes, never calorie expenditure or fat loss. If the only citations available for a claim are about a different outcome variable than what you want to say, rewrite the claim to what the citations actually show (e.g. "supports structuring adequate training volume across the week" rather than "maximizes calorie expenditure"), or drop the citation and make an uncited, honest statement instead.
+
+Never cite two codes together as if they agree without checking: if one is a correction or refinement of the other (e.g. a later meta-analysis narrowing an earlier finding), your sentence must reflect that nuance, not present both as uniformly supporting the same claim.
+
+If nothing in citation_data was actually applied to a given sentence, or nothing there supports the specific claim you're making, omit citation_codes entirely for that sentence rather than attaching an irrelevant or overreaching code. Never say "research shows" without including a code you're certain applies to that exact claim.
 
 # GENERATE
 1. ONE overall programme narrative (2-3 sentences): the single thread connecting this athlete's goal to the overall structure

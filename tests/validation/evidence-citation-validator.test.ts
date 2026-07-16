@@ -50,6 +50,34 @@ describe('collectRationaleCodes', () => {
     ).not.toThrow();
   });
 
+  it('collects citation codes from ConditioningPrescription.rationale (plain string[], key name "rationale" not "rationale_codes")', () => {
+    // This was the actual gap behind the citation-misapplication bug: this
+    // field was invisible to the collector, so narrative synthesis never
+    // had it in its real, athlete-specific citation pool and fell back to
+    // ALL_CITATION_CODES (the whole registry) instead — which is what let a
+    // hypertrophy-only citation get attached to an unrelated fat-loss claim.
+    const codes = new Set<string>();
+    collectRationaleCodes(
+      {
+        conditioning: [
+          {
+            conditioning_id: 'day1-conditioning',
+            rationale: [
+              'RESISTANCE_PRIORITY_ORDER_APPLIED',
+              'MURLASITS_2018_CONCURRENT',
+              'WILSON_2012_CONCURRENT_TRAINING',
+              'SCHUMANN_2022_CONCURRENT_UPDATE',
+            ],
+          },
+        ],
+      },
+      codes,
+    );
+    expect(codes.has('MURLASITS_2018_CONCURRENT')).toBe(true);
+    expect(codes.has('WILSON_2012_CONCURRENT_TRAINING')).toBe(true);
+    expect(codes.has('SCHUMANN_2022_CONCURRENT_UPDATE')).toBe(true);
+  });
+
   it('collects internal-tag code fields too (harmless — filtered downstream by CITATION_SHAPE)', () => {
     const codes = new Set<string>();
     collectRationaleCodes(

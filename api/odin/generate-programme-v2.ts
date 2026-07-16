@@ -45,7 +45,6 @@ import {
   collectRationaleCodes,
   CITATION_SHAPE,
 } from '../../src/validation/evidence-citation-validator.js';
-import { ALL_CITATION_CODES } from '../../src/planning/evidence.js';
 import type {
   HttpRequest,
   HttpResponse,
@@ -533,21 +532,25 @@ export const createGenerateProgrammeV2Handler = (
             ? [...new Set(repair_log.flatMap((r) => r.errorCodes))]
             : null;
 
-          // Union of citations actually stamped on decisions in the assembled
-          // programme (baseline assessment, conditioning finishers) with the
-          // full evidence registry (volume fill rates, HIIT cycling, equipment
-          // preference, etc.) — those rules genuinely drove this athlete's
-          // phase/split/volume decisions even though the deterministic planner
-          // never attaches a citation-shaped rationale_code to them. Without
-          // this, narrative synthesis only ever had baseline/finisher codes to
-          // cite, which are topically irrelevant to most phase/split/day-pattern
-          // narratives, so citation_codes came back empty on every sentence
-          // even when the narrative itself was correct.
+          // Citations actually stamped on decisions in this athlete's own
+          // assembled programme (split/frequency, conditioning interference,
+          // baseline assessment, RIR/failure, load progression, etc.) — NOT
+          // the full evidence registry. A prior version of this unioned in
+          // ALL_CITATION_CODES (every citation in the system, regardless of
+          // relevance) because collectRationaleCodes previously missed
+          // strategy.rationale[].code and ConditioningPrescription's plain
+          // `rationale` field, so embedded came back too sparse to be useful
+          // on its own. That collector gap is now fixed (see
+          // evidence-citation-validator.ts) — exposing the entire registry
+          // was letting the model attach a real-but-irrelevant citation to a
+          // claim it doesn't support (e.g. a hypertrophy-frequency citation
+          // used to justify a fat-loss/calorie-expenditure claim, since both
+          // are topically "about frequency"). Better to have no citation on
+          // a sentence than a real one attached to the wrong claim.
           const citationCodes = (() => {
             const codes = new Set<string>();
             collectRationaleCodes(programme, codes);
-            const embedded = [...codes].filter((code) => CITATION_SHAPE.test(code));
-            return [...new Set([...embedded, ...ALL_CITATION_CODES])];
+            return [...codes].filter((code) => CITATION_SHAPE.test(code));
           })();
 
           let narrativeResult: Awaited<ReturnType<typeof synthesizeNarratives>>;
