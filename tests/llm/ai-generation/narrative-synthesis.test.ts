@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { synthesizeNarratives } from '../../../src/llm/ai-generation/narrative-synthesis.service.js';
+import {
+  synthesizeNarratives,
+  mergeDocumentCitations,
+} from '../../../src/llm/ai-generation/narrative-synthesis.service.js';
 import { getProvider } from '../../../src/llm/ai-generation/step-request-helpers.js';
 import type { AiProgrammeGenerationProvider } from '../../../src/llm/ai-generation/ai-programme-generation-provider.js';
 import type { AppConfig } from '../../../src/infrastructure/config/env.schema.js';
@@ -161,6 +164,67 @@ describe('synthesizeNarratives', () => {
     );
     expect(matching[0]!.author).toBeDefined();
     expect(matching[0]!.year).toBeDefined();
+  });
+});
+
+describe('mergeDocumentCitations', () => {
+  it('adds document-wide citation codes not already covered by narrative sentences', () => {
+    const narrativeCitations = [
+      {
+        code: 'SCHOENFELD_2019_FREQUENCY_VOLUME_EQUATED',
+        author: 'a',
+        year: 2019,
+        finding: 'f',
+        referenced_by: ['phase:phase-1'],
+      },
+    ];
+    // Real programme citations the ~8 narrative sentences never had a
+    // chance to surface on their own (split/conditioning/RIR decisions).
+    const documentCodes = [
+      'SCHOENFELD_2019_FREQUENCY_VOLUME_EQUATED',
+      'SCHOENFELD_2016_FREQUENCY',
+      'WILSON_2012_CONCURRENT_TRAINING',
+    ];
+
+    const merged = mergeDocumentCitations(narrativeCitations, documentCodes);
+
+    expect(merged.map((c) => c.code).sort()).toEqual([
+      'SCHOENFELD_2016_FREQUENCY',
+      'SCHOENFELD_2019_FREQUENCY_VOLUME_EQUATED',
+      'WILSON_2012_CONCURRENT_TRAINING',
+    ]);
+    // The narrative-sourced entry keeps its precise provenance...
+    const narrativeSourced = merged.find(
+      (c) => c.code === 'SCHOENFELD_2019_FREQUENCY_VOLUME_EQUATED',
+    )!;
+    expect(narrativeSourced.referenced_by).toEqual(['phase:phase-1']);
+    // ...while document-only codes get the coarser label, not a fabricated one.
+    const documentOnly = merged.find(
+      (c) => c.code === 'SCHOENFELD_2016_FREQUENCY',
+    )!;
+    expect(documentOnly.referenced_by).toEqual(['programme']);
+  });
+
+  it('silently drops a document code that is not a real registry entry, rather than fabricating one', () => {
+    const merged = mergeDocumentCitations([], ['NOT_A_REAL_CITATION_CODE']);
+    expect(merged).toHaveLength(0);
+  });
+
+  it('does not duplicate a code already present from narrative sentences', () => {
+    const narrativeCitations = [
+      {
+        code: 'SCHOENFELD_2017_DOSE_RESPONSE',
+        author: 'a',
+        year: 2017,
+        finding: 'f',
+        referenced_by: ['overall'],
+      },
+    ];
+    const merged = mergeDocumentCitations(narrativeCitations, [
+      'SCHOENFELD_2017_DOSE_RESPONSE',
+    ]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]!.referenced_by).toEqual(['overall']);
   });
 });
 

@@ -62,6 +62,32 @@ const buildCitations = (output: NarrativeSynthesisOutput): CitationOutputEntry[]
     }));
 };
 
+// buildCitations() above only scans the ~8 sentences narrative synthesis
+// itself writes — the programme's own decisions (split selection,
+// conditioning interference, RIR/failure policy, baseline assessment, etc.)
+// cite dozens of real, valid codes that a handful of narrative sentences
+// were never going to surface on their own. This merges in every real
+// citation-shaped code found anywhere in the full document (already
+// collected and hallucination-filtered by the caller, e.g. via
+// collectRationaleCodes in evidence-citation-validator.ts) that isn't
+// already covered by a narrative sentence's own citation_codes. Those
+// document-wide codes don't have a precise "which sentence" provenance the
+// way narrative-sourced ones do, so they're tagged with the coarser
+// 'programme' label rather than a fabricated one.
+export const mergeDocumentCitations = (
+  narrativeCitations: CitationOutputEntry[],
+  documentCitationCodes: string[],
+): CitationOutputEntry[] => {
+  const merged = new Map(
+    narrativeCitations.map((entry) => [entry.code, entry]),
+  );
+  for (const code of documentCitationCodes) {
+    if (merged.has(code) || !(code in CITATION_REGISTRY)) continue;
+    merged.set(code, { code, ...CITATION_REGISTRY[code]!, referenced_by: ['programme'] });
+  }
+  return [...merged.values()];
+};
+
 export const synthesizeNarratives = async (
   input: NarrativeSynthesisInput,
   provider: AiProgrammeGenerationProvider,

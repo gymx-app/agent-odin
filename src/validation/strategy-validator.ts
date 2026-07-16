@@ -1,5 +1,6 @@
 import type { NormalizedAthleteProfile } from '../domain/athlete/athlete.types.js';
 import type { LongitudinalOdinProgramme } from '../domain/programme/programme.types.js';
+import { requiresSafeSplit as requiresSafeSplitCheck } from '../planning/strategy/split-safety-override.js';
 import { validationCodes } from './validation-codes.js';
 import { finding } from './validation-helpers.js';
 import type { ProgrammeValidationFinding } from './validation.types.js';
@@ -106,13 +107,7 @@ export const validateLongitudinalStrategy = (
   // not a days-count-driven optimisation. This is broader than the 6-day-
   // PPL-specific recovery check above (that one only blocks one split at
   // one frequency; this blocks every other split entirely).
-  const requiresSafeSplit =
-    training === 'returning' ||
-    profile.recovery_capacity === 'low' ||
-    profile.movement_restrictions.some(
-      (restriction) => restriction.severity === 'avoid',
-    ) ||
-    profile.health_flags.some((flag) => flag.severity === 'blocking');
+  const requiresSafeSplit = requiresSafeSplitCheck(profile);
   if (
     requiresSafeSplit &&
     !['full_body', 'upper_lower'].includes(strategy.split_type)
@@ -123,13 +118,27 @@ export const validateLongitudinalStrategy = (
       'Return-to-training status, low recovery capacity, an avoid-severity movement restriction, or a blocking health flag requires full_body or upper_lower split regardless of days available.',
     );
   }
-  if (
-    !strategy.rationale.some((decision) => decision.code === 'SPLIT_TYPE_DECISION')
-  ) {
+  const splitDecision = strategy.rationale.find(
+    (decision) => decision.code === 'SPLIT_TYPE_DECISION',
+  );
+  if (!splitDecision) {
     add(
       'SPLIT_RATIONALE_MISSING',
       'error',
       'Strategy rationale is missing the required SPLIT_TYPE_DECISION entry explaining the split choice.',
+    );
+  } else if (splitDecision.selected_value !== strategy.split_type) {
+    // The model's own rationale entry disagrees with the split_type it
+    // actually committed to in the same output — e.g. reasoning justifying
+    // push_pull_legs while split_type correctly reflects a safety override
+    // to upper_lower. rationale-summary.ts reconciles this before it
+    // reaches the user-facing narrative, but it should never happen in the
+    // first place, so it's flagged here as an error, not silently patched
+    // with no trace.
+    add(
+      'AI_STRATEGY_RATIONALE_SPLIT_MISMATCH',
+      'error',
+      `SPLIT_TYPE_DECISION rationale describes split_type "${splitDecision.selected_value}" but the strategy actually committed to "${strategy.split_type}".`,
     );
   }
   if (

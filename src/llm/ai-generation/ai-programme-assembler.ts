@@ -1,4 +1,5 @@
 import type { LongitudinalOdinProgramme } from '../../domain/programme/programme.types.js';
+import type { PlannerVersion } from '../../domain/programme/planner-version.js';
 import type { AiStrategyOutput, AiPhaseOutput } from './ai-generation.types.js';
 
 export type AssemblerInput = {
@@ -9,16 +10,24 @@ export type AssemblerInput = {
   targetWeightKg: number;
   exerciseLibraryVersion: string;
   validationRuleVersion: string;
+  // Defaults to 'longitudinal_v1' for backward compatibility with
+  // ai-programme-generation.service.ts's callers, which already override this
+  // field explicitly downstream in programme-preview.service.ts regardless of
+  // what's set here. generate-programme-v2.ts's 'assemble' step does NOT
+  // override it downstream, so it must pass its own 'ai_agent_v2' label
+  // explicitly or these nested fields silently go stale again.
+  plannerVersion?: PlannerVersion;
 };
 
 export const assembleProgramme = (
   input: AssemblerInput,
 ): LongitudinalOdinProgramme => {
   const now = new Date().toISOString();
+  const plannerVersion = input.plannerVersion ?? 'longitudinal_v1';
 
   return {
     schema_version: '2.0',
-    planner_version: 'longitudinal_v1',
+    planner_version: plannerVersion,
     programme: {
       name: input.strategy.programme.name,
       goal_type: input.strategy.programme.goal_type,
@@ -49,7 +58,7 @@ export const assembleProgramme = (
     },
     generation_metadata: {
       generated_at: now,
-      planner_version: 'longitudinal_v1',
+      planner_version: plannerVersion,
       schema_version: '2.0',
       exercise_library_version: input.exerciseLibraryVersion,
       validation_rule_version: input.validationRuleVersion,

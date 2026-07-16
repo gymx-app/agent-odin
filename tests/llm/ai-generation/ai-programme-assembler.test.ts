@@ -105,6 +105,25 @@ describe('assembleProgramme', () => {
     expect(result.programme.status).toBe('preview');
   });
 
+  it('uses the caller-supplied plannerVersion instead of the default, in both nested fields', () => {
+    // Production bug: generate-programme-v2.ts's 'assemble' step never
+    // overrode these two nested fields, so they stayed 'longitudinal_v1'
+    // even under the ai_agent_v2 endpoint.
+    const result = assembleProgramme({
+      strategy: mockStrategy,
+      phases: [],
+      startDate: '2026-06-22',
+      startWeightKg: 82,
+      targetWeightKg: 74,
+      exerciseLibraryVersion: 'test-v1',
+      validationRuleVersion: 'programme-validation/v2',
+      plannerVersion: 'ai_agent_v2',
+    });
+
+    expect(result.planner_version).toBe('ai_agent_v2');
+    expect(result.generation_metadata.planner_version).toBe('ai_agent_v2');
+  });
+
   it('stamps generation_metadata with deterministic: false', () => {
     const result = assembleProgramme({
       strategy: mockStrategy,

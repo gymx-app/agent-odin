@@ -4,6 +4,7 @@ import {
   DAYS_OF_WEEK,
   DayOfWeekSchema,
 } from '../shared/domain-enums.js';
+import { PlannerVersionSchema } from './planner-version.js';
 
 export const PROGRAMME_FACTOR_MIN = 0.5;
 export const PROGRAMME_FACTOR_MAX = 1.5;
@@ -937,7 +938,7 @@ export const CalendarSchema = z
 export const LongitudinalOdinProgrammeSchema = z
   .object({
     schema_version: z.literal('2.0'),
-    planner_version: z.enum(['longitudinal_v1', 'ai_agent_v1']),
+    planner_version: PlannerVersionSchema,
     programme: z.object({
       name: conciseName,
       goal_type: AthleteGoalSchema,
@@ -1113,7 +1114,7 @@ export const LongitudinalOdinProgrammeSchema = z
     }),
     generation_metadata: z.object({
       generated_at: isoDateString,
-      planner_version: z.enum(['longitudinal_v1', 'ai_agent_v1']),
+      planner_version: PlannerVersionSchema,
       schema_version: z.literal('2.0'),
       exercise_library_version: z.string().min(1),
       validation_rule_version: z.string().min(1),

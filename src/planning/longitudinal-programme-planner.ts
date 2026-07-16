@@ -1,5 +1,6 @@
 import { LongitudinalOdinProgrammeSchema } from '../domain/programme/programme.schema.js';
 import type { NormalizedAthleteProfile } from '../domain/athlete/athlete.types.js';
+import type { PlannerVersion } from '../domain/programme/planner-version.js';
 import type { Exercise } from '../domain/exercise/exercise.types.js';
 import type { LongitudinalOdinProgramme } from '../domain/programme/programme.types.js';
 import type { AiStrategyOutput } from '../llm/ai-generation/ai-generation.types.js';
@@ -32,6 +33,13 @@ export type LongitudinalProgrammePlannerOptions = {
   startDate?: string;
   generatedAt?: string;
   exerciseLibraryVersion?: string;
+  // Only consumed by buildProgrammeFromAiStrategy — buildLongitudinalProgramme
+  // always hardcodes 'longitudinal_v1' correctly and ignores this. Defaults to
+  // 'ai_agent_v1' for backward compatibility with callers that don't pass it;
+  // generate-programme-v2.ts passes its own 'ai_agent_v2' label explicitly so
+  // the nested programme/generation_metadata fields stop disagreeing with the
+  // top-level response wrapper.
+  plannerVersion?: PlannerVersion;
   stageRunner?: <T>(stage: string, operation: () => T) => T;
   // Absolute Date.now()-comparable deadline for the whole repair loop in
   // buildProgrammeWithRepair. Each individual LLM call already has its own
@@ -378,6 +386,7 @@ export const buildProgrammeFromAiStrategy = (
 ): BuildResult => {
   const startDate = options.startDate ?? new Date().toISOString().slice(0, 10);
   const generatedAt = options.generatedAt ?? new Date().toISOString();
+  const plannerVersion = options.plannerVersion ?? 'ai_agent_v1';
   const run =
     options.stageRunner ??
     (<T>(_stage: string, operation: () => T): T => operation());
@@ -475,7 +484,7 @@ export const buildProgrammeFromAiStrategy = (
 
   const candidate = run<LongitudinalOdinProgramme>('composition', () => ({
     schema_version: '2.0',
-    planner_version: 'ai_agent_v1',
+    planner_version: plannerVersion,
     programme: {
       name: aiStrategy.programme.name,
       goal_type: aiStrategy.programme.goal_type,
@@ -531,7 +540,7 @@ export const buildProgrammeFromAiStrategy = (
     },
     generation_metadata: {
       generated_at: generatedAt,
-      planner_version: 'ai_agent_v1',
+      planner_version: plannerVersion,
       schema_version: '2.0',
       exercise_library_version:
         options.exerciseLibraryVersion ?? 'approved-library-v1',

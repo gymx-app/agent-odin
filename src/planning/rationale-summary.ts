@@ -1,5 +1,7 @@
 import type { AiStrategyOutput } from '../llm/ai-generation/ai-generation.types.js';
 import type { LongitudinalOdinProgramme } from '../domain/programme/programme.types.js';
+import type { NormalizedAthleteProfile } from '../domain/athlete/athlete.types.js';
+import { requiresSafeSplit } from './strategy/split-safety-override.js';
 
 export type StrategyRationaleItem = {
   decision: string;
@@ -57,16 +59,38 @@ const periodLabel = (model: string): string => {
 export const buildRationaleSummary = (
   aiStrategy: AiStrategyOutput,
   programme: LongitudinalOdinProgramme,
+  profile: NormalizedAthleteProfile,
 ): RationaleSummary => {
   const strat = aiStrategy.strategy;
   const prog = programme;
 
-  const aiDecisions: StrategyRationaleItem[] = strat.rationale.map((r) => ({
-    decision: r.code.replace(/_/g, ' ').toLowerCase(),
-    value: r.selected_value,
-    reason: r.reason,
-    confidence: r.confidence,
-  }));
+  // The model's own SPLIT_TYPE_DECISION rationale entry occasionally
+  // disagrees with the split_type it actually committed to in the same
+  // output (e.g. reasoning justifying push_pull_legs while split_type
+  // correctly reflects a safety override to upper_lower) — strategy-
+  // validator.ts flags this as AI_STRATEGY_RATIONALE_SPLIT_MISMATCH so it's
+  // observable, but the user-facing narrative must never describe a split
+  // the athlete isn't actually on, so it's reconciled here to the real
+  // value before narrative synthesis (which reads this summary, not the
+  // model's raw output) ever sees it.
+  const aiDecisions: StrategyRationaleItem[] = strat.rationale.map((r) => {
+    if (r.code === 'SPLIT_TYPE_DECISION' && r.selected_value !== prog.strategy.split_type) {
+      return {
+        decision: r.code.replace(/_/g, ' ').toLowerCase(),
+        value: prog.strategy.split_type,
+        reason: requiresSafeSplit(profile)
+          ? 'Return-to-training status, low recovery capacity, an avoid-severity movement restriction, or a blocking health flag requires full_body or upper_lower split regardless of days available — a conservative safety default, not evidence from a specific trial.'
+          : `Split chosen from available_days_per_week: ${splitLabel(prog.strategy.split_type)} fits ${prog.strategy.resistance_frequency} resistance sessions/week without exceeding available session-days.`,
+        confidence: r.confidence,
+      };
+    }
+    return {
+      decision: r.code.replace(/_/g, ' ').toLowerCase(),
+      value: r.selected_value,
+      reason: r.reason,
+      confidence: r.confidence,
+    };
+  });
 
   const assumptions = aiStrategy.assumptions.map((a) => ({
     assumption: a.message,

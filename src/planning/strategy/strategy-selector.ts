@@ -5,6 +5,7 @@ import {
   scoreStrategyCandidate,
   strategyConstraintFailures,
 } from './strategy-scorer.js';
+import { requiresSafeSplit as requiresSafeSplitCheck } from './split-safety-override.js';
 import type {
   ProgrammeStrategyResult,
   StrategyDecision,
@@ -117,16 +118,8 @@ const rationaleFor = (
   );
 
   // odin-programme-design-logic.md, Section 1 / Section 6: every programme
-  // needs a stated split rationale. requiresSafeSplit mirrors
-  // strategy-validator.ts's STRATEGY_SPLIT_SAFETY_OVERRIDE_VIOLATED check —
-  // keep both in sync.
-  const requiresSafeSplit =
-    training === 'returning' ||
-    input.profile.recovery_capacity === 'low' ||
-    input.profile.movement_restrictions.some(
-      (restriction) => restriction.severity === 'avoid',
-    ) ||
-    input.profile.health_flags.some((flag) => flag.severity === 'blocking');
+  // needs a stated split rationale.
+  const requiresSafeSplit = requiresSafeSplitCheck(input.profile);
   add(
     'SPLIT_TYPE_DECISION',
     selected.split_type,

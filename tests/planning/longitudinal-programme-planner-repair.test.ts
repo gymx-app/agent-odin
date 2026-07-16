@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { seedExercises } from '../../fixtures/exercises/seed-exercises.js';
-import { buildProgrammeWithRepair } from '../../src/planning/longitudinal-programme-planner.js';
+import {
+  buildProgrammeWithRepair,
+  buildProgrammeFromAiStrategy,
+} from '../../src/planning/longitudinal-programme-planner.js';
 import type { AiProgrammeGenerationProvider, AiStrategyContext } from '../../src/llm/ai-generation/ai-programme-generation-provider.js';
 import type { AiStrategyOutput } from '../../src/llm/ai-generation/ai-generation.types.js';
 import { createProfile } from './test-planning-utils.js';
@@ -95,6 +98,60 @@ const fakeProvider = (generateStrategy: AiProgrammeGenerationProvider['generateS
   generatePhase: () => {
     throw new Error('generatePhase should not be called by buildProgrammeWithRepair');
   },
+});
+
+describe('buildProgrammeFromAiStrategy planner_version', () => {
+  // invalidStrategy's empty phase_skeletons fails schema validation (by
+  // design, for the repair tests below), so the function's returned
+  // `programme` is null in that case — captured via stageRunner instead,
+  // which sees the pre-validation candidate regardless of outcome.
+  const captureComposition = () => {
+    let captured: { planner_version: string; generation_metadata: { planner_version: string } } | null = null;
+    const stageRunner = <T,>(stage: string, operation: () => T): T => {
+      const result = operation();
+      if (stage === 'composition') {
+        captured = result as typeof captured;
+      }
+      return result;
+    };
+    return { stageRunner, get: () => captured };
+  };
+
+  // invalidStrategy's empty phase_skeletons also fails schema validation
+  // inside buildProgrammeFromAiStrategy itself (it throws) — but that
+  // happens in a later stage than 'composition', so stageRunner has
+  // already captured the pre-validation candidate by the time it throws.
+  it('defaults to ai_agent_v1 when no plannerVersion option is supplied', () => {
+    const profile = createProfile({ available_days_per_week: 4, session_duration_min: 60 });
+    const capture = captureComposition();
+    expect(() =>
+      buildProgrammeFromAiStrategy(profile, seedExercises, invalidStrategy, {
+        startDate: '2026-06-22',
+        stageRunner: capture.stageRunner,
+      }),
+    ).toThrow();
+
+    expect(capture.get()?.planner_version).toBe('ai_agent_v1');
+    expect(capture.get()?.generation_metadata.planner_version).toBe('ai_agent_v1');
+  });
+
+  it('uses the caller-supplied plannerVersion in both nested fields', () => {
+    // Production bug: generate-programme-v2.ts's 'build' step never
+    // overrode these two nested fields, so they stayed 'ai_agent_v1' even
+    // under the ai_agent_v2 endpoint.
+    const profile = createProfile({ available_days_per_week: 4, session_duration_min: 60 });
+    const capture = captureComposition();
+    expect(() =>
+      buildProgrammeFromAiStrategy(profile, seedExercises, invalidStrategy, {
+        startDate: '2026-06-22',
+        plannerVersion: 'ai_agent_v2',
+        stageRunner: capture.stageRunner,
+      }),
+    ).toThrow();
+
+    expect(capture.get()?.planner_version).toBe('ai_agent_v2');
+    expect(capture.get()?.generation_metadata.planner_version).toBe('ai_agent_v2');
+  });
 });
 
 describe('buildProgrammeWithRepair deadline enforcement', () => {

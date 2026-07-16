@@ -133,6 +133,25 @@ describe('V2 strategy validator', () => {
     ).toContain('SPLIT_RATIONALE_MISSING');
   });
 
+  it('flags the AI strategy rationale describing a different split than the one it committed to', () => {
+    // The exact production bug: split_type correctly reflects the split
+    // actually built, but the model's own SPLIT_TYPE_DECISION rationale
+    // entry describes a different split entirely.
+    const programme = clone();
+    const splitDecision = programme.strategy.rationale.find(
+      (decision) => decision.code === 'SPLIT_TYPE_DECISION',
+    )!;
+    splitDecision.selected_value = 'push_pull_legs';
+
+    expect(
+      validateLongitudinalStrategy(
+        programme.strategy,
+        programme.calendar,
+        createProfile(),
+      ).map(({ code }) => code),
+    ).toContain('AI_STRATEGY_RATIONALE_SPLIT_MISMATCH');
+  });
+
   it('rejects competition peak without a target date', () => {
     const programme = clone();
     programme.strategy.periodization_model = 'competition_peak';

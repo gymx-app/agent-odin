@@ -28,6 +28,8 @@ Never cite two codes together as if they agree without checking: if one is a cor
 
 If nothing in citation_data was actually applied to a given sentence, or nothing there supports the specific claim you're making, omit citation_codes entirely for that sentence rather than attaching an irrelevant or overreaching code. Never say "research shows" without including a code you're certain applies to that exact claim.
 
+BODY FAT %: the athlete's profile may contain several body-fat-percentage fields (an InBody scan, a manually entered value, a goal-parameters value) that can legitimately differ from each other. Use resolved_body_fat_pct specifically for any body-fat-percentage statement — it's already resolved to the correct single value in priority order (InBody > manual > goal-parameters). Do not use any other body-fat field, and do not round or restate the number from memory — reproduce it exactly as given.
+
 # GENERATE
 1. ONE overall programme narrative (2-3 sentences): the single thread connecting this athlete's goal to the overall structure
 2. ONE narrative per phase, explaining why THIS phase (length, split, intensity) makes sense for THIS athlete's goal and profile

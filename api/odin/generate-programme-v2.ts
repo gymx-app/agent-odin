@@ -40,7 +40,10 @@ import {
   logGeneration,
 } from '../../src/infrastructure/supabase/generation-log.js';
 import { aiStrategySystemPromptV2 } from '../../src/llm/ai-generation/ai-generation-strategy-prompt-v2.js';
-import { synthesizeNarratives } from '../../src/llm/ai-generation/narrative-synthesis.service.js';
+import {
+  synthesizeNarratives,
+  mergeDocumentCitations,
+} from '../../src/llm/ai-generation/narrative-synthesis.service.js';
 import {
   collectRationaleCodes,
   CITATION_SHAPE,
@@ -480,6 +483,7 @@ export const createGenerateProgrammeV2Handler = (
               {
                 startDate: new Date().toISOString().slice(0, 10),
                 deadline: buildStartedAt + appConfig.generationTimeoutMs,
+                plannerVersion: PLANNER_VERSION,
                 onRepairAttempt: (event) =>
                   logger.info('build step attempt', { userId: user.id, ...event }),
               },
@@ -526,7 +530,7 @@ export const createGenerateProgrammeV2Handler = (
             }),
           };
 
-          const rationale = buildRationaleSummary(strategy, programme);
+          const rationale = buildRationaleSummary(strategy, programme, normalized);
           const repairAttempted = repair_log.length > 0;
           const repairReasons = repairAttempted
             ? [...new Set(repair_log.flatMap((r) => r.errorCodes))]
@@ -624,7 +628,9 @@ export const createGenerateProgrammeV2Handler = (
             validation,
             rationale,
             narratives: narrativeResult.narratives,
-            citations: narrativeResult.citations,
+            citations: narrativeResult.citations
+              ? mergeDocumentCitations(narrativeResult.citations, citationCodes)
+              : null,
             narratives_unavailable: narrativeResult.narratives_unavailable,
             refinement: {
               requested: false,
@@ -660,6 +666,7 @@ export const createGenerateProgrammeV2Handler = (
             targetWeightKg: normalized.source.target_weight_kg,
             exerciseLibraryVersion: 'approved-library-v1',
             validationRuleVersion: LONGITUDINAL_VALIDATION_RULE_VERSION,
+            plannerVersion: PLANNER_VERSION,
           });
           const programme = {
             ...assembled,

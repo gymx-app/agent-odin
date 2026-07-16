@@ -28,7 +28,10 @@ export const longitudinalValidationRules: readonly LongitudinalValidationRule[] 
     },
     {
       id: 'strategy',
-      version: 2,
+      // v3: added AI_STRATEGY_RATIONALE_SPLIT_MISMATCH — catches the AI
+      // strategy's own rationale describing a different split_type than
+      // the one it actually committed to in the same output.
+      version: 3,
       validate: (programme, profile) =>
         validateLongitudinalStrategy(
           programme.strategy,
@@ -62,7 +65,12 @@ export const longitudinalValidationRules: readonly LongitudinalValidationRule[] 
       validate: validateProgrammeCoherence,
     },
     {
-      id: 'evidence-citations',
+      // Renamed from 'evidence-citations': this rule only ever checked for
+      // hallucinated citation codes (real vs. fake), never completeness of
+      // the citations summary array or whether a citation actually supports
+      // the specific claim it's attached to — 'evidence-citations' implied
+      // a broader guarantee than the rule provides.
+      id: 'citation-hallucination',
       version: 1,
       validate: validateEvidenceCitations,
     },
