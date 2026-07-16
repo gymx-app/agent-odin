@@ -224,9 +224,16 @@ export class ProgrammeValidationService {
       return this.validate({ ...input, programme });
     }
 
+    // ai_agent_v2 reuses the exact same LongitudinalOdinProgramme shape and
+    // rule set as ai_agent_v1 (same schema, same prompts via the provider
+    // classes) — this allow-list predates the v1→v2 step-based split and was
+    // never updated, which broke every ai_agent_v2 build the moment its
+    // nested planner_version field started actually saying 'ai_agent_v2'
+    // instead of the stale 'ai_agent_v1' label it carried before.
     if (
       input.programme.planner_version !== 'longitudinal_v1' &&
-      input.programme.planner_version !== 'ai_agent_v1'
+      input.programme.planner_version !== 'ai_agent_v1' &&
+      input.programme.planner_version !== 'ai_agent_v2'
     ) {
       const findings = [
         finding(

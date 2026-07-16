@@ -39,6 +39,25 @@ describe('longitudinal validation dispatch', () => {
     expect(report.findings).toEqual([]);
   });
 
+  it('accepts ai_agent_v2 planner_version (regression: validateVersioned had its own hardcoded allow-list, separate from the schema enum, that never got updated for the v2 step-based endpoint)', () => {
+    const programme = structuredClone(validLongitudinalProgramme);
+    programme.planner_version = 'ai_agent_v2';
+    programme.generation_metadata.planner_version = 'ai_agent_v2';
+
+    const report = programmeValidationService.validateVersioned({
+      programme,
+      profile,
+      exercises: seedExercises,
+    });
+
+    expect(
+      report.findings.some(
+        (finding) => finding.code === 'UNSUPPORTED_PLANNER_VERSION',
+      ),
+    ).toBe(false);
+    expect(report.status).toBe('pass');
+  });
+
   it('reports V2 structural failures using stable codes', () => {
     const programme = structuredClone(validLongitudinalProgramme);
     programme.calendar.cycle_length_days = 8;
