@@ -100,6 +100,38 @@ export const validateLongitudinalStrategy = (
       'Strategy density or volume conflicts with low recovery capacity.',
     );
   }
+  // odin-programme-design-logic.md, Section 1: return-to-training / high
+  // injury flag / low recovery signal forces full_body or upper_lower
+  // regardless of available_days_per_week — a conservative safety default,
+  // not a days-count-driven optimisation. This is broader than the 6-day-
+  // PPL-specific recovery check above (that one only blocks one split at
+  // one frequency; this blocks every other split entirely).
+  const requiresSafeSplit =
+    training === 'returning' ||
+    profile.recovery_capacity === 'low' ||
+    profile.movement_restrictions.some(
+      (restriction) => restriction.severity === 'avoid',
+    ) ||
+    profile.health_flags.some((flag) => flag.severity === 'blocking');
+  if (
+    requiresSafeSplit &&
+    !['full_body', 'upper_lower'].includes(strategy.split_type)
+  ) {
+    add(
+      'STRATEGY_SPLIT_SAFETY_OVERRIDE_VIOLATED',
+      'error',
+      'Return-to-training status, low recovery capacity, an avoid-severity movement restriction, or a blocking health flag requires full_body or upper_lower split regardless of days available.',
+    );
+  }
+  if (
+    !strategy.rationale.some((decision) => decision.code === 'SPLIT_TYPE_DECISION')
+  ) {
+    add(
+      'SPLIT_RATIONALE_MISSING',
+      'error',
+      'Strategy rationale is missing the required SPLIT_TYPE_DECISION entry explaining the split choice.',
+    );
+  }
   if (
     strategy.periodization_model === 'competition_peak' &&
     !profile.source.sport?.competition_date

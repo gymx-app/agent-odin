@@ -40,4 +40,10 @@ describe('selectTargetReps', () => {
       }),
     ).toBe(15);
   });
+
+  it('overrides goal-driven targeting with the top of the rep zone when the exercise is modifiable due to a restriction', () => {
+    expect(
+      selectTargetReps(createProfile({ goal: 'strength' }), slot, 'modifiable'),
+    ).toBe(slot.rep_zone.max);
+  });
 });

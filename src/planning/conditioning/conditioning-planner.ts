@@ -159,13 +159,14 @@ const prescriptionForDay = (
         : ['intervals', 'sprint_intervals', 'threshold'].includes(type)
           ? 'high'
           : 'low',
-    interference_risk: risk,
+    interference_risk: risk.interference_risk,
     progression_policy_id: 'conditioning-v2',
     rationale: [
       ...modality.rationale_codes,
       ...intensity.rationale_codes,
       progression.rationale_code,
-      placement.rationale_code,
+      ...placement.rationale_codes,
+      ...risk.rationale_codes,
       ...(sportHasSprints ? ['SPORT_LOAD_REPLACED_HIIT'] : []),
     ],
     ...(modality.status === 'modifiable'

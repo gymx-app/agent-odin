@@ -181,12 +181,88 @@ const ProgressionBoundsSchema = z
     }
   });
 
+// odin-programme-design-logic.md, Section 3. 'straight' is the safe,
+// always-valid default — every producer must state a choice rather than
+// leave this a guess. Pyramid needs no parameters beyond the label: it's
+// already expressible via varying target_reps/target_rpe across `sets[]`.
+// Superset/giant_set are grouping techniques (see superset_group_id below),
+// not single-exercise parameters, but share the same type/rationale surface.
+const SetStructureSchema = z
+  .object({
+    type: z.enum([
+      'straight',
+      'pyramid',
+      'drop_set',
+      'rest_pause',
+      'cluster',
+      'superset',
+      'giant_set',
+    ]),
+    applies_to: z.enum(['all_sets', 'last_set_only']).optional(),
+    drop_set_detail: z
+      .object({
+        drop_count: z.number().int().min(1).max(3),
+        load_drop_pct: z.number().min(10).max(40),
+      })
+      .optional(),
+    rest_pause_detail: z
+      .object({
+        intra_set_rest_seconds: z.number().int().min(10).max(20),
+        mini_set_count: z.number().int().min(1).max(3),
+      })
+      .optional(),
+    cluster_detail: z
+      .object({
+        intra_set_rest_seconds: z.number().int().min(15).max(45),
+      })
+      .optional(),
+    rationale_codes: z.array(identifier),
+  })
+  .superRefine((s, ctx) => {
+    const detailKeyFor: Partial<Record<typeof s.type, string>> = {
+      drop_set: 'drop_set_detail',
+      rest_pause: 'rest_pause_detail',
+      cluster: 'cluster_detail',
+    };
+    const requiredDetailKey = detailKeyFor[s.type];
+    const detailKeys = [
+      'drop_set_detail',
+      'rest_pause_detail',
+      'cluster_detail',
+    ] as const;
+    detailKeys.forEach((key) => {
+      const present = s[key] !== undefined;
+      const shouldBePresent = key === requiredDetailKey;
+      if (present !== shouldBePresent) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: shouldBePresent
+            ? `${s.type} requires ${key}`
+            : `${key} is only valid when type is the matching structure`,
+          path: [key],
+        });
+      }
+    });
+    if (s.type !== 'straight' && s.rationale_codes.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'non-straight set structures require rationale_codes',
+        path: ['rationale_codes'],
+      });
+    }
+  });
+
 const ExercisePrescriptionSchema = z
   .object({
     prescription_id: identifier,
     exercise_id: identifier,
     exercise_name: z.string().min(1).max(80),
     display_order: z.number().int().nonnegative(),
+    set_structure: SetStructureSchema,
+    // Exercises sharing a superset_group_id run back-to-back (minimal rest
+    // between members) as a superset (2 members) or giant set (3+),
+    // mirroring the existing substitution_group_id grouping precedent below.
+    superset_group_id: identifier.optional(),
     sequence_role: z.enum([
       'power',
       'primary',
@@ -228,6 +304,11 @@ const ExercisePrescriptionSchema = z
     secondary_muscles: z.array(z.string()),
     sequencing_rationale: z.array(z.string()),
     weight_kg: z.number().positive().nullable(),
+    // odin-programme-design-logic.md, Section 4: a bodyweight-ratio-default
+    // 1RM estimate must never be presented with the same certainty as a
+    // self-reported one — required whenever weight_kg is non-null so the
+    // Why tab can't silently drop the distinction.
+    weight_confidence: z.enum(['low', 'moderate', 'high']).optional(),
   })
   .superRefine((exercise, ctx) => {
     if (!uniqueBy(exercise.sets, (set) => set.set_number)) {
@@ -248,6 +329,13 @@ const ExercisePrescriptionSchema = z
         code: z.ZodIssueCode.custom,
         message: 'target reps must fit progression bounds',
         path: ['sets'],
+      });
+    }
+    if ((exercise.weight_kg !== null) !== (exercise.weight_confidence !== undefined)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'weight_confidence is required whenever weight_kg is set, and forbidden when it is null',
+        path: ['weight_confidence'],
       });
     }
   });
@@ -551,6 +639,38 @@ const ProgrammeDaySchema = z
         });
       }
     });
+    const groups = new Map<string, typeof day.exercises>();
+    day.exercises.forEach((exercise) => {
+      if (!exercise.superset_group_id) return;
+      const group = groups.get(exercise.superset_group_id) ?? [];
+      group.push(exercise);
+      groups.set(exercise.superset_group_id, group);
+    });
+    groups.forEach((members, groupId) => {
+      const expectedType = members.length >= 3 ? 'giant_set' : 'superset';
+      if (
+        members.some((member) => member.set_structure.type !== expectedType)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `superset_group_id ${groupId} members must all use set_structure.type '${expectedType}' matching the group size`,
+          path: ['exercises'],
+        });
+      }
+      const orders = members
+        .map((member) => member.display_order)
+        .sort((a, b) => a - b);
+      const contiguous = orders.every(
+        (value, index) => index === 0 || value === orders[index - 1]! + 1,
+      );
+      if (!contiguous) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `superset_group_id ${groupId} members must have contiguous display_order values`,
+          path: ['exercises'],
+        });
+      }
+    });
   });
 
 export const ProgrammeWeekSchema = z.object({
@@ -617,6 +737,7 @@ export const ProgrammeWeekSchema = z.object({
         'last_set_optional',
         'phase_specific',
       ]),
+      rationale_codes: z.array(identifier),
     }),
     progression_policy: z.object({
       model: ProgressionModelSchema,

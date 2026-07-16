@@ -8,9 +8,38 @@ import type {
   ScoredStrategyCandidate,
   StrategyCandidate,
   StrategySelectorV2Input,
+  TrainingStrategyV2,
 } from './strategy.types.js';
 
 const clamp = (value: number): number => Math.max(0, Math.min(1, value));
+
+// odin-programme-design-logic.md, Section 4 (SCHOENFELD_2021_LOAD_HYPERTROPHY):
+// strength-primary needs load as the progression variable — linear_load,
+// wave_loading, step_loading, and performance_based all make load (not
+// reps) the axis that climbs, just via different periodization shapes.
+// muscle_gain/recomposition needs proximity-to-failure and volume as the
+// target, not a specific load — double_progression (reps climb before
+// load) matches that framing. This was previously entirely absent:
+// goal had zero influence on progression_model selection anywhere.
+const progressionFitForGoal = (
+  progression_model: TrainingStrategyV2['progression_model'],
+  goal: string,
+): number => {
+  if (goal === 'strength') {
+    return [
+      'linear_load',
+      'wave_loading',
+      'step_loading',
+      'performance_based',
+    ].includes(progression_model)
+      ? 1
+      : 0.5;
+  }
+  if (goal === 'muscle_gain' || goal === 'recomposition') {
+    return progression_model === 'double_progression' ? 1 : 0.7;
+  }
+  return 0.8;
+};
 
 const goalFit = (
   candidate: StrategyCandidate,
@@ -18,26 +47,43 @@ const goalFit = (
 ): number => {
   const goal = input.profile.source.goal;
   const model = candidate.strategy.periodization_model;
+  const progressionFit = progressionFitForGoal(
+    candidate.strategy.progression_model,
+    goal,
+  );
   if (candidate.strategy.primary_objective === 'sport_support') {
-    return model === 'concurrent' || model === 'competition_peak' ? 1 : 0.7;
+    return (
+      (model === 'concurrent' || model === 'competition_peak' ? 1 : 0.7) +
+      progressionFit
+    ) / 2;
   }
   if (goal === 'strength') {
     if (input.profile.source.sport?.competition_date) {
-      return model === 'competition_peak' ? 1 : model === 'block' ? 0.4 : 0.2;
+      return (
+        (model === 'competition_peak' ? 1 : model === 'block' ? 0.4 : 0.2) +
+        progressionFit
+      ) / 2;
     }
-    return ['block', 'competition_peak', 'simple_progressive'].includes(model)
-      ? 1
-      : 0.6;
+    return (
+      (['block', 'competition_peak', 'simple_progressive'].includes(model)
+        ? 1
+        : 0.6) + progressionFit
+    ) / 2;
   }
   if (goal === 'muscle_gain') {
-    return ['block', 'undulating', 'simple_progressive'].includes(model)
-      ? 1
-      : 0.6;
+    return (
+      (['block', 'undulating', 'simple_progressive'].includes(model)
+        ? 1
+        : 0.6) + progressionFit
+    ) / 2;
   }
   if (goal === 'fat_loss' || goal === 'endurance') {
-    return ['concurrent', 'simple_progressive'].includes(model) ? 1 : 0.6;
+    return (
+      (['concurrent', 'simple_progressive'].includes(model) ? 1 : 0.6) +
+      progressionFit
+    ) / 2;
   }
-  return model === 'simple_progressive' ? 1 : 0.8;
+  return ((model === 'simple_progressive' ? 1 : 0.8) + progressionFit) / 2;
 };
 
 export const strategyConstraintFailures = (

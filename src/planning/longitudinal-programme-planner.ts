@@ -208,6 +208,10 @@ export const buildLongitudinalProgramme = (
       baseline_path: profile.source.baseline_path ?? 'skipped',
       known_lifts: profile.source.known_lifts ?? null,
       goal: profile.source.goal,
+      sex: profile.source.sex,
+      age: profile.source.age,
+      bodyweight_kg: profile.source.current_weight_kg,
+      training_status: profile.athlete_state.training_status.value,
     }),
   );
   const progressionModel =
@@ -458,6 +462,10 @@ export const buildProgrammeFromAiStrategy = (
       baseline_path: profile.source.baseline_path ?? 'skipped',
       known_lifts: profile.source.known_lifts ?? null,
       goal: profile.source.goal,
+      sex: profile.source.sex,
+      age: profile.source.age,
+      bodyweight_kg: profile.source.current_weight_kg,
+      training_status: profile.athlete_state.training_status.value,
     }),
   );
 

@@ -4,6 +4,15 @@ import { evaluateReadiness } from '../../../src/planning/fatigue/readiness-evalu
 const goodSet = { target_reps: 8, rpe_ceiling: 8, reps_achieved: 8, rpe_reported: 7 };
 const missedSet = { target_reps: 8, rpe_ceiling: 8, reps_achieved: 6, rpe_reported: 8 };
 const overshootSet = { target_reps: 8, rpe_ceiling: 8, reps_achieved: 8, rpe_reported: 9.5 };
+// Ceiling <=6 sits in the self-report zone the design doc flags as less
+// accurate (a set left at 4-5 RIR, RPE 5-6) — same overshoot margin as
+// overshootSet above, but at a low ceiling.
+const lowConfidenceOvershootSet = {
+  target_reps: 12,
+  rpe_ceiling: 6,
+  reps_achieved: 12,
+  rpe_reported: 7.5,
+};
 
 describe('evaluateReadiness', () => {
   it('does not recommend a deload for solid recent sessions', () => {
@@ -48,6 +57,26 @@ describe('evaluateReadiness', () => {
     ]);
     expect(result.deload_recommended).toBe(true);
     expect(result.triggered_reasons[0]).toContain('PERSISTENT_RPE_ELEVATION');
+  });
+
+  it('does not trigger persistent RPE elevation on just 2 low-confidence-zone sessions', () => {
+    const result = evaluateReadiness([
+      { completed_sets: [lowConfidenceOvershootSet, lowConfidenceOvershootSet] },
+      { completed_sets: [lowConfidenceOvershootSet, lowConfidenceOvershootSet] },
+    ]);
+    expect(result.deload_recommended).toBe(false);
+  });
+
+  it('triggers persistent RPE elevation on 3 consecutive low-confidence-zone sessions, with the relaxed-threshold note', () => {
+    const result = evaluateReadiness([
+      { completed_sets: [lowConfidenceOvershootSet, lowConfidenceOvershootSet] },
+      { completed_sets: [lowConfidenceOvershootSet, lowConfidenceOvershootSet] },
+      { completed_sets: [lowConfidenceOvershootSet, lowConfidenceOvershootSet] },
+    ]);
+    expect(result.deload_recommended).toBe(true);
+    expect(result.triggered_reasons[0]).toContain('PERSISTENT_RPE_ELEVATION');
+    expect(result.triggered_reasons[0]).toContain('last 3 sessions');
+    expect(result.triggered_reasons[0]).toContain('relaxed threshold');
   });
 
   it('only evaluates the most recent sessions in a longer history', () => {

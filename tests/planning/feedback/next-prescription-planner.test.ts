@@ -54,6 +54,53 @@ describe('planNextPrescription', () => {
       increase_load: true,
       rationale_codes: ['TOP_OF_RANGE_REACHED_LOAD_INCREASED'],
     });
+    expect(result.next_target_weight_kg).toBeUndefined();
+  });
+
+  it('computes an actual next_target_weight_kg (not just a flag) when current_weight_kg is known', () => {
+    const result = planNextPrescription(
+      [{ target_reps: 10, rpe_ceiling: 8, reps_achieved: 10, rpe_reported: 8 }],
+      10,
+      { ...bounds, current_weight_kg: 100 },
+    );
+    expect(result.increase_load).toBe(true);
+    expect(result.next_target_weight_kg).toBe(102.5);
+  });
+
+  it('does not fabricate a next_target_weight_kg when current_weight_kg is unknown', () => {
+    const result = planNextPrescription(
+      [{ target_reps: 10, rpe_ceiling: 8, reps_achieved: 10, rpe_reported: 8 }],
+      10,
+      bounds,
+    );
+    expect(result.increase_load).toBe(true);
+    expect(result.next_target_weight_kg).toBeUndefined();
+  });
+
+  it('holds reps at the top of the range instead of increasing load when load progression is suppressed', () => {
+    const result = planNextPrescription(
+      [{ target_reps: 10, rpe_ceiling: 8, reps_achieved: 10, rpe_reported: 8 }],
+      10,
+      { ...bounds, load_increment_type: 'none' },
+    );
+    expect(result).toMatchObject({
+      next_target_reps: 10,
+      increase_load: false,
+      rationale_codes: ['LOAD_PROGRESSION_SUPPRESSED_REPS_HELD'],
+    });
+  });
+
+  it('still progresses reps toward the top of the range when load progression is suppressed but reps have room left', () => {
+    const result = planNextPrescription(
+      [setAt(8, 7), setAt(8, 8)],
+      8,
+      { ...bounds, load_increment_type: 'none' },
+    );
+    expect(result).toMatchObject({
+      next_target_reps: 9,
+      increase_load: false,
+      rationale_codes: ['TARGET_REPS_PROGRESSED'],
+    });
   });
 
   it('is deterministic', () => {

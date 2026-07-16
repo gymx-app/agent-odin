@@ -190,6 +190,50 @@ export const validateLongitudinalSessions = (
               );
             }
             if (
+              prescription.modification_metadata &&
+              prescription.modification_metadata.restriction_tags.length >
+                0 &&
+              prescription.progression_bounds.load_increment_type !== 'none'
+            ) {
+              add(
+                'RESTRICTED_EXERCISE_LOAD_PROGRESSION_NOT_SUPPRESSED',
+                'error',
+                'prescription_quality',
+                'Exercise has an active movement restriction but load progression was not suppressed in favor of reps/ROM.',
+                { exercise_id: prescription.exercise_id },
+              );
+            }
+            if (
+              ['drop_set', 'rest_pause'].includes(
+                prescription.set_structure.type,
+              ) &&
+              approved.exercise_type === 'compound' &&
+              ['primary', 'secondary'].includes(prescription.sequence_role)
+            ) {
+              add(
+                'UNSAFE_SET_STRUCTURE_ON_COMPOUND_LIFT',
+                'error',
+                'prescription_quality',
+                'Drop sets and rest-pause are for isolation/accessory work only, not primary or secondary compound lifts.',
+                { exercise_id: prescription.exercise_id },
+              );
+            }
+            if (
+              prescription.set_structure.type === 'cluster' &&
+              !(
+                approved.exercise_type === 'compound' &&
+                ['primary', 'secondary'].includes(prescription.sequence_role)
+              )
+            ) {
+              add(
+                'CLUSTER_SET_OFF_TARGET_USE',
+                'warning',
+                'prescription_quality',
+                'Cluster sets are for velocity/power preservation on compound primary/secondary lifts, not isolation/accessory work.',
+                { exercise_id: prescription.exercise_id },
+              );
+            }
+            if (
               prescription.exercise_name !==
               (approved.display_name ?? approved.name)
             ) {
@@ -251,6 +295,25 @@ export const validateLongitudinalSessions = (
                   { exercise_id: prescription.exercise_id },
                 );
               }
+              // odin-programme-design-logic.md, Section 5: failure exposure
+              // (rpe_ceiling pushed to true failure) must never happen when
+              // the week's policy is 'none', and never on an exercise
+              // carrying an active movement restriction (Item 1's reps/ROM
+              // priority always wins), regardless of what the policy allows.
+              if (
+                set.rpe_ceiling >= 10 &&
+                (week.planning_metadata.intensity_target
+                  .failure_exposure_policy === 'none' ||
+                  prescription.modification_metadata !== undefined)
+              ) {
+                add(
+                  'UNSAFE_FAILURE_EXPOSURE',
+                  'error',
+                  'prescription_quality',
+                  'A set is exposed to true failure (rpe_ceiling 10) despite failure_exposure_policy being "none" or an active movement restriction on this exercise.',
+                  { exercise_id: prescription.exercise_id },
+                );
+              }
             });
             prescription.substitution_options?.approved_exercise_ids.forEach(
               (substituteId) => {
@@ -265,6 +328,45 @@ export const validateLongitudinalSessions = (
                 }
               },
             );
+          });
+          const groups = new Map<string, typeof day.exercises>();
+          day.exercises.forEach((exercise) => {
+            if (!exercise.superset_group_id) return;
+            const group = groups.get(exercise.superset_group_id) ?? [];
+            group.push(exercise);
+            groups.set(exercise.superset_group_id, group);
+          });
+          groups.forEach((members, groupId) => {
+            const expectedType =
+              members.length >= 3 ? 'giant_set' : 'superset';
+            const hasStrengthPrimaryMember = members.some(
+              (member) =>
+                member.sequence_role === 'primary' &&
+                exerciseById.get(member.exercise_id)?.exercise_type ===
+                  'compound',
+            );
+            if (hasStrengthPrimaryMember) {
+              add(
+                'SUPERSET_ON_PRIMARY_STRENGTH_LIFT',
+                'error',
+                'prescription_quality',
+                `superset_group_id ${groupId} groups a primary compound lift into a superset/giant set — elevated fatigue degrades force output on subsequent exercises.`,
+                { week_number: week.week_number, cycle_day: day.cycle_day },
+              );
+            }
+            if (
+              members.some(
+                (member) => member.set_structure.type !== expectedType,
+              )
+            ) {
+              add(
+                'SUPERSET_GROUP_TYPE_MISMATCH',
+                'error',
+                'prescription_quality',
+                `superset_group_id ${groupId} members must all use set_structure.type '${expectedType}' matching the group size.`,
+                { week_number: week.week_number, cycle_day: day.cycle_day },
+              );
+            }
           });
         });
     });

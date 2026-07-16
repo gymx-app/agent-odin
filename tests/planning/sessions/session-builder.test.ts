@@ -537,4 +537,45 @@ describe('Session Construction V2', () => {
     );
     expect(week2CarriesSeedRationale).toBe(false);
   });
+
+  it('prioritizes reps/ROM over load for any exercise retained despite a movement restriction', () => {
+    const { result } = buildFirst(
+      {
+        movement_restrictions: [
+          {
+            region: 'knee',
+            movement_demand: 'loaded_deep_knee_flexion',
+            tolerance: 'modifiable',
+          },
+        ],
+      },
+      8,
+      3,
+    );
+
+    const restricted = result.day.exercises.filter(
+      (exercise) =>
+        (exercise.modification_metadata?.restriction_tags.length ?? 0) > 0,
+    );
+    expect(restricted.length).toBeGreaterThan(0);
+    restricted.forEach((exercise) => {
+      expect(exercise.progression_bounds.load_increment_type).toBe('none');
+      expect(exercise.sequencing_rationale).toContain(
+        'INJURY_RESTRICTION_REPS_PRIORITY',
+      );
+      exercise.sets.forEach((set) => {
+        expect(set.target_reps).toBe(exercise.progression_bounds.rep_max);
+      });
+    });
+
+    const unrestricted = result.day.exercises.filter(
+      (exercise) =>
+        (exercise.modification_metadata?.restriction_tags.length ?? 0) === 0,
+    );
+    unrestricted.forEach((exercise) => {
+      expect(exercise.sequencing_rationale).not.toContain(
+        'INJURY_RESTRICTION_REPS_PRIORITY',
+      );
+    });
+  });
 });

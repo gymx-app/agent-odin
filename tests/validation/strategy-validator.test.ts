@@ -51,6 +51,88 @@ describe('V2 strategy validator', () => {
     expect(codes).toContain(expectedCode);
   });
 
+  it.each([
+    [
+      'returning training status',
+      (profile: ReturnType<typeof createProfile>) => {
+        profile.athlete_state.training_status.value = 'returning';
+      },
+    ],
+    [
+      'low recovery capacity',
+      (profile: ReturnType<typeof createProfile>) => {
+        profile.recovery_capacity = 'low';
+      },
+    ],
+    [
+      'an avoid-severity movement restriction',
+      (profile: ReturnType<typeof createProfile>) => {
+        profile.movement_restrictions.push({
+          tag: 'loaded_deep_knee_flexion',
+          severity: 'avoid',
+          source_area: 'knee',
+          notes: 'Active flare-up.',
+        });
+      },
+    ],
+    [
+      'a blocking health flag',
+      (profile: ReturnType<typeof createProfile>) => {
+        profile.health_flags.push({
+          code: 'MEDICAL_CLEARANCE_REQUIRED',
+          severity: 'blocking',
+          message: 'Physician clearance required before training.',
+        });
+      },
+    ],
+  ])(
+    'requires full_body/upper_lower split for %s regardless of days available',
+    (_name, mutateProfile) => {
+      const programme = clone();
+      programme.strategy.split_type = 'push_pull_legs';
+      const profile = createProfile();
+      mutateProfile(profile);
+
+      expect(
+        validateLongitudinalStrategy(
+          programme.strategy,
+          programme.calendar,
+          profile,
+        ).map(({ code }) => code),
+      ).toContain('STRATEGY_SPLIT_SAFETY_OVERRIDE_VIOLATED');
+    },
+  );
+
+  it('does not require the safety-split override when full_body/upper_lower is already selected', () => {
+    const programme = clone();
+    programme.strategy.split_type = 'upper_lower';
+    const profile = createProfile();
+    profile.recovery_capacity = 'low';
+
+    expect(
+      validateLongitudinalStrategy(
+        programme.strategy,
+        programme.calendar,
+        profile,
+      ).map(({ code }) => code),
+    ).not.toContain('STRATEGY_SPLIT_SAFETY_OVERRIDE_VIOLATED');
+  });
+
+  it('reports missing split rationale', () => {
+    const programme = clone();
+    programme.strategy.rationale = programme.strategy.rationale.filter(
+      (decision) => decision.code !== 'SPLIT_TYPE_DECISION',
+    );
+
+    expect(
+      validateLongitudinalStrategy(
+        programme.strategy,
+        programme.calendar,
+        createProfile(),
+      ).map(({ code }) => code),
+    ).toContain('SPLIT_RATIONALE_MISSING');
+  });
+
   it('rejects competition peak without a target date', () => {
     const programme = clone();
     programme.strategy.periodization_model = 'competition_peak';

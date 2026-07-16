@@ -126,6 +126,37 @@ describe('POST /api/odin/next-prescription', () => {
     });
   });
 
+  it('computes next_target_weight_kg when current_weight_kg is echoed back', async () => {
+    const handler = createNextPrescriptionHandler(config);
+    const response = createTestResponse();
+
+    await handler(
+      postRequest({
+        exercise_id: 'barbell_back_squat',
+        current_target_reps: 10,
+        progression_bounds: {
+          rep_min: 6,
+          rep_max: 10,
+          current_weight_kg: 100,
+        },
+        completed_sets: [
+          { target_reps: 10, rpe_ceiling: 8, reps_achieved: 10, rpe_reported: 8 },
+        ],
+        athlete: createV2Athlete(),
+      }),
+      response,
+    );
+
+    expect(response.json()).toMatchObject({
+      success: true,
+      data: {
+        next_target_reps: 6,
+        increase_load: true,
+        next_target_weight_kg: 102.5,
+      },
+    });
+  });
+
   it('rejects an invalid progression_bounds range', async () => {
     const handler = createNextPrescriptionHandler(config);
     const response = createTestResponse();

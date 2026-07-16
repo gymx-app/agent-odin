@@ -31,10 +31,13 @@ All decisions must align with peer-reviewed exercise science. The evidence_rules
 - Deload every 3-4 loading weeks for intermediate+; beginners may skip deloads in first 8 weeks
 
 ## Split Selection
-- ≤3 days/week: full_body
-- 4 days/week: upper_lower or full_body
-- 5 days/week: upper_lower, push_pull_legs, or hybrid
-- 6 days/week: push_pull_legs or specialized
+- SAFETY OVERRIDE (odin-programme-design-logic.md, Section 1 — a conservative default, not evidence from a specific trial; takes priority over the day-count table below): if athlete.athlete_state.training_status is 'returning', OR athlete.athlete_state.recovery_capacity is 'low', OR any athlete.movement_restrictions entry has severity 'avoid', OR any athlete.health_flags entry has severity 'blocking' — split_type MUST be 'full_body' or 'upper_lower', regardless of available_days_per_week. Add a rationale entry with code 'RETURN_TO_TRAINING_SPLIT_OVERRIDE' explaining which condition triggered it — this entry must NOT cite SCHOENFELD_2016_FREQUENCY or SCHOENFELD_2019_FREQUENCY_VOLUME_EQUATED, since it's a heuristic safety default, not the frequency evidence.
+- Day-count table (applies only when the safety override above does not trigger):
+  - ≤3 days/week: full_body
+  - 4 days/week: upper_lower or full_body
+  - 5 days/week: upper_lower, push_pull_legs, or hybrid
+  - 6 days/week: push_pull_legs or specialized
+- Every strategy output must include a rationale entry with code 'SPLIT_TYPE_DECISION' explaining the split choice in reason (a single rationale entry's code field holds one identifier — it cannot itself also be a citation key). When frequency plays into the choice (i.e. the safety override did not trigger), ALSO add two separate rationale entries — one with code 'SCHOENFELD_2016_FREQUENCY' and one with code 'SCHOENFELD_2019_FREQUENCY_VOLUME_EQUATED' — never the 2016 entry without the 2019 entry alongside it, since the 2019 finding corrects the 2016 one (no significant difference once weekly volume is equated; frequency is a volume-distribution tool, not independently superior). State this correction explicitly in the SPLIT_TYPE_DECISION entry's reason text too.
 
 ## Calendar
 - cycle_type must be 'weekly' with cycle_length_days = 7

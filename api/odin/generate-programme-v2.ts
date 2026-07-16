@@ -520,6 +520,10 @@ export const createGenerateProgrammeV2Handler = (
               baseline_path: body.athlete.baseline_path,
               known_lifts: body.athlete.known_lifts,
               goal: body.athlete.goal,
+              sex: normalized.source.sex,
+              age: normalized.source.age,
+              bodyweight_kg: normalized.source.current_weight_kg,
+              training_status: normalized.athlete_state.training_status.value,
             }),
           };
 
@@ -660,6 +664,10 @@ export const createGenerateProgrammeV2Handler = (
               baseline_path: body.athlete.baseline_path,
               known_lifts: body.athlete.known_lifts,
               goal: body.athlete.goal,
+              sex: normalized.source.sex,
+              age: normalized.source.age,
+              bodyweight_kg: normalized.source.current_weight_kg,
+              training_status: normalized.athlete_state.training_status.value,
             }),
           };
 

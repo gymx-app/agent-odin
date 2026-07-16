@@ -18,6 +18,17 @@ export type ReadinessAssessment = {
 };
 
 const CONSECUTIVE_SESSIONS_REQUIRED = 2;
+// odin-programme-design-logic.md, Section 5 (ZOURDOS_2019_BASTOS_2024_RIR_
+// ACCURACY_DEGRADATION): self-reported RIR/RPE accuracy degrades the
+// further a set is from failure — the doc's own worked example anchors
+// this at "a set left at 4-5 reps in reserve", i.e. RPE 5-6. An overshoot
+// signal computed from sessions working at or below that ceiling is less
+// trustworthy than the same signal near failure, so it's required to
+// persist one session longer before triggering a deload. This +1-session
+// response is a heuristic built on the cited accuracy finding, not itself
+// a validated protocol — it does not get its own citation code.
+const LOW_CONFIDENCE_CEILING_THRESHOLD = 6;
+const CONSECUTIVE_SESSIONS_REQUIRED_LOW_CONFIDENCE = 3;
 // A session "misses" when the majority of its sets fall short of target
 // reps — a single off set doesn't indicate accumulated fatigue.
 const MISSED_SET_MAJORITY_THRESHOLD = 0.5;
@@ -40,6 +51,15 @@ const sessionAverageRpeOvershoot = (session: SessionPerformance): number => {
   return overshoots.reduce((sum, value) => sum + value, 0) / overshoots.length;
 };
 
+const sessionAverageCeiling = (session: SessionPerformance): number => {
+  const ceilings = session.completed_sets.map((set) => set.rpe_ceiling);
+  return ceilings.reduce((sum, value) => sum + value, 0) / ceilings.length;
+};
+
+const isLowConfidenceSelfReportSession = (
+  session: SessionPerformance,
+): boolean => sessionAverageCeiling(session) <= LOW_CONFIDENCE_CEILING_THRESHOLD;
+
 // Turns the two previously-static readiness_triggers strings
 // ("Repeated performance decline.", "Persistent recovery deterioration.")
 // into computed conditions over the most recent sessions, instead of
@@ -59,15 +79,29 @@ export const evaluateReadiness = (
     );
   }
 
-  if (
+  // Rep-completion is an objective count, unaffected by RIR self-report
+  // accuracy — only the RPE-overshoot signal below needs the low-confidence
+  // window extension, so this check keeps the standard, fixed window.
+  const rpeRequiredSessions =
     lastN.length === CONSECUTIVE_SESSIONS_REQUIRED &&
-    lastN.every(
+    lastN.every(isLowConfidenceSelfReportSession)
+      ? CONSECUTIVE_SESSIONS_REQUIRED_LOW_CONFIDENCE
+      : CONSECUTIVE_SESSIONS_REQUIRED;
+  const rpeWindow = recentSessions.slice(-rpeRequiredSessions);
+
+  if (
+    rpeWindow.length === rpeRequiredSessions &&
+    rpeWindow.every(
       (session) =>
         sessionAverageRpeOvershoot(session) >= RPE_OVERSHOOT_THRESHOLD,
     )
   ) {
+    const lowConfidenceNote =
+      rpeRequiredSessions === CONSECUTIVE_SESSIONS_REQUIRED_LOW_CONFIDENCE
+        ? ' (relaxed threshold: ceiling <=6 self-report zone has degraded accuracy per ZOURDOS_2019_BASTOS_2024_RIR_ACCURACY_DEGRADATION — heuristic response, not itself validated)'
+        : '';
     triggered_reasons.push(
-      `PERSISTENT_RPE_ELEVATION: average reported RPE exceeded the ceiling by ${RPE_OVERSHOOT_THRESHOLD}+ across the last ${CONSECUTIVE_SESSIONS_REQUIRED} sessions.`,
+      `PERSISTENT_RPE_ELEVATION: average reported RPE exceeded the ceiling by ${RPE_OVERSHOOT_THRESHOLD}+ across the last ${rpeRequiredSessions} sessions.${lowConfidenceNote}`,
     );
   }
 

@@ -110,25 +110,51 @@ describe('calculateWorkingWeight', () => {
   });
 });
 
+const baseAthlete = {
+  goal: 'strength',
+  sex: 'male' as const,
+  age: 30,
+  bodyweight_kg: 80,
+  training_status: 'intermediate' as const,
+};
+
 describe('applyWeightPrescription', () => {
-  it('leaves weight_kg null when baseline_path is not self_reported', () => {
+  it('falls back to a bodyweight-ratio estimate (low confidence) when baseline_path is not self_reported, instead of leaving weight_kg null', () => {
+    // odin-programme-design-logic.md, Section 4: "not just an RPE-anchored
+    // fallback when 1RM is missing" — estimateBaselineStrength always
+    // produces a number, honestly tiered.
     const phases = buildPhases([buildExercise('barbell_back_squat')]);
     const result = applyWeightPrescription(phases, {
+      ...baseAthlete,
       baseline_path: 'skipped',
-      known_lifts: [{ exercise_id: 'squat', weight_kg: 100, reps: 5 }],
-      goal: 'strength',
+      known_lifts: null,
     });
-    expect(result[0]!.weeks[0]!.days[0]!.exercises[0]!.weight_kg).toBeNull();
+    const exercise = result[0]!.weeks[0]!.days[0]!.exercises[0]!;
+    expect(exercise.weight_kg).not.toBeNull();
+    expect(exercise.weight_confidence).toBe('low');
   });
 
-  it('leaves weight_kg null for exercises with no matching known lift', () => {
+  it('leaves weight_kg null for exercises with no mapped movement pattern (no barbell lift for it in the library)', () => {
     const phases = buildPhases([buildExercise('dumbbell_goblet_squat')]);
     const result = applyWeightPrescription(phases, {
+      ...baseAthlete,
       baseline_path: 'self_reported',
       known_lifts: [{ exercise_id: 'squat', weight_kg: 100, reps: 5 }],
-      goal: 'strength',
     });
-    expect(result[0]!.weeks[0]!.days[0]!.exercises[0]!.weight_kg).toBeNull();
+    const exercise = result[0]!.weeks[0]!.days[0]!.exercises[0]!;
+    expect(exercise.weight_kg).toBeNull();
+    expect(exercise.weight_confidence).toBeUndefined();
+  });
+
+  it('prefers the self-reported known lift (high confidence) over the ratio-default estimate', () => {
+    const phases = buildPhases([buildExercise('barbell_back_squat')]);
+    const result = applyWeightPrescription(phases, {
+      ...baseAthlete,
+      baseline_path: 'self_reported',
+      known_lifts: [{ exercise_id: 'squat', weight_kg: 100, reps: 5 }],
+    });
+    const exercise = result[0]!.weeks[0]!.days[0]!.exercises[0]!;
+    expect(exercise.weight_confidence).toBe('high');
   });
 
   it('computes weight from the RPE/reps table for a matching working set', () => {
@@ -136,9 +162,9 @@ describe('applyWeightPrescription', () => {
       buildExercise('barbell_back_squat', { target_rpe: 8, target_reps: 5 }),
     ]);
     const result = applyWeightPrescription(phases, {
+      ...baseAthlete,
       baseline_path: 'self_reported',
       known_lifts: [{ exercise_id: 'squat', weight_kg: 100, reps: 5 }],
-      goal: 'strength',
     });
     const weight = result[0]!.weeks[0]!.days[0]!.exercises[0]!.weight_kg;
     const estimated1rm = 100 * (1 + 5 / 30);
@@ -155,9 +181,9 @@ describe('applyWeightPrescription', () => {
         buildExercise('barbell_back_squat', { target_rpe: 6, target_reps: 5 }),
       ]),
       {
+        ...baseAthlete,
         baseline_path: 'self_reported',
         known_lifts: [{ exercise_id: 'squat', weight_kg: 100, reps: 5 }],
-        goal: 'strength',
       },
     )[0]!.weeks[0]!.days[0]!.exercises[0]!.weight_kg!;
 
@@ -166,9 +192,9 @@ describe('applyWeightPrescription', () => {
         buildExercise('barbell_back_squat', { target_rpe: 9.5, target_reps: 5 }),
       ]),
       {
+        ...baseAthlete,
         baseline_path: 'self_reported',
         known_lifts: [{ exercise_id: 'squat', weight_kg: 100, reps: 5 }],
-        goal: 'strength',
       },
     )[0]!.weeks[0]!.days[0]!.exercises[0]!.weight_kg!;
 
@@ -180,9 +206,9 @@ describe('applyWeightPrescription', () => {
       buildExercise('barbell_back_squat', { target_rpe: 3, target_reps: 5 }),
     ]);
     const result = applyWeightPrescription(phases, {
+      ...baseAthlete,
       baseline_path: 'self_reported',
       known_lifts: [{ exercise_id: 'squat', weight_kg: 100, reps: 5 }],
-      goal: 'strength',
     });
     const weight = result[0]!.weeks[0]!.days[0]!.exercises[0]!.weight_kg;
     const estimated1rm = 100 * (1 + 5 / 30);
@@ -194,9 +220,9 @@ describe('applyWeightPrescription', () => {
       buildExercise('barbell_back_squat', { target_rpe: 8, target_reps: 5 }),
     ]);
     const athlete = {
+      ...baseAthlete,
       baseline_path: 'self_reported' as const,
       known_lifts: [{ exercise_id: 'squat' as const, weight_kg: 100, reps: 5 }],
-      goal: 'strength',
     };
     expect(applyWeightPrescription(phases, athlete)).toEqual(
       applyWeightPrescription(phases, athlete),

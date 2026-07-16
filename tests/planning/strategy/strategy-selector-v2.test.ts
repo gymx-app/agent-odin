@@ -86,6 +86,44 @@ describe('Strategy Selector V2', () => {
     expect(result.strategy.periodization_model).not.toBe('competition_peak');
   });
 
+  it('selects load-primary progression for an intermediate strength goal without a competition date', () => {
+    // Short horizon (<=6wk) constraint-rejects block/undulating/
+    // competition_peak (PERIODIZATION_EXCESSIVE_FOR_HORIZON), isolating the
+    // choice to simple_progressive/concurrent/maintenance so the
+    // goal-driven progression_model pick is unambiguous.
+    const { result } = select(
+      {
+        goal: 'strength',
+        fitness_level: 'intermediate',
+        available_days_per_week: 4,
+      },
+      { horizon: 6, resistance: 4 },
+    );
+
+    expect(result.strategy.progression_model).toBe('linear_load');
+    expect(
+      result.strategy.rationale.some(
+        (decision) => decision.code === 'SCHOENFELD_2021_LOAD_HYPERTROPHY',
+      ),
+    ).toBe(true);
+  });
+
+  it('does not select a load-primary progression model for an intermediate hypertrophy goal', () => {
+    const { result } = select(
+      {
+        goal: 'muscle_gain',
+        fitness_level: 'intermediate',
+        available_days_per_week: 4,
+      },
+      { horizon: 6, resistance: 4 },
+    );
+
+    expect(result.strategy.progression_model).not.toBe('linear_load');
+    expect(
+      ['linear_load', 'wave_loading', 'step_loading', 'performance_based'],
+    ).not.toContain(result.strategy.progression_model);
+  });
+
   it('constrains volume for intermediate fat loss in a deficit', () => {
     const { result } = select(
       {

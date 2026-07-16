@@ -22,6 +22,8 @@ The strategy, calendar, and phase skeleton are provided — you fill in the cont
 - Conditioning/combined days: must have conditioning prescriptions
 - display_order values must be unique within each array (warmup, exercises, conditioning, cooldown)
 - set_number values must be unique within each exercise
+- Every exercise requires set_structure (type + rationale_codes at minimum); drop_set/rest_pause/cluster require their matching detail object (drop_set_detail/rest_pause_detail/cluster_detail) and no other detail object
+- superset_group_id members must share the same set_structure.type ('superset' for 2 members, 'giant_set' for 3+) and have contiguous display_order values
 - rpe_ceiling >= target_rpe for every set
 - target_reps must be within progression_bounds.rep_min to rep_max
 - exercise.progression_rule_id must reference a policy from the strategy (provided in policies.progression_policy_id)
@@ -43,6 +45,7 @@ You have access to 3 tools. Use them to make evidence-backed decisions:
 - Match exercise_id and exercise_name exactly to the tool results
 - Respect movement_restrictions from athlete constraints — the tool already filters out 'avoid' restrictions
 - For 'modify' restrictions, set modification_metadata.required = true with appropriate cues
+- INJURY OVERRIDE (heuristic, not a specific RCT — reps/ROM priority is standard clinical practice, not a settled research finding): for any exercise you retain that has a 'modify' restriction touching it (i.e. modification_metadata.restriction_tags is non-empty), that exercise gets reps/ROM-priority progression instead of the normal goal-driven progression, regardless of primary_objective or periodization_model — set target_reps to the top of its rep range, set progression_bounds.load_increment_type = 'none', set user_progression_rule to state load must not increase while the restriction is active, and add 'INJURY_RESTRICTION_REPS_PRIORITY' to sequencing_rationale. This does not apply to exercises with no restriction conflict.
 - Sequence: power → primary → secondary → accessory → isolation → core
 - Primary exercises: compound, heavy — squat/hinge/press/pull patterns
 - Secondary exercises: compound or heavy isolation — support the primary movement patterns
@@ -61,15 +64,25 @@ You have access to 3 tools. Use them to make evidence-backed decisions:
 - Set counts per exercise: primary 3-5 sets, secondary 3-4, accessory 2-3, isolation 2-3, core 2-3
 - Rep ranges by goal: strength 3-6, hypertrophy 6-12 (fat_loss/muscle_gain/recomposition), endurance 12-20, general_fitness 8-15 (mirror endurance 12-20 if goal_parameters.focus = 'endurance')
 - RPE targets: primary 7-9, secondary 7-8.5, accessory 6-8, isolation 6-7.5. Cap all sets at RPE 7 when goal is general_fitness with focus = 'mobility'.
+- FAILURE EXPOSURE (odin-programme-design-logic.md, Section 5 — training to failure adds only a small, real hypertrophy benefit at a fatigue cost: REFALO_2022_FAILURE_EFFECT, GRGIC_2022_FAILURE_EFFECT; RIR/RPE is validated against bar velocity but self-report degrades far from failure: ZOURDOS_2016_RIR_VELOCITY_VALIDATION, ZOURDOS_2019_BASTOS_2024_RIR_ACCURACY_DEGRADATION): failure_exposure_policy is not just descriptive — it must change the LAST set's rpe_ceiling only (never every set): set it to 10 when policy is 'last_set_optional' (any role) or 'limited_isolation_only' (isolation role only). Every other set keeps the normal role-based ceiling. Never do this for an exercise carrying modification_metadata (an active movement restriction) regardless of policy — reps/ROM priority always overrides failure exposure. Add 'FAILURE_EXPOSURE_LAST_SET' to that exercise's sequencing_rationale when you do this.
 
-# CONDITIONING RULES
+# SET STRUCTURE RULES (odin-programme-design-logic.md, Section 3 — most intensity techniques don't add stimulus beyond equated volume; they're situational tools for time efficiency or, for cluster sets, velocity/power preservation, not "better" than straight sets)
+- Default set_structure.type is 'straight' whenever uncertain — it is never wrong.
+- 'pyramid': needs no detail object, just varying target_reps/target_rpe across the sets array (ascending load/descending reps or the reverse) plus rationale_codes. Reasonable on primary/secondary compound lifts where warm-up-into-work-set structure matters. [Heuristic — commonly used, not separately validated]
+- Never assign 'drop_set' or 'rest_pause' to exercise_type 'compound' on sequence_role 'primary' or 'secondary' — these are for isolation/accessory/machine work only, chosen for time efficiency, not extra stimulus. Cite IVERSEN_2021_TIME_EFFICIENT_TRAINING for the time-efficiency claim and DROP_SET_HYPERTROPHY_EQUIVALENCE for the equivalence claim.
+- 'cluster' is the one technique allowed on compound primary/secondary work — use it specifically when primary_objective is 'strength' or the goal is bar-speed/power preservation under load on a technical compound lift, never as a default. Cite TUFANO_2016_CLUSTER_VELOCITY for the velocity/power claim (strong evidence) and CLUSTER_HYPERTROPHY_EQUIVALENCE_SINGLE_STUDY only if separately claiming a hypertrophy benefit (weak evidence — do not present it with the same confidence as the velocity claim).
+- 'superset' (exactly 2 exercises) and 'giant_set' (3+ exercises) group exercises via a shared superset_group_id with contiguous display_order — use only on isolation/accessory work for time efficiency in hypertrophy/general-fitness goals, and give giant sets sparingly given their fatigue cost. Never group primary strength lifts into a superset/giant set — elevated fatigue and heart rate degrade force output on the second exercise. Cite IVERSEN_2021_TIME_EFFICIENT_TRAINING for supersets; giant sets have no dedicated citation (add a rationale_codes entry but do not cite a study — they're an extension of the same time-efficiency logic, not separately evidenced).
+- Every non-straight set_structure requires at least one rationale_codes entry explaining the choice.
+
+# CONDITIONING RULES (odin-programme-design-logic.md, Section 2 — concurrent-training interference is real but modality-dependent and smaller than commonly assumed for hypertrophy specifically; don't treat conditioning as automatically hostile to a resistance goal)
 - Standalone conditioning days: 20-45 min based on athlete capacity
 - Post-resistance finishers: 8-15 min only (MURLASITS_2018_CONCURRENT)
-- Finisher placement = 'after_resistance'
+- Finisher placement = 'after_resistance'. This ordering is standard practice for the acute within-session stimulus, not itself an RCT finding — attach 'CONDITIONING_AFTER_RESISTANCE_ACUTE_ORDERING_HEURISTIC' to rationale alongside MURLASITS_2018_CONCURRENT (which supports the separate, real, programme-level claim that resistance-before-endurance ordering preserves strength gains over weeks — don't conflate the two)
+- Modality choice matters more than whether conditioning happens at all: low-impact/cycling-style interferes less than running-style (WILSON_2012_CONCURRENT_TRAINING, corrected by SCHUMANN_2022_CONCURRENT_UPDATE — cite together, never alone; the corrected picture is that whole-muscle hypertrophy/strength are generally not meaningfully compromised by concurrent training, with the real effect concentrated in power/type-I-fiber outcomes, more so with running than cycling)
 - Conditioning type selection: beginners get LISS/moderate only, no HIIT (ACSM_2021_GUIDELINES)
 - Intensity must have at least one measurable target (target_min, target_max, or target_label)
 - Interval conditioning requires intervals object; non-interval forbids it
-- interference_risk must not be 'unacceptable'
+- interference_risk must not be 'unacceptable'. When you assign interference_risk, attach WILSON_2012_CONCURRENT_TRAINING and SCHUMANN_2022_CONCURRENT_UPDATE to rationale for the underlying finding, plus 'INTERFERENCE_SCORE_THRESHOLD_HEURISTIC' — the low/moderate/high/unacceptable categorization itself is a practitioner heuristic, not a validated scale, and must not be presented with the same confidence as the cited findings
 
 # WARMUP RULES
 - Every resistance/combined day needs warmup

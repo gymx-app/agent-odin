@@ -172,7 +172,11 @@ export const planResistanceSessionFinisher = (
     prescription: base,
     resistanceDay: day,
   });
-  if (risk === 'unacceptable' || risk === 'high') return undefined;
+  if (
+    risk.interference_risk === 'unacceptable' ||
+    risk.interference_risk === 'high'
+  )
+    return undefined;
 
   const isHiitFinisher = type === 'intervals' || type === 'sprint_intervals';
   return {
@@ -190,12 +194,17 @@ export const planResistanceSessionFinisher = (
     ...(intensity.intervals ? { intervals: intensity.intervals } : {}),
     impact_level: CONDITIONING_MODALITIES[modality].impact,
     fatigue_cost: isHiitFinisher ? 'moderate' : 'low',
-    interference_risk: risk,
+    interference_risk: risk.interference_risk,
     progression_policy_id: 'conditioning-v2',
     rationale: [
       ...rationale_codes,
       ...intensity.rationale_codes,
+      ...risk.rationale_codes,
       'FINISHER_PLACED_AFTER_RESISTANCE',
+      // Finishers are after-resistance by definition (see `base` above) —
+      // same acute-ordering heuristic as conditioning-placement-planner.ts's
+      // after_resistance case, not itself a cited RCT finding.
+      'CONDITIONING_AFTER_RESISTANCE_ACUTE_ORDERING_HEURISTIC',
       `FINISHER_AVAILABLE_${duration}_MIN`,
       ...FINISHER_DURATION_CITATIONS,
       ...(isHiitFinisher

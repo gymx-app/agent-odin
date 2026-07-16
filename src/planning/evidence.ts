@@ -19,6 +19,28 @@
  *   PMC: https://pmc.ncbi.nlm.nih.gov/articles/PMC6303131/
  *   Finding: 45 weekly sets > 27 > 9 for hypertrophy in trained men.
  *
+ * SCHOENFELD_2016_FREQUENCY
+ *   Schoenfeld BJ, Ogborn D, Krieger JW. Effects of Resistance Training
+ *   Frequency on Measures of Muscle Hypertrophy: A Systematic Review and
+ *   Meta-Analysis. Sports Med. 2016;46(11):1689-1697.
+ *   Finding: training a muscle group 2+ times per week produces superior
+ *   hypertrophy to 1x/week — but only established when weekly volume was
+ *   NOT equated between conditions. See the 2019 correction below.
+ *
+ * SCHOENFELD_2019_FREQUENCY_VOLUME_EQUATED
+ *   Schoenfeld BJ, Grgic J, Krieger JW. How many times per week should a
+ *   muscle be trained to maximize muscle hypertrophy? A systematic review
+ *   and meta-analysis of studies examining the effects of resistance
+ *   training frequency. J Sports Sci. 2019;37(11):1286-1295.
+ *   Finding: a later, larger meta-analysis by the same lead author found
+ *   NO significant difference between higher and lower frequency once
+ *   total weekly volume is equated. Frequency itself isn't the active
+ *   ingredient for hypertrophy — it's a vehicle for fitting more quality
+ *   volume into a week without single sessions becoming too long or too
+ *   fatiguing. Use this alongside SCHOENFELD_2016_FREQUENCY, never alone —
+ *   citing only the 2016 finding without this correction overstates
+ *   frequency's importance relative to total volume.
+ *
  * ISRAETEL_RP_VOLUME_LANDMARKS
  *   Israetel M, Hoffmann J. Training Volume Landmarks for Muscle Growth.
  *   RP Strength. https://rpstrength.com/blogs/articles/training-volume-landmarks-muscle-growth
@@ -31,7 +53,7 @@
  *   counts toward that muscle's weekly volume, at roughly half the credit
  *   of a set where the muscle is the primary target.
  *
- * SABAG_2022_CONCURRENT_HIIT
+ * SABAG_2018_CONCURRENT_HIIT
  *   Sabag A et al. The compatibility of concurrent high intensity interval
  *   training and resistance training for muscular strength and hypertrophy:
  *   a systematic review and meta-analysis. J Sports Sci. 2018;36(21):2472-2483.
@@ -39,6 +61,8 @@
  *   Finding: HIIT may reduce interference vs steady-state endurance when
  *   combined with resistance training. Cycling HIIT showed more lower-body
  *   interference than running.
+ *   (Key renamed from SABAG_2022_CONCURRENT_HIIT — the study is 2018, matching
+ *   this comment and the registry's own year field; the 2022 label was wrong.)
  *
  * MURLASITS_2018_CONCURRENT
  *   Murlasits Z et al. The physiological effects of concurrent strength and
@@ -46,7 +70,31 @@
  *   J Sports Sci. 2018;36(11):1212-1219.
  *   Finding: Resistance-before-endurance order preserves strength gains in
  *   programmes ≥5 weeks. Shorter endurance bouts (≤30 min) cause less
- *   interference than longer (50-60+ min).
+ *   interference than longer (50-60+ min). This is a programme-level,
+ *   multi-week adaptation finding — it does not itself test the acute,
+ *   single-session claim that pre-fatiguing a muscle degrades that day's
+ *   lifting stimulus; that specific mechanistic step is a standard-practice
+ *   inference, not what this study measured. [Heuristic for the acute claim]
+ *
+ * WILSON_2012_CONCURRENT_TRAINING
+ *   Wilson JM et al. Concurrent training: a meta-analysis examining
+ *   interference of aerobic and resistance exercise. J Strength Cond Res.
+ *   2012;26(8):2293-2307.
+ *   Finding: concurrent training reduced hypertrophy, strength, and power
+ *   outcomes relative to resistance training alone, but the effect was
+ *   driven mainly by running-based endurance work, not cycling, and was
+ *   largest for power output, smaller for hypertrophy. [Meta-analysis, 21
+ *   studies.]
+ *
+ * SCHUMANN_2022_CONCURRENT_UPDATE
+ *   Schumann M et al.-line updated meta-analyses through 2022, Sports
+ *   Medicine. Finding: whole-muscle hypertrophy and maximal strength are
+ *   generally not meaningfully compromised by concurrent training; a small
+ *   negative effect shows up specifically at the muscle-fiber level (mainly
+ *   type I fibers) and for explosive/power output, more so with running than
+ *   cycling. This is the doc's own correction to WILSON_2012_CONCURRENT_TRAINING
+ *   — cite together, never alone, or the interference risk is overstated
+ *   for a hypertrophy/strength-primary goal. [Meta-analysis.]
  *
  * VIANA_2019_HIIT_FAT_LOSS
  *   Viana RB et al. Is interval training the magic bullet for fat loss?
@@ -106,6 +154,75 @@
  *   to an estimated percentage of 1RM.
  *   2x/week endurance has minimal interference; 3x/week shows detriment.
  *   3-6 hour separation recommended for same-day sessions.
+ *
+ * IVERSEN_2021_TIME_EFFICIENT_TRAINING
+ *   Iversen VM et al. No Time to Lift? Designing Time-Efficient Training
+ *   Programs for Strength and Hypertrophy: A Narrative Review. Sports Med.
+ *   2021;51(10):2079-2095.
+ *   Finding: drop sets, rest-pause, and antagonist-paired supersets roughly
+ *   halve session time versus straight sets at equated volume, with similar
+ *   hypertrophy/strength outcomes. Drop sets are best suited to
+ *   single-joint/isolation exercises and are not advisable on heavy
+ *   compound free-weight lifts (e.g. the squat) for safety reasons.
+ *   [Narrative review — synthesizes multiple trials, not itself a
+ *   meta-analysis.]
+ *
+ * DROP_SET_HYPERTROPHY_EQUIVALENCE
+ *   Rest-pause and drop-set trial referenced in the design doc (PubMed
+ *   34260860). Finding: similar hypertrophy and strength outcomes to
+ *   straight sets when volume is equated. [Single/few studies — not yet
+ *   meta-analyzed.]
+ *
+ * TUFANO_2016_CLUSTER_VELOCITY
+ *   Tufano JJ et al. Cluster Sets: Permitting Greater Mechanical Stress
+ *   without Decreasing Relative Volume. Int J Sports Physiol Perform.
+ *   2016;11(2):142-155. (Also see Haff GG et al. 2003.)
+ *   Finding: intra-set rest (~20-30s) maintains bar velocity and power
+ *   output across a set far better than traditional straight sets —
+ *   well-replicated in squat/clean-pull research. [Meta-analysis +
+ *   multiple direct trials — the strong claim about cluster sets.]
+ *
+ * CLUSTER_HYPERTROPHY_EQUIVALENCE_SINGLE_STUDY
+ *   A volume/effort-matched comparison found similar hypertrophy between
+ *   cluster and traditional straight sets. [Single study — this is the
+ *   weak claim about cluster sets and must not be cited with the same
+ *   confidence as TUFANO_2016_CLUSTER_VELOCITY above; cluster sets' real
+ *   evidenced benefit is velocity/power preservation, not superior
+ *   hypertrophy.]
+ *
+ * REFALO_2022_FAILURE_EFFECT
+ *   Refalo MC et al. Influence of Resistance Training Proximity-to-Failure
+ *   on Skeletal Muscle Hypertrophy: A Systematic Review with Meta-analysis.
+ *   Sports Med. 2022;52(7):1573-1594.
+ *   Finding: training to failure produces only a small hypertrophy
+ *   advantage over stopping short (ES=0.19, 95% CI 0.00-0.37, p=0.045),
+ *   with no significant moderation by volume or relative load — real, but
+ *   marginal, and it costs more fatigue. [Meta-analysis, 15 studies.]
+ *
+ * GRGIC_2022_FAILURE_EFFECT
+ *   Grgic J et al. Effect of Resistance Training Performed to Failure or
+ *   Not to Failure on Muscular Strength and Hypertrophy: A Systematic
+ *   Review and Meta-Analysis. J Sport Health Sci. 2022;11(2):202-211.
+ *   Finding: companion meta-analysis, same conclusion as Refalo 2022 above
+ *   — kept as a separate citation code rather than merged, since it's an
+ *   independent meta-analysis reaching the same finding, not a duplicate.
+ *   [Meta-analysis.]
+ *
+ * ZOURDOS_2016_RIR_VELOCITY_VALIDATION
+ *   Zourdos MC et al. Novel Resistance Training-Specific Rating of
+ *   Perceived Exertion Scale Measuring Repetitions in Reserve. J Strength
+ *   Cond Res. 2016;30(1):267-275.
+ *   Finding: RIR-based RPE has a strong inverse relationship with measured
+ *   bar velocity (r=-0.77 to -0.88), validating RPE/RIR as a genuinely
+ *   useful proximity-to-failure signal. [Direct validation study.]
+ *
+ * ZOURDOS_2019_BASTOS_2024_RIR_ACCURACY_DEGRADATION
+ *   Zourdos MC et al. (2019) plus a corroborating 2024 scoping review
+ *   (Bastos et al., J Sports Sci). Finding: self-reported RIR accuracy
+ *   degrades the further a set is from failure and at higher rep counts —
+ *   RIR called near failure is more trustworthy than RIR self-reported on
+ *   a set left at 4-5 reps in reserve. [Multiple studies + scoping review
+ *   — not itself a meta-analysis.]
  */
 
 // ─── Volume fill rates ───────────────────────────────────────────────
@@ -512,6 +629,52 @@ export const BASELINE_ASSESSMENT_CITATIONS = [
 
 // Merged registry of every real citation code, used to catch a hallucinated
 // (plausible-looking but fake) citation in LLM-authored rationale_codes.
+// odin-programme-design-logic.md, Section 3: set-structure techniques carry
+// mixed-confidence evidence, and cluster sets specifically split into two
+// separate claims at two separate tiers (velocity/power vs. hypertrophy) —
+// kept as two codes rather than one to avoid citing the weak claim with the
+// strong claim's confidence.
+export const SET_STRUCTURE_CITATIONS = [
+  'IVERSEN_2021_TIME_EFFICIENT_TRAINING',
+  'DROP_SET_HYPERTROPHY_EQUIVALENCE',
+  'TUFANO_2016_CLUSTER_VELOCITY',
+  'CLUSTER_HYPERTROPHY_EQUIVALENCE_SINGLE_STUDY',
+] as const;
+
+// odin-programme-design-logic.md, Section 1: frequency is a volume-
+// distribution tool, not independently superior — SCHOENFELD_2016_FREQUENCY
+// must be cited alongside its 2019 correction, never alone, or the split
+// rationale overstates frequency's importance.
+export const SPLIT_FREQUENCY_CITATIONS = [
+  'SCHOENFELD_2016_FREQUENCY',
+  'SCHOENFELD_2019_FREQUENCY_VOLUME_EQUATED',
+] as const;
+
+// odin-programme-design-logic.md, Section 5: the failure-vs-non-failure
+// effect (marginal but real) and RIR's validity-vs-accuracy split (validated
+// against bar velocity, but self-report degrades far from failure) are
+// distinct claims — kept as separate codes so a rationale citing "RIR is a
+// useful signal" can't borrow confidence from "training to failure adds a
+// meaningful hypertrophy benefit," which the evidence doesn't support.
+export const RIR_FAILURE_CITATIONS = [
+  'REFALO_2022_FAILURE_EFFECT',
+  'GRGIC_2022_FAILURE_EFFECT',
+  'ZOURDOS_2016_RIR_VELOCITY_VALIDATION',
+  'ZOURDOS_2019_BASTOS_2024_RIR_ACCURACY_DEGRADATION',
+] as const;
+
+// odin-programme-design-logic.md, Section 2: concurrent-training interference
+// is real but modality-dependent, and smaller than commonly assumed for
+// hypertrophy — WILSON_2012 and its SCHUMANN_2022 correction are cited
+// together, the same way SCHOENFELD_2016/2019 frequency pair together.
+// SABAG_2018 is the narrower HIIT-vs-steady-state-specific finding.
+export const CONCURRENT_INTERFERENCE_CITATIONS = [
+  'WILSON_2012_CONCURRENT_TRAINING',
+  'SCHUMANN_2022_CONCURRENT_UPDATE',
+] as const;
+
+export const HIIT_INTERFERENCE_CITATIONS = ['SABAG_2018_CONCURRENT_HIIT'] as const;
+
 export const ALL_CITATION_CODES = new Set<string>([
   ...VOLUME_FILL_RATE_CITATIONS,
   ...MIN_SESSION_VOLUME_CITATIONS,
@@ -522,7 +685,26 @@ export const ALL_CITATION_CODES = new Set<string>([
   ...STRENGTH_RATIO_CITATIONS,
   ...PUSHUP_NORM_CITATIONS,
   ...BASELINE_ASSESSMENT_CITATIONS,
+  ...SET_STRUCTURE_CITATIONS,
+  ...SPLIT_FREQUENCY_CITATIONS,
+  ...RIR_FAILURE_CITATIONS,
+  ...CONCURRENT_INTERFERENCE_CITATIONS,
+  ...HIIT_INTERFERENCE_CITATIONS,
 ]);
+
+// odin-programme-design-logic.md's evidence-tier discipline: a citation
+// shouldn't be presented with more certainty than it actually carries.
+// Optional and not yet backfilled onto every existing entry below (that's
+// a separate follow-up) — populated on new entries added for the
+// set-structure work, where two claims about the same technique (e.g.
+// cluster sets' velocity benefit vs. its hypertrophy benefit) can carry
+// different tiers and must not be collapsed into one.
+export type EvidenceTier =
+  | 'meta_analysis'
+  | 'few_studies'
+  | 'narrative_review'
+  | 'direct_validation'
+  | 'heuristic';
 
 // Structured form of the citation keys documented in the comment block above,
 // for consumers (e.g. narrative synthesis) that need author/year/finding as
@@ -532,6 +714,7 @@ export type CitationEntry = {
   author: string;
   year: number;
   finding: string;
+  tier?: EvidenceTier;
 };
 
 export const CITATION_REGISTRY: Record<string, CitationEntry> = {
@@ -547,6 +730,20 @@ export const CITATION_REGISTRY: Record<string, CitationEntry> = {
     finding:
       '45 weekly sets produced greater hypertrophy than 27, which produced greater hypertrophy than 9, in trained men.',
   },
+  SCHOENFELD_2016_FREQUENCY: {
+    author: 'Schoenfeld BJ, Ogborn D, Krieger JW',
+    year: 2016,
+    finding:
+      'Training a muscle group 2 or more times per week produces superior hypertrophy to 1x/week — established when weekly volume was not equated between conditions.',
+    tier: 'meta_analysis',
+  },
+  SCHOENFELD_2019_FREQUENCY_VOLUME_EQUATED: {
+    author: 'Schoenfeld BJ, Grgic J, Krieger JW',
+    year: 2019,
+    finding:
+      'No significant difference between higher and lower training frequency once total weekly volume is equated — frequency is a volume-distribution tool, not independently superior. Must be cited alongside SCHOENFELD_2016_FREQUENCY, not in its place.',
+    tier: 'meta_analysis',
+  },
   ISRAETEL_RP_VOLUME_LANDMARKS: {
     author: 'Israetel M, Hoffmann J',
     year: 2019,
@@ -559,17 +756,33 @@ export const CITATION_REGISTRY: Record<string, CitationEntry> = {
     finding:
       "A compound movement's secondary/indirect muscle involvement counts toward that muscle's weekly volume, at roughly half the credit of a set where the muscle is the primary target.",
   },
-  SABAG_2022_CONCURRENT_HIIT: {
+  SABAG_2018_CONCURRENT_HIIT: {
     author: 'Sabag A et al.',
     year: 2018,
     finding:
       'HIIT may reduce interference with strength/hypertrophy gains compared to steady-state endurance when combined with resistance training; cycling HIIT showed more lower-body interference than running.',
+    tier: 'meta_analysis',
   },
   MURLASITS_2018_CONCURRENT: {
     author: 'Murlasits Z et al.',
     year: 2018,
     finding:
-      'Doing resistance training before endurance training preserves strength gains in programmes of 5+ weeks. Shorter endurance bouts (≤30 min) cause less interference than longer bouts (50-60+ min).',
+      'Doing resistance training before endurance training preserves strength gains in programmes of 5+ weeks (a programme-level, multi-week finding — not itself a test of the acute claim that pre-fatiguing a muscle degrades that same session\'s lifting stimulus). Shorter endurance bouts (≤30 min) cause less interference than longer bouts (50-60+ min).',
+    tier: 'meta_analysis',
+  },
+  WILSON_2012_CONCURRENT_TRAINING: {
+    author: 'Wilson JM et al.',
+    year: 2012,
+    finding:
+      'Concurrent training reduced hypertrophy, strength, and power outcomes relative to resistance training alone, but the effect was driven mainly by running-based endurance work, not cycling, and was largest for power output, smaller for hypertrophy.',
+    tier: 'meta_analysis',
+  },
+  SCHUMANN_2022_CONCURRENT_UPDATE: {
+    author: 'Schumann M et al. (updated meta-analyses through 2022)',
+    year: 2022,
+    finding:
+      'Whole-muscle hypertrophy and maximal strength are generally not meaningfully compromised by concurrent training; a small negative effect shows up specifically at the muscle-fiber level (mainly type I fibers) and for explosive/power output, more so with running than cycling. Corrects WILSON_2012_CONCURRENT_TRAINING — cite together, never alone.',
+    tier: 'meta_analysis',
   },
   VIANA_2019_HIIT_FAT_LOSS: {
     author: 'Viana RB et al.',
@@ -666,5 +879,61 @@ export const CITATION_REGISTRY: Record<string, CitationEntry> = {
     year: 2016,
     finding:
       "A target RPE (repetitions in reserve) and rep count can be converted to an estimated percentage of 1RM via a published correspondence table, letting load prescriptions track an athlete's RPE-based intensity progression.",
+  },
+  IVERSEN_2021_TIME_EFFICIENT_TRAINING: {
+    author: 'Iversen VM et al.',
+    year: 2021,
+    finding:
+      'Drop sets, rest-pause, and antagonist-paired supersets roughly halve session time versus straight sets at equated volume, with similar hypertrophy/strength outcomes. Drop sets are best suited to single-joint/isolation exercises and are not advisable on heavy compound free-weight lifts for safety reasons.',
+    tier: 'narrative_review',
+  },
+  DROP_SET_HYPERTROPHY_EQUIVALENCE: {
+    author: 'Rest-pause/drop-set trial (PubMed 34260860)',
+    year: 2021,
+    finding:
+      'Drop sets produce similar hypertrophy and strength outcomes to straight sets when volume is equated.',
+    tier: 'few_studies',
+  },
+  TUFANO_2016_CLUSTER_VELOCITY: {
+    author: 'Tufano JJ et al.',
+    year: 2016,
+    finding:
+      'Intra-set rest (roughly 20-30 seconds) maintains bar velocity and power output across a set far better than traditional straight sets, well-replicated in squat and clean-pull research.',
+    tier: 'meta_analysis',
+  },
+  CLUSTER_HYPERTROPHY_EQUIVALENCE_SINGLE_STUDY: {
+    author: 'Volume/effort-matched cluster-vs-straight-set comparison',
+    year: 2019,
+    finding:
+      'A volume/effort-matched comparison found similar hypertrophy between cluster sets and traditional straight sets — this is a weaker, single-study claim distinct from cluster sets\' well-evidenced velocity/power-preservation benefit.',
+    tier: 'few_studies',
+  },
+  REFALO_2022_FAILURE_EFFECT: {
+    author: 'Refalo MC et al.',
+    year: 2022,
+    finding:
+      'Training to failure produces only a small hypertrophy advantage over stopping short (effect size 0.19, 95% CI 0.00-0.37), with no significant moderation by volume or relative load — real, but marginal, and it costs more fatigue.',
+    tier: 'meta_analysis',
+  },
+  GRGIC_2022_FAILURE_EFFECT: {
+    author: 'Grgic J et al.',
+    year: 2022,
+    finding:
+      'A companion meta-analysis reaching the same conclusion as Refalo et al. 2022 on training to failure vs. stopping short.',
+    tier: 'meta_analysis',
+  },
+  ZOURDOS_2016_RIR_VELOCITY_VALIDATION: {
+    author: 'Zourdos MC et al.',
+    year: 2016,
+    finding:
+      'Reps-in-reserve-based RPE has a strong inverse relationship with measured bar velocity (r=-0.77 to -0.88), validating RPE/RIR as a genuinely useful proximity-to-failure signal.',
+    tier: 'direct_validation',
+  },
+  ZOURDOS_2019_BASTOS_2024_RIR_ACCURACY_DEGRADATION: {
+    author: 'Zourdos MC et al. (2019); Bastos et al., scoping review (2024)',
+    year: 2019,
+    finding:
+      'Self-reported RIR accuracy degrades the further a set is from failure and at higher rep counts — RIR called near failure is more trustworthy than RIR self-reported on a set left at 4-5 reps in reserve.',
+    tier: 'few_studies',
   },
 };

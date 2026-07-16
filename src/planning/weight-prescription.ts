@@ -1,5 +1,10 @@
 import type { LongitudinalOdinProgramme } from '../domain/programme/programme.types.js';
 import type { CompoundExerciseId, KnownLift, BaselinePath } from '../domain/athlete/athlete-input-v2.schema.js';
+import type {
+  BaselineEstimate,
+  MovementPattern,
+} from '../domain/athlete/baseline-assessment.schema.js';
+import { estimateBaselineStrength } from './baseline/baseline-strength-estimator.js';
 import { percentOneRepMaxForRpeReps } from './evidence.js';
 
 // ── Epley 1985 ────────────────────────────────────────────────────────────────
@@ -28,8 +33,10 @@ const WORKING_WEIGHT_PCT: Record<string, number> = {
   general_fitness: 0.65,
 };
 
+export const PLATE_INCREMENT_KG = 2.5;
+
 const roundToPlate = (weight_kg: number): number =>
-  Math.round(weight_kg / 2.5) * 2.5;
+  Math.round(weight_kg / PLATE_INCREMENT_KG) * PLATE_INCREMENT_KG;
 
 export const calculateWorkingWeight = (
   estimated_1rm_kg: number,
@@ -76,6 +83,29 @@ export const COMPOUND_TO_LIBRARY_IDS: Record<CompoundExerciseId, readonly string
   barbell_row:    ['barbell_bent_over_row', 'barbell_pendlay_row', 'tbar_row'],
 };
 
+// Same library IDs as above, re-keyed by movement_pattern rather than the
+// narrower self-reported-lift exercise_id vocabulary, so
+// estimateBaselineStrength's per-pattern estimate (which always produces a
+// number, down to a bodyweight-ratio default) can price the same exercises
+// regardless of whether the athlete self-reported a specific lift.
+// vertical_pull has no barbell lift in COMPOUND_TO_LIBRARY_IDS today, so it's
+// intentionally absent here too — those exercises keep weight_kg: null.
+const MOVEMENT_PATTERN_TO_LIBRARY_IDS: Partial<Record<MovementPattern, readonly string[]>> = {
+  squat: COMPOUND_TO_LIBRARY_IDS.squat,
+  hip_hinge: COMPOUND_TO_LIBRARY_IDS.deadlift,
+  horizontal_push: COMPOUND_TO_LIBRARY_IDS.bench_press,
+  horizontal_pull: COMPOUND_TO_LIBRARY_IDS.barbell_row,
+  vertical_push: COMPOUND_TO_LIBRARY_IDS.overhead_press,
+};
+
+const EXERCISE_ID_TO_MOVEMENT_PATTERN: Record<CompoundExerciseId, MovementPattern> = {
+  squat: 'squat',
+  deadlift: 'hip_hinge',
+  bench_press: 'horizontal_push',
+  barbell_row: 'horizontal_pull',
+  overhead_press: 'vertical_push',
+};
+
 // ── applyWeightPrescription ───────────────────────────────────────────────────
 
 export const applyWeightPrescription = (
@@ -84,26 +114,43 @@ export const applyWeightPrescription = (
     baseline_path: BaselinePath;
     known_lifts: KnownLift[] | null;
     goal: string;
+    sex: 'male' | 'female' | 'other';
+    age: number;
+    bodyweight_kg: number;
+    training_status: 'beginner' | 'intermediate' | 'advanced' | 'returning' | 'unknown';
   },
 ): LongitudinalOdinProgramme['phases'] => {
-  if (athlete.baseline_path !== 'self_reported') {
-    // day_one_test and skipped — weight_kg stays null on every exercise
-    return phases;
-  }
+  const knownLifts = athlete.baseline_path === 'self_reported' ? (athlete.known_lifts ?? []) : [];
 
-  const lifts = athlete.known_lifts ?? [];
-  if (lifts.length === 0) return phases;
+  // odin-programme-design-logic.md, Section 4: "not just an RPE-anchored
+  // fallback when 1RM is missing" — estimateBaselineStrength always
+  // produces a number, per movement pattern, honestly tiered by confidence
+  // (self-reported lift > field test > bodyweight-ratio default), instead
+  // of leaving weight_kg null for every athlete who didn't self-report one
+  // of the 5 named compound lifts.
+  const baseline = estimateBaselineStrength(
+    {
+      sex: athlete.sex,
+      age: athlete.age,
+      bodyweight_kg: athlete.bodyweight_kg,
+      known_lifts: knownLifts.map((lift) => ({
+        movement_pattern: EXERCISE_ID_TO_MOVEMENT_PATTERN[lift.exercise_id as CompoundExerciseId],
+        weight_kg: lift.weight_kg,
+        reps: lift.reps,
+      })),
+    },
+    athlete.training_status,
+  );
 
-  // Build a flat map: library_exercise_id → estimated 1RM (kg). The
-  // working weight for each occurrence of that exercise is computed fresh
-  // below, from that specific occurrence's prescribed RPE/reps.
-  const estimated1rmByExerciseId = new Map<string, number>();
-  for (const lift of lifts) {
-    const estimated1rm = estimateOneRepMax(lift.weight_kg, lift.reps);
-    const libraryIds = COMPOUND_TO_LIBRARY_IDS[lift.exercise_id as CompoundExerciseId];
+  // Build a flat map: library_exercise_id → estimate. The working weight for
+  // each occurrence of that exercise is computed fresh below, from that
+  // specific occurrence's prescribed RPE/reps.
+  const estimateByExerciseId = new Map<string, BaselineEstimate>();
+  for (const estimate of baseline.estimates) {
+    const libraryIds = MOVEMENT_PATTERN_TO_LIBRARY_IDS[estimate.movement_pattern];
     if (libraryIds) {
       for (const id of libraryIds) {
-        estimated1rmByExerciseId.set(id, estimated1rm);
+        estimateByExerciseId.set(id, estimate);
       }
     }
   }
@@ -115,15 +162,24 @@ export const applyWeightPrescription = (
       days: week.days.map((day) => ({
         ...day,
         exercises: day.exercises.map((ex) => {
-          const estimated1rm = estimated1rmByExerciseId.get(ex.exercise_id);
-          if (estimated1rm === undefined) {
+          const estimate = estimateByExerciseId.get(ex.exercise_id);
+          if (estimate === undefined) {
             return { ...ex, weight_kg: null };
           }
           const workingSet =
             ex.sets?.find((set) => set.set_type === 'working') ?? ex.sets?.[0];
           return {
             ...ex,
-            weight_kg: workingWeightForSet(estimated1rm, athlete.goal, workingSet),
+            weight_kg: workingWeightForSet(
+              estimate.estimated_1rm_kg,
+              athlete.goal,
+              workingSet,
+            ),
+            weight_confidence: estimate.confidence,
+            sequencing_rationale: [
+              ...(ex.sequencing_rationale ?? []),
+              ...estimate.rationale_codes,
+            ],
           };
         }),
       })),

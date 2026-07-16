@@ -98,5 +98,14 @@ export const planIntensityTarget = (
             hypertrophy
           ? 'limited_isolation_only'
           : 'last_set_optional',
+    // odin-programme-design-logic.md, Section 5: RIR/RPE validity and the
+    // marginal-but-real failure effect are separate, cited claims — kept as
+    // distinct citation codes so this rationale never implies more
+    // certainty than either individually carries.
+    rationale_codes: [
+      'ZOURDOS_2016_RIR_VELOCITY_VALIDATION',
+      'REFALO_2022_FAILURE_EFFECT',
+      'GRGIC_2022_FAILURE_EFFECT',
+    ],
   };
 };

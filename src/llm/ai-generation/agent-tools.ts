@@ -83,7 +83,8 @@ export const GET_EVIDENCE_RULE_TOOL: AgentToolDefinition = {
     'Look up an evidence-backed training rule by key. Returns the rule value and its peer-reviewed citations. ' +
     'Available keys: volume_fill_rates, min_session_volume_fraction, equipment_preference, ' +
     'finisher_duration, hiit_cycling, beginner_hiit_exclusion, ' +
-    'untrained_strength_ratios, novice_strength_ratios, intermediate_strength_ratios, pushup_norms.',
+    'untrained_strength_ratios, novice_strength_ratios, intermediate_strength_ratios, pushup_norms, ' +
+    'set_structure_evidence.',
   parameters: {
     type: 'object',
     properties: {
@@ -100,6 +101,7 @@ export const GET_EVIDENCE_RULE_TOOL: AgentToolDefinition = {
           'novice_strength_ratios',
           'intermediate_strength_ratios',
           'pushup_norms',
+          'set_structure_evidence',
         ],
         description: 'The evidence rule to look up.',
       },

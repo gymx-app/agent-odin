@@ -29,6 +29,11 @@ const buildEvidenceRules = () => ({
   hiit_cycling_citations: evidence.HIIT_CYCLING_CITATIONS,
   beginner_hiit_exclusion: evidence.BEGINNER_HIIT_EXCLUSION,
   beginner_hiit_citations: evidence.BEGINNER_HIIT_CITATIONS,
+  // odin-programme-design-logic.md, Section 1 — split_type decisions cite
+  // both together (frequency's benefit only holds when volume isn't
+  // equated) since strategy generation is a single structured-output call
+  // with no evidence-lookup tool the way phase generation has.
+  split_frequency_citations: evidence.SPLIT_FREQUENCY_CITATIONS,
 });
 
 const buildAthleteContext = (profile: NormalizedAthleteProfile) => ({

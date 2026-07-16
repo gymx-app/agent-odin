@@ -15,8 +15,12 @@ const deterministicPreviewHashes = new Map([
     '84fd980f36fc14ddf78c409d169f1709b288306e5cc2a6fbacf16293eb0d7f8e',
   ],
   [
+    // Updated for the set_structure field added to ExercisePrescription
+    // (odin-programme-design-logic.md, Section 3) — this athlete's preview
+    // is the only one of the three that resolves to the V2/longitudinal
+    // schema, so it's the only hash the field addition changes.
     intermediateHypertrophyKneeAthlete.name,
-    '9a8a732e0465704a39b769192466da0e97fd1d3aee25b769d5e424f4e46fb604',
+    'f90bf60ec45bac56196ae57d6d8486abeee0f86330417958cb5d525a9cb29633',
   ],
   [
     advancedStrengthInBodyAthlete.name,

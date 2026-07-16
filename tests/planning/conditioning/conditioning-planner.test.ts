@@ -55,6 +55,17 @@ describe('Conditioning Planner V2', () => {
     expect(parsed.success, parsed.success ? '' : parsed.error.message).toBe(
       true,
     );
+    // odin-programme-design-logic.md, Section 2: every conditioning
+    // prescription now carries the real concurrent-interference citations
+    // plus an explicit tag disclosing the scoring rubric is a heuristic,
+    // not a validated scale.
+    expect(prescriptions[0]!.rationale).toEqual(
+      expect.arrayContaining([
+        'WILSON_2012_CONCURRENT_TRAINING',
+        'SCHUMANN_2022_CONCURRENT_UPDATE',
+        'INTERFERENCE_SCORE_THRESHOLD_HEURISTIC',
+      ]),
+    );
   });
 
   it('does not default a high-body-weight, low-impact athlete to running', () => {
@@ -233,6 +244,10 @@ describe('Conditioning Planner V2', () => {
   });
 
   it('places resistance-priority same-session conditioning after lifting', () => {
+    // odin-programme-design-logic.md, Section 2: the after_resistance
+    // ordering carries both the real programme-level citation (Murlasits)
+    // and an explicit heuristic tag for the acute same-session reasoning —
+    // they must not collapse into one undifferentiated claim.
     expect(
       planConditioningPlacement({
         profile: createProfile(),
@@ -243,7 +258,11 @@ describe('Conditioning Planner V2', () => {
       }),
     ).toEqual({
       placement: 'after_resistance',
-      rationale_code: 'RESISTANCE_PRIORITY_ORDER_APPLIED',
+      rationale_codes: [
+        'RESISTANCE_PRIORITY_ORDER_APPLIED',
+        'MURLASITS_2018_CONCURRENT',
+        'CONDITIONING_AFTER_RESISTANCE_ACUTE_ORDERING_HEURISTIC',
+      ],
     });
   });
 
@@ -259,7 +278,7 @@ describe('Conditioning Planner V2', () => {
     ).toEqual({
       placement: 'same_day_separate_session',
       same_day_separation: { category: '6_to_12_hours' },
-      rationale_code: 'CONDITIONING_MOVED_TO_SEPARATE_DAY',
+      rationale_codes: ['CONDITIONING_MOVED_TO_SEPARATE_DAY'],
     });
   });
 });

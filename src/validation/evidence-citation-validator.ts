@@ -17,6 +17,18 @@ export const collectRationaleCodes = (value: unknown, out: Set<string>): void =>
     return;
   }
   if (value && typeof value === 'object') {
+    // strategy.rationale is StrategyDecisionSchema[] — {code, reason,
+    // selected_value, source_fields, confidence} — not a bare
+    // rationale_codes string[], so it wouldn't otherwise be reached by the
+    // key check below. Collecting any object's string `code` field
+    // unconditionally is safe: HealthFlagSchema/ReviewTriggerSchema/
+    // PlanningAssumptionSchema also have a `code` field, but their values
+    // are internal tags that never match CITATION_SHAPE below, so they pass
+    // through this collection step as harmless no-ops.
+    const maybeCode = (value as { code?: unknown }).code;
+    if (typeof maybeCode === 'string') {
+      out.add(maybeCode);
+    }
     for (const [key, val] of Object.entries(value)) {
       if (key === 'rationale_codes' && Array.isArray(val)) {
         val.forEach((code) => typeof code === 'string' && out.add(code));

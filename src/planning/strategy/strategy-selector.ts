@@ -37,13 +37,23 @@ const rationaleFor = (
   add(
     training === 'beginner'
       ? 'BEGINNER_SIMPLE_PROGRESSION_SELECTED'
-      : selected.progression_model === 'wave_loading'
-        ? 'ADVANCED_WAVE_LOADING_SELECTED'
-        : 'INTERMEDIATE_DOUBLE_PROGRESSION_SELECTED',
+      : selected.progression_model === 'linear_load'
+        ? 'STRENGTH_LOAD_PROGRESSION_SELECTED'
+        : selected.progression_model === 'wave_loading'
+          ? 'ADVANCED_WAVE_LOADING_SELECTED'
+          : 'INTERMEDIATE_DOUBLE_PROGRESSION_SELECTED',
     selected.progression_model,
     'Progression complexity matches training status and programme horizon.',
     ['athlete_state.training_status', 'programme_horizon_weeks'],
   );
+  if (selected.progression_model === 'linear_load') {
+    add(
+      'SCHOENFELD_2021_LOAD_HYPERTROPHY',
+      selected.progression_model,
+      'Strength-primary goal: load is the target variable, not reps/effort — heavier loads are directly superior for maximal strength, even though hypertrophy is comparable across a wide load range.',
+      ['goal'],
+    );
+  }
   if (input.profile.source.nutrition?.calorie_status === 'deficit') {
     add(
       'CALORIC_DEFICIT_VOLUME_CONSTRAINED',
@@ -105,6 +115,52 @@ const rationaleFor = (
       'sport',
     ],
   );
+
+  // odin-programme-design-logic.md, Section 1 / Section 6: every programme
+  // needs a stated split rationale. requiresSafeSplit mirrors
+  // strategy-validator.ts's STRATEGY_SPLIT_SAFETY_OVERRIDE_VIOLATED check —
+  // keep both in sync.
+  const requiresSafeSplit =
+    training === 'returning' ||
+    input.profile.recovery_capacity === 'low' ||
+    input.profile.movement_restrictions.some(
+      (restriction) => restriction.severity === 'avoid',
+    ) ||
+    input.profile.health_flags.some((flag) => flag.severity === 'blocking');
+  add(
+    'SPLIT_TYPE_DECISION',
+    selected.split_type,
+    requiresSafeSplit
+      ? 'Return-to-training status, low recovery capacity, an avoid-severity movement restriction, or a blocking health flag requires full_body or upper_lower regardless of days available — a conservative safety default, not evidence from a specific trial.'
+      : 'Split chosen from available_days_per_week: enough days to hit each muscle group more than once weekly without exceeding available session-days. Frequency is a volume-distribution tool, not independently superior to lower frequency once weekly volume is equated.',
+    ['available_days_per_week'],
+  );
+  if (requiresSafeSplit) {
+    add(
+      'RETURN_TO_TRAINING_SPLIT_OVERRIDE',
+      selected.split_type,
+      'Safety override triggered ahead of the days-count table.',
+      [
+        'athlete_state.training_status',
+        'athlete_state.recovery_capacity',
+        'movement_restrictions',
+        'health_flags',
+      ],
+    );
+  } else {
+    add(
+      'SCHOENFELD_2016_FREQUENCY',
+      selected.split_type,
+      'Training a muscle group 2+ times/week outperforms 1x/week on hypertrophy when weekly volume is not equated.',
+      ['available_days_per_week'],
+    );
+    add(
+      'SCHOENFELD_2019_FREQUENCY_VOLUME_EQUATED',
+      selected.split_type,
+      'No significant difference between higher and lower frequency once total weekly volume is equated — cited alongside SCHOENFELD_2016_FREQUENCY, never in its place.',
+      ['available_days_per_week'],
+    );
+  }
 
   return decisions;
 };

@@ -33,6 +33,19 @@ const nextPrescriptionRequestSchema = z.object({
     .object({
       rep_min: z.number().int().positive(),
       rep_max: z.number().int().positive(),
+      // Echoed back from the persisted prescription's
+      // progression_bounds.load_increment_type. 'none' means load
+      // progression is suppressed (bodyweight-only, or an active movement
+      // restriction prioritizing reps/ROM) — reps hold at rep_max instead
+      // of resetting and calling for a load increase.
+      load_increment_type: z
+        .enum(['absolute', 'percentage', 'smallest_available', 'none'])
+        .optional(),
+      // Echoed back from the persisted prescription's weight_kg — absent
+      // when Odin never priced this exercise (no 1RM basis at all, or no
+      // mapped movement pattern). Without it, "increase load" is a label
+      // with no number for the caller to act on.
+      current_weight_kg: z.number().positive().optional(),
     })
     .superRefine((bounds, ctx) => {
       if (bounds.rep_max < bounds.rep_min) {

@@ -5,6 +5,7 @@ const exercise = {
   exercise_id: 'dumbbell_goblet_squat',
   exercise_name: 'Dumbbell Goblet Squat',
   display_order: 1,
+  set_structure: { type: 'straight' as const, rationale_codes: [] },
   sequence_role: 'primary' as const,
   priority: 1,
   weight_kg: null,
@@ -223,6 +224,7 @@ const weeks = [1, 2, 3, 4].map((week_number) => ({
       accessory_target_rpe: 6.5,
       maximum_allowed_rpe: 8,
       failure_exposure_policy: 'none' as const,
+      rationale_codes: [],
     },
     progression_policy: {
       model: 'double_progression' as const,
@@ -297,7 +299,32 @@ export const validLongitudinalProgramme = LongitudinalOdinProgrammeSchema.parse(
       intensity_strategy: 'technique_first',
       fatigue_strategy: 'none',
       conditioning_strategy: 'health_minimum',
-      rationale: [],
+      rationale: [
+        {
+          code: 'SPLIT_TYPE_DECISION',
+          selected_value: 'full_body',
+          reason:
+            'At 3 resistance days/week, full body ensures each muscle group is still trained more than once weekly without needing more session-days than available. Frequency is a volume-distribution tool, not independently superior to lower frequency once weekly volume is equated.',
+          source_fields: ['available_days_per_week'],
+          confidence: 'high' as const,
+        },
+        {
+          code: 'SCHOENFELD_2016_FREQUENCY',
+          selected_value: 'full_body',
+          reason:
+            'Training a muscle group 2+ times/week outperforms 1x/week on hypertrophy when weekly volume is not equated.',
+          source_fields: ['available_days_per_week'],
+          confidence: 'moderate' as const,
+        },
+        {
+          code: 'SCHOENFELD_2019_FREQUENCY_VOLUME_EQUATED',
+          selected_value: 'full_body',
+          reason:
+            'No significant difference between higher and lower frequency once total weekly volume is equated — this correction is why frequency is treated as a volume-distribution tool rather than cited alone.',
+          source_fields: ['available_days_per_week'],
+          confidence: 'moderate' as const,
+        },
+      ],
     },
     calendar: {
       cycle_type: 'weekly',

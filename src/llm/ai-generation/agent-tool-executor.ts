@@ -36,6 +36,22 @@ const EVIDENCE_RULES: Record<string, { value: unknown; citations: readonly strin
   novice_strength_ratios: { value: evidence.NOVICE_STRENGTH_RATIOS, citations: evidence.STRENGTH_RATIO_CITATIONS },
   intermediate_strength_ratios: { value: evidence.INTERMEDIATE_STRENGTH_RATIOS, citations: evidence.STRENGTH_RATIO_CITATIONS },
   pushup_norms: { value: evidence.PUSHUP_NORMS, citations: evidence.PUSHUP_NORM_CITATIONS },
+  // No single "value" constant — set-structure choice is a categorical
+  // decision, not a numeric parameter — so this exposes the citation
+  // registry entries the model needs to cite each technique correctly,
+  // including the split tier for cluster sets (velocity vs. hypertrophy).
+  set_structure_evidence: {
+    value: {
+      straight: 'always valid, no citation needed',
+      pyramid: 'heuristic, not separately validated',
+      drop_set: 'isolation/accessory only, time efficiency',
+      rest_pause: 'isolation/accessory only, time efficiency',
+      cluster: 'compound strength/power work, velocity preservation',
+      superset: 'isolation/accessory only, time efficiency',
+      giant_set: 'isolation/accessory only, sparingly, no dedicated citation',
+    },
+    citations: evidence.SET_STRUCTURE_CITATIONS,
+  },
 };
 
 // Schoenfeld 2017 / RP Volume Landmarks: evidence-backed weekly set ranges per muscle group.

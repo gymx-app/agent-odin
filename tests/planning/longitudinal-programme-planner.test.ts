@@ -184,4 +184,57 @@ describe('end-to-end longitudinal programme planner', () => {
       expect(exercise.weight_kg! % 2.5).toBe(0);
     });
   });
+
+  it('gives an advanced hypertrophy athlete occasional last-set failure exposure on isolation work only', () => {
+    const result = buildLongitudinalProgramme(
+      createProfile({
+        available_days_per_week: 4,
+        fitness_level: 'advanced',
+        goal: 'muscle_gain',
+        training_history: {
+          years_consistent_training: 5,
+          consistency_last_12_weeks: 'high',
+          exercise_competency: 'advanced',
+        },
+      }),
+      seedExercises,
+      { startDate: '2026-06-22', generatedAt: '2026-06-19T05:30:00.000Z' },
+    );
+    expect(result.validation.passed).toBe(true);
+    const allExercises = result.programme.phases
+      .flatMap((phase) => phase.weeks)
+      .flatMap((week) => week.days)
+      .flatMap((day) => day.exercises);
+    const failureExposedSets = allExercises.flatMap((exercise) =>
+      exercise.sets
+        .filter((set) => set.rpe_ceiling >= 10)
+        .map((set) => ({ exercise, set })),
+    );
+    expect(failureExposedSets.length).toBeGreaterThan(0);
+    failureExposedSets.forEach(({ exercise, set }) => {
+      expect(exercise.sequence_role).toBe('isolation');
+      expect(set.set_number).toBe(exercise.sets.length);
+      expect(exercise.sequencing_rationale).toContain(
+        'FAILURE_EXPOSURE_LAST_SET',
+      );
+    });
+  });
+
+  it('never exposes a beginner to true failure (failure_exposure_policy is "none")', () => {
+    const result = buildLongitudinalProgramme(
+      createProfile({
+        available_days_per_week: 3,
+        fitness_level: 'beginner',
+      }),
+      seedExercises,
+      { startDate: '2026-06-22', generatedAt: '2026-06-19T05:30:00.000Z' },
+    );
+    expect(result.validation.passed).toBe(true);
+    const allSets = result.programme.phases
+      .flatMap((phase) => phase.weeks)
+      .flatMap((week) => week.days)
+      .flatMap((day) => day.exercises)
+      .flatMap((exercise) => exercise.sets);
+    expect(allSets.some((set) => set.rpe_ceiling >= 10)).toBe(false);
+  });
 });

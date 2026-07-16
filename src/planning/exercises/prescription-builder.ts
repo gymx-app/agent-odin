@@ -19,6 +19,16 @@ const exactReps = (
     slot.rep_zone.max,
     candidate.exercise.default_rep_range.max,
   );
+  // An active joint/movement restriction on this exercise means reps and
+  // ROM take priority over load (odin-programme-design-logic.md, Section 4
+  // — heuristic, clinically standard, not a specific RCT): sit at the top
+  // of the rep range rather than the goal-driven target, since there's no
+  // load progression to hold reps low in reserve for.
+  if (candidate.status === 'modifiable') {
+    return max >= min
+      ? max
+      : candidate.exercise.default_rep_range.max;
+  }
   if (max < min) {
     return input.strategy.primary_objective === 'strength' &&
       slot.sequence_role === 'primary'
@@ -105,14 +115,20 @@ export const buildExactPrescription = (
     }
     return 'working';
   };
+  // An active restriction overrides the slot's normal progression policy
+  // regardless of goal/periodization — reps/ROM stay the progression
+  // variable and load never advances (odin-programme-design-logic.md,
+  // Section 4; [Heuristic]).
   const progressionRule =
-    input.week.planning_metadata.progression_policy.next_action.type ===
-    'increase_reps'
-      ? 'Increase target reps by one after completing all prescribed sets at or below the RPE ceiling.'
+    candidate.status === 'modifiable'
+      ? 'Movement restriction on file: hold load and progress reps/range of motion only. Do not increase load while this restriction remains active.'
       : input.week.planning_metadata.progression_policy.next_action.type ===
-          'increase_load'
-        ? 'Increase load by the smallest available increment after completing all prescribed sets at or below the RPE ceiling.'
-        : 'Maintain the prescription while all sets remain within the RPE ceiling.';
+          'increase_reps'
+        ? 'Increase target reps by one after completing all prescribed sets at or below the RPE ceiling.'
+        : input.week.planning_metadata.progression_policy.next_action.type ===
+            'increase_load'
+          ? 'Increase load by the smallest available increment after completing all prescribed sets at or below the RPE ceiling.'
+          : 'Maintain the prescription while all sets remain within the RPE ceiling.';
   const intersectedRepMin = Math.max(
     slot.rep_zone.min,
     candidate.exercise.default_rep_range.min,
@@ -129,11 +145,35 @@ export const buildExactPrescription = (
           rep_max: candidate.exercise.default_rep_range.max,
         };
 
+  // odin-programme-design-logic.md, Section 5: failure_exposure_policy was
+  // previously descriptive-only — nothing ever varied a specific set's
+  // ceiling because of it. This gives it an actual effect: the last set of
+  // an eligible exercise gets its ceiling lifted to true failure (RPE 10),
+  // not every set — "occasional", not routine, per the doc's practical
+  // rule. An active movement restriction (Item 1) always wins: reps/ROM
+  // priority means never pushing that exercise toward failure, regardless
+  // of what failure_exposure_policy would otherwise allow.
+  const lastSetIndex = slot.set_budget - 1;
+  const failureExposurePolicy =
+    input.week.planning_metadata.intensity_target.failure_exposure_policy;
+  const failureExposureEligible =
+    candidate.status !== 'modifiable' &&
+    (failureExposurePolicy === 'last_set_optional' ||
+      (failureExposurePolicy === 'limited_isolation_only' &&
+        slot.sequence_role === 'isolation'));
+  const rpeCeilingFor = (index: number): number =>
+    failureExposureEligible && index === lastSetIndex ? 10 : slot.rpe_ceiling;
+
   return {
     prescription_id: `${input.calendar_day.day_id}-${slot.slot_id}`,
     exercise_id: candidate.exercise.id,
     exercise_name: candidate.exercise.display_name ?? candidate.exercise.name,
     display_order: displayOrder,
+    // odin-programme-design-logic.md, Section 3: the deterministic planner
+    // doesn't assign set-structure techniques (that logic lives in the AI
+    // agent path only, for now) — straight sets are the doc's own safe
+    // default, so this is an honest, not a placeholder, choice.
+    set_structure: { type: 'straight', rationale_codes: [] },
     sequence_role: slot.sequence_role,
     priority: slot.priority,
     tags: [
@@ -148,13 +188,14 @@ export const buildExactPrescription = (
       set_type: setType(index),
       target_reps: targetReps,
       target_rpe: slot.target_rpe,
-      rpe_ceiling: slot.rpe_ceiling,
+      rpe_ceiling: rpeCeilingFor(index),
       rest_seconds: restSeconds(slot, candidate, targetReps),
     })),
     progression_bounds: {
       ...progressionBounds,
       load_increment_type:
-        input.profile.source.equipment === 'bodyweight'
+        input.profile.source.equipment === 'bodyweight' ||
+        candidate.status === 'modifiable'
           ? 'none'
           : 'smallest_available',
     },
@@ -174,7 +215,13 @@ export const buildExactPrescription = (
     movement_patterns: candidate.exercise.movement_patterns,
     primary_muscles: candidate.exercise.primary_muscles,
     secondary_muscles: candidate.exercise.secondary_muscles,
-    sequencing_rationale: candidate.rationale_codes,
+    sequencing_rationale: [
+      ...candidate.rationale_codes,
+      ...(candidate.status === 'modifiable'
+        ? ['INJURY_RESTRICTION_REPS_PRIORITY']
+        : []),
+      ...(failureExposureEligible ? ['FAILURE_EXPOSURE_LAST_SET'] : []),
+    ],
     weight_kg: null,
   };
 };

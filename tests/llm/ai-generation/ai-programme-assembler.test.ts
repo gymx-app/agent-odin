@@ -228,6 +228,10 @@ describe('assemble step weight prescription (regression: known_lifts must popula
       baseline_path: 'self_reported',
       known_lifts: [{ exercise_id: 'squat', weight_kg: 100, reps: 5 }],
       goal: 'strength',
+      sex: 'male',
+      age: 30,
+      bodyweight_kg: 80,
+      training_status: 'intermediate',
     });
 
     const [squat, accessory] = phases[0]!.weeks[0]!.days[0]!.exercises;

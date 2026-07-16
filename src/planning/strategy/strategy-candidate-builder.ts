@@ -159,6 +159,12 @@ export const buildStrategyCandidates = (
   const competition =
     input.profile.source.goal === 'strength' &&
     input.profile.source.sport?.competition_date;
+  // odin-programme-design-logic.md, Section 4: strength-primary means load
+  // is the target variable, not reps/effort — linear_load makes that the
+  // progression axis directly, instead of the reps-then-load double
+  // progression every other goal uses. Beginners still get linear_reps
+  // first (technique/ROM before load progression, per the same section).
+  const strengthPrimary = input.profile.source.goal === 'strength';
   const pairs: Array<
     [
       TrainingStrategyV2['periodization_model'],
@@ -167,7 +173,11 @@ export const buildStrategyCandidates = (
   > = [
     [
       'simple_progressive',
-      trainingStatus === 'beginner' ? 'linear_reps' : 'double_progression',
+      trainingStatus === 'beginner'
+        ? 'linear_reps'
+        : strengthPrimary
+          ? 'linear_load'
+          : 'double_progression',
     ],
     ['concurrent', 'double_progression'],
     ['block', trainingStatus === 'advanced' ? 'wave_loading' : 'step_loading'],

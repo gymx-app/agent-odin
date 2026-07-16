@@ -197,6 +197,7 @@ const createWorkoutDay = (
       filledSlot.exercise,
       index + 1,
       filledSlot.warnings,
+      filledSlot.status,
     ),
   );
   const reducedPrescriptions = reducePrescriptionsToFit(

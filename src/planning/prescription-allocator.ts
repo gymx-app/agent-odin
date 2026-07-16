@@ -14,7 +14,16 @@ const clamp = (value: number, min: number, max: number): number =>
 export const selectTargetReps = (
   profile: NormalizedAthleteProfile,
   slot: MovementSlot,
+  status: 'eligible' | 'modifiable' = 'eligible',
 ): number => {
+  // An active joint/movement restriction on this exercise means reps/ROM
+  // take priority over load (odin-programme-design-logic.md, Section 4 —
+  // heuristic, clinically standard, not a specific RCT): sit at the top of
+  // the rep range regardless of goal, rather than the usual target.
+  if (status === 'modifiable') {
+    return slot.rep_zone.max;
+  }
+
   if (slot.priority === 'accessory') {
     return profile.source.goal === 'strength' ? 12 : 15;
   }
@@ -71,8 +80,9 @@ const rpeFor = (
 export const createSetPrescriptions = (
   profile: NormalizedAthleteProfile,
   slot: MovementSlot,
+  status: 'eligible' | 'modifiable' = 'eligible',
 ): SetPrescription[] => {
-  const targetReps = selectTargetReps(profile, slot);
+  const targetReps = selectTargetReps(profile, slot, status);
   const restSeconds = restSecondsFor(profile, slot);
   const rpe = rpeFor(profile, slot);
 
@@ -100,6 +110,7 @@ export const createExercisePrescription = (
   exercise: Exercise,
   displayOrder: number,
   warnings: string[] = [],
+  status: 'eligible' | 'modifiable' = 'eligible',
 ): OdinProgramme['phase_week_templates'][number]['days'][number]['exercises'][number] => ({
   display_order: displayOrder,
   exercise_id: exercise.id,
@@ -111,13 +122,19 @@ export const createExercisePrescription = (
     ...exercise.coaching_notes,
   ],
   warnings,
-  sets: createSetPrescriptions(profile, slot),
+  sets: createSetPrescriptions(profile, slot, status),
   progression_bounds: {
     rep_min: slot.rep_zone.min,
     rep_max: slot.rep_zone.max,
   },
+  // A restriction on this exercise overrides the normal double-progression
+  // rule regardless of goal (odin-programme-design-logic.md, Section 4 —
+  // heuristic, clinically standard, not a specific RCT): reps/ROM stay the
+  // progression variable and load never advances while it's active.
   progression_rule:
-    'If all prescribed sets are completed at or below the RPE ceiling, increase target reps next time until the top of the range; then increase load and reset to the lower rep bound. If minimum reps cannot be completed without exceeding the ceiling, maintain or reduce load.',
+    status === 'modifiable'
+      ? 'Movement restriction on file: hold load and progress reps/range of motion only. Do not increase load while this restriction remains active.'
+      : 'If all prescribed sets are completed at or below the RPE ceiling, increase target reps next time until the top of the range; then increase load and reset to the lower rep bound. If minimum reps cannot be completed without exceeding the ceiling, maintain or reduce load.',
   equipment: exercise.equipment,
   movement_patterns: exercise.movement_patterns,
   primary_muscles: exercise.primary_muscles,
